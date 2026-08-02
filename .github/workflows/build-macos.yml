@@ -103,4 +103,3 @@ jobs:
           name: keeperfx-macos-arm64-${{ github.sha }}
           path: dist/KeeperFX.app.zip
           if-no-files-found: error
-
