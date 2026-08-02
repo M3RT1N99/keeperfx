@@ -811,8 +811,10 @@ static short get_global_inputs(void)
         }
         if (((grab_check_flags & MG_OnPauseEnter) != 0))
         {
-            for (int i = 0; i < PLAYER_NEUTRAL; i++)
+            for (PlayerNumber i = 0; i < PLAYERS_COUNT; i++)
             {
+                if (i == PLAYER_NEUTRAL)
+                    continue;
                 stop_thing_playing_sample(find_players_dungeon_heart(i), 93);
             }
         }
@@ -3246,15 +3248,21 @@ static void process_cheat_mode_selection_inputs(void)
     }
     else if (is_key_pressed(KC_NUMPAD7, KMod_DONTCARE))
     {
-        new_value = PLAYER_GOOD;
+        new_value = PLAYER7;
         set_players_packet_action(player, PckA_CheatSwitchPlayer, new_value, 0, 0, 0);
         clear_key_pressed(KC_NUMPAD7);
     }
     else if (is_key_pressed(KC_NUMPAD8, KMod_DONTCARE))
     {
-        new_value = PLAYER_NEUTRAL;
+        new_value = PLAYER_GOOD;
         set_players_packet_action(player, PckA_CheatSwitchPlayer, new_value, 0, 0, 0);
         clear_key_pressed(KC_NUMPAD8);
+    }
+    else if (is_key_pressed(KC_NUMPAD9, KMod_DONTCARE))
+    {
+        new_value = PLAYER_NEUTRAL;
+        set_players_packet_action(player, PckA_CheatSwitchPlayer, new_value, 0, 0, 0);
+        clear_key_pressed(KC_NUMPAD9);
     }
 
     INPUTS:

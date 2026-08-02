@@ -23,6 +23,7 @@
 #include "bflib_dernc.h"
 #include "globals.h"
 #include "game_legacy.h"
+#include "player_instances.h"
 #include "config.h"
 #include "config_cubes.h"
 #include "post_inc.h"
@@ -132,6 +133,11 @@ static TbBool load_cubes_config_file(const char *fname, unsigned short flags)
     TbBool result = (len > 0);
     // Parse blocks of the config file.
     parse_named_field_blocks(buf, len, fname, flags, &cubes_named_fields_set);
+    for (int ownership_group = 0; ownership_group < CUBE_OWNERSHIP_GROUPS; ownership_group++) {
+        if (game.conf.cube_conf.cube_bits[ownership_group][PLAYER7] == 0) {
+            game.conf.cube_conf.cube_bits[ownership_group][PLAYER7] = game.conf.cube_conf.cube_bits[ownership_group][PLAYER1];
+        }
+    }
     // Freeing and exiting.
     KfxFree(buf);
     return result;

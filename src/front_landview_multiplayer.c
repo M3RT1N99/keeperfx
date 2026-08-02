@@ -91,7 +91,7 @@ void frontmap_zoom_in_init(LevelNumber lvnum);
 TbBool frontmap_input_active_ensign(long curr_mx, long curr_my);
 TbBool frontmap_update_zoom(void);
 
-TbPixel net_player_colours[] = { 251, 58, 182, 11 };
+const unsigned char net_player_colours[MAX_NET_USERS] = { 251, 58, 182, 11, 106, 52, 42, 74, 20 };
 const int32_t hand_limp_xoffset[] = { 32, 31, 30, 29, 28, 27, 26, 24, 22, 19, 15, 9 };
 const int32_t hand_limp_yoffset[] = { -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0 };
 
@@ -219,11 +219,11 @@ static const struct TbSprite *get_hand_sprite_for_packet(const struct ScreenPack
     }
 }
 
-static void get_hand_packet(PlayerNumber plyr_idx, struct ScreenPacket *nspck, int32_t slap_frame, TbClockMSec now)
+static void get_hand_packet(NetUserId user_id, struct ScreenPacket *nspck, int32_t slap_frame, TbClockMSec now)
 {
-    if (!is_my_player_number(plyr_idx)) {
-        struct NetLandRemoteSlap *remote_slap = &net_map_remote_slap[(int32_t)plyr_idx];
-        *nspck = net_screen_packet[(int32_t)plyr_idx];
+    if (user_id != netstate.my_id) {
+        struct NetLandRemoteSlap *remote_slap = &net_map_remote_slap[user_id];
+        *nspck = net_screen_packet[user_id];
         TbBool packet_slap = screen_packet_action(nspck) == NetAct_Slapping;
         if (packet_slap) {
             // Hold onto a remote slap until the sender clears it, so network delay doesn't accidentally turn one slap into multiple.
@@ -258,7 +258,7 @@ static void get_hand_packet(PlayerNumber plyr_idx, struct ScreenPacket *nspck, i
     nspck->action_par1 = fe_net_level_selected;
     set_screen_packet_position(nspck, GetMouseX()*16/units_per_pixel_landview + map_info.screen_shift_x, GetMouseY()*16/units_per_pixel_landview + map_info.screen_shift_y);
     LevelNumber selected_level_number = get_selected_level_number();
-    if ((my_player_number == get_host_player_id()) && (selected_level_number > SINGLEPLAYER_NOTSTARTED)) {
+    if ((netstate.my_id == SERVER_ID) && (selected_level_number > SINGLEPLAYER_NOTSTARTED)) {
         screen_packet_set_action(nspck, NetAct_HostStartLevel);
         nspck->action_par1 = selected_level_number;
         return;
@@ -278,7 +278,7 @@ static void get_hand_packet(PlayerNumber plyr_idx, struct ScreenPacket *nspck, i
         const struct TbSprite* spr = get_map_ensign(1);
         struct LevelInformation* lvinfo = get_level_info(nspck->action_par1);
         if (lvinfo != NULL) {
-            set_screen_packet_position(nspck, lvinfo->ensign_x + my_player_number * ((int32_t)spr->SWidth), lvinfo->ensign_y - 48);
+            set_screen_packet_position(nspck, lvinfo->ensign_x + netstate.my_id * ((int32_t)spr->SWidth), lvinfo->ensign_y - 48);
         }
     }
 }
@@ -305,7 +305,7 @@ static void draw_netmap_players_hands(void)
             continue;
         }
         slap_frame = 0;
-        if (i == my_player_number) {
+        if (i == netstate.my_id) {
             slap_frame = get_slap_anim_frame(net_map_local.local_slap_anim_start, now);
         }
         get_hand_packet(i, &nspck, slap_frame, now);
@@ -468,12 +468,12 @@ TbBool frontnetmap_load(void)
 
 static TbBool frontmap_exchange_screen_packet(void)
 {
-    struct ScreenPacket* nspck = &net_screen_packet[my_player_number];
+    struct ScreenPacket* nspck = &net_screen_packet[netstate.my_id];
     TbClockMSec now = LbTimerClock();
     if (net_map_local.local_slap_send_frame > NetLandSlap_EndFrame) {
         net_map_local.local_slap_send_frame = 0;
     }
-    get_hand_packet(my_player_number, nspck, net_map_local.local_slap_send_frame, now);
+    get_hand_packet(netstate.my_id, nspck, net_map_local.local_slap_send_frame, now);
     if (screen_packet_action(nspck) == NetAct_Slapping) {
         if (net_map_local.local_slap_send_frame == NetLandSlap_HitFrame) {
             net_map_local.slap_miss_wait = 2;
@@ -506,11 +506,10 @@ static LevelNumber frontnetmap_update_players(void)
     if (!fe_network_active && (fe_net_level_selected > SINGLEPLAYER_NOTSTARTED)) {
         return fe_net_level_selected;
     }
-    const PlayerNumber host_player_number = get_host_player_id();
-    const TbBool is_host = my_player_number == host_player_number;
+    const TbBool is_host = netstate.my_id == SERVER_ID;
     const TbBool level_not_selected = get_selected_level_number() <= SINGLEPLAYER_NOTSTARTED;
     const TbBool can_start_level = is_host && level_not_selected;
-    struct ScreenPacket* my_nspck = &net_screen_packet[my_player_number];
+    struct ScreenPacket* my_nspck = &net_screen_packet[netstate.my_id];
     TbBool slap_hit_confirmed = false;
     int32_t leading_votes = 0;
     LevelNumber selected_level_number = SINGLEPLAYER_NOTSTARTED;
@@ -524,7 +523,7 @@ static LevelNumber frontnetmap_update_players(void)
         if (!is_connected_screen_packet(nspck)) {
             continue;
         }
-        remote_player = i != my_player_number;
+        remote_player = i != netstate.my_id;
         if (remote_player && !network_player_active(i)) {
             LbNetwork_EnableNewPlayers(1);
             frontend_set_state(FeSt_NET_START);
@@ -542,7 +541,7 @@ static LevelNumber frontnetmap_update_players(void)
             return SINGLEPLAYER_NOTSTARTED;
         }
         action = screen_packet_action(nspck);
-        if ((i == host_player_number) && (action == NetAct_HostStartLevel) && (nspck->action_par1 > SINGLEPLAYER_NOTSTARTED)) {
+        if ((i == SERVER_ID) && (action == NetAct_HostStartLevel) && (nspck->action_par1 > SINGLEPLAYER_NOTSTARTED)) {
             return nspck->action_par1;
         }
         if (can_start_level) {

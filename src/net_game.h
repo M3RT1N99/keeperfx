@@ -27,7 +27,7 @@
 extern "C" {
 #endif
 
-#define PACKETS_COUNT           9
+#define PACKETS_COUNT          10
 
 /******************************************************************************/
 #pragma pack(1)
@@ -55,6 +55,9 @@ void process_player_leave_game_packet(struct PlayerInfo *player);
 void process_disconnected_network_players(void);
 void sync_initial_network_seed(void);
 unsigned long get_host_player_id(void);
+PlayerNumber network_user_to_player_number(NetUserId user_id);
+NetUserId player_number_to_network_user(PlayerNumber player_number);
+TbBool network_user_is_hero(NetUserId user_id);
 /******************************************************************************/
 #ifdef __cplusplus
 }

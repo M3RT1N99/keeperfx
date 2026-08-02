@@ -30,9 +30,10 @@ extern "C" {
 
 /******************************************************************************/
 // Limits for GUI arrays
-#define ACTIVE_BUTTONS_COUNT        100
+#define ACTIVE_BUTTONS_COUNT        128
 #define MENU_LIST_ITEMS_COUNT       52
 #define FRONTEND_BUTTON_INFO_COUNT 115
+#define FRONTEND_ALLIANCES_UNSET UINT64_MAX
 #define NET_MESSAGES_COUNT           8
 #define NET_MESSAGE_LEN             64
 // Sprite limits
@@ -289,9 +290,9 @@ extern unsigned long playing_bad_descriptive_speech;
 extern unsigned long playing_good_descriptive_speech;
 extern long scrolling_index;
 extern float scrolling_offset;
-extern long packet_left_button_double_clicked[6];
-extern long packet_left_button_click_space_count[6];
-extern char frontend_alliances;
+extern long packet_left_button_double_clicked[];
+extern long packet_left_button_click_space_count[];
+extern uint64_t frontend_alliances;
 extern char busy_doing_gui;
 extern long gui_last_left_button_pressed_id;
 extern long gui_last_right_button_pressed_id;
@@ -312,7 +313,6 @@ extern TbClockMSec gui_message_timeout;
 extern struct GuiMenu *menu_list[MENU_LIST_ITEMS_COUNT];
 
 extern int status_panel_width;
-extern const unsigned long alliance_grid[4][4];
 
 #if (BFDEBUG_LEVEL > 0)
 #define TESTFONTS_COUNT 12
@@ -396,6 +396,7 @@ void init_audio_menu(struct GuiMenu *gmnu);
 void frontend_init_options_menu(struct GuiMenu *gmnu);
 TbBool frontend_is_player_allied(long idx1, long idx2);
 void frontend_set_alliance(long idx1, long idx2);
+uint64_t frontend_player_alliance_mask(long idx);
 char update_menu_fade_level(struct GuiMenu *gmnu);
 void draw_menu_buttons(struct GuiMenu *gmnu);
 MenuNumber create_menu(struct GuiMenu *mnu);

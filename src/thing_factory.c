@@ -242,7 +242,7 @@ TbBool thing_create_thing_adv(VALUE *init_data)
         return false;
     }
 
-    if (owner > PLAYERS_COUNT)
+    if (owner < 0 || owner >= PLAYERS_COUNT)
     {
         ERRORLOG("Invalid owning player %d, thing discarded", owner);
         return false;

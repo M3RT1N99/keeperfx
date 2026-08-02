@@ -371,13 +371,6 @@ struct EventTypeInfo event_button_info[] = {
   {GPS_message_rpanel_msg_exclam_act,     GUIStr_EventSecretDoorSpottedDesc,  GUIStr_EventSecretDoorSpotted,   300, 200, EvKind_Nothing},
 };
 
-const unsigned long alliance_grid[4][4] = {
-  {0x00, 0x01, 0x02, 0x04,},
-  {0x01, 0x00, 0x08, 0x10,},
-  {0x02, 0x08, 0x00, 0x20,},
-  {0x04, 0x10, 0x20, 0x00,},
-};
-
 #if (BFDEBUG_LEVEL > 0)
 // Declarations for font testing screen (debug version only)
 struct TbSpriteSheet *testfont[TESTFONTS_COUNT];
@@ -428,9 +421,10 @@ unsigned long playing_bad_descriptive_speech;
 unsigned long playing_good_descriptive_speech;
 long scrolling_index;
 float scrolling_offset;
-long packet_left_button_double_clicked[6];
-long packet_left_button_click_space_count[6];
-char frontend_alliances;
+long packet_left_button_double_clicked[PLAYERS_COUNT];
+long packet_left_button_click_space_count[PLAYERS_COUNT];
+uint64_t frontend_alliances;
+static_assert((MAX_NET_USERS * (MAX_NET_USERS - 1) / 2) <= 64, "Alliance pairs must fit in frontend_alliances");
 char busy_doing_gui;
 long gui_last_left_button_pressed_id;
 long gui_last_right_button_pressed_id;
@@ -722,19 +716,58 @@ TbBool frontend_is_player_allied(long idx1, long idx2)
 {
     if (idx1 == idx2)
       return true;
-    if ((idx1 < 0) || (idx1 >= PLAYER_GOOD))
+    if ((idx1 < 0) || (idx1 >= MAX_NET_USERS))
       return false;
-    if ((idx2 < 0) || (idx2 >= PLAYER_GOOD))
+    if ((idx2 < 0) || (idx2 >= MAX_NET_USERS))
       return false;
-    return ((frontend_alliances & alliance_grid[idx1][idx2]) != 0);
+    long first = idx1;
+    long second = idx2;
+    if (first > second) {
+        const long swap = first;
+        first = second;
+        second = swap;
+    }
+    const unsigned int bit_index = first * (2 * MAX_NET_USERS - first - 1) / 2 + (second - first - 1);
+    return (frontend_alliances & (UINT64_C(1) << bit_index)) != 0;
 }
 
 void frontend_set_alliance(long idx1, long idx2)
 {
-    if (frontend_is_player_allied(idx1, idx2))
-      frontend_alliances &= ~alliance_grid[idx1][idx2];
-    else
-      frontend_alliances |= alliance_grid[idx1][idx2];
+    if (idx1 == idx2 || idx1 < 0 || idx1 >= MAX_NET_USERS || idx2 < 0 || idx2 >= MAX_NET_USERS) {
+        return;
+    }
+    long first = idx1;
+    long second = idx2;
+    if (first > second) {
+        const long swap = first;
+        first = second;
+        second = swap;
+    }
+    const unsigned int bit_index = first * (2 * MAX_NET_USERS - first - 1) / 2 + (second - first - 1);
+    frontend_alliances ^= UINT64_C(1) << bit_index;
+}
+
+uint64_t frontend_player_alliance_mask(long idx)
+{
+    if (idx < 0 || idx >= MAX_NET_USERS) {
+        return 0;
+    }
+    uint64_t mask = 0;
+    for (long other = 0; other < MAX_NET_USERS; other++) {
+        if (other == idx) {
+            continue;
+        }
+        long first = idx;
+        long second = other;
+        if (first > second) {
+            const long swap = first;
+            first = second;
+            second = swap;
+        }
+        const unsigned int bit_index = first * (2 * MAX_NET_USERS - first - 1) / 2 + (second - first - 1);
+        mask |= UINT64_C(1) << bit_index;
+    }
+    return mask;
 }
 
 TbResult frontend_load_data(void)
@@ -1312,7 +1345,7 @@ void frontend_draw_small_menu_button(struct GuiButton *gbtn)
 void frontend_toggle_computer_players(struct GuiButton *gbtn)
 {
     struct ScreenPacket *nspck;
-    nspck = &net_screen_packet[my_player_number];
+    nspck = &net_screen_packet[netstate.my_id];
     if (screen_packet_action(nspck) == NetAct_None)
     {
         screen_packet_set_action(nspck, NetAct_SetComputerPlayers);
@@ -1366,7 +1399,7 @@ void frontend_draw_mp_mappack(struct GuiButton *gbtn)
 void set_packet_start(struct GuiButton *gbtn)
 {
     struct ScreenPacket *nspck;
-    nspck = &net_screen_packet[my_player_number];
+    nspck = &net_screen_packet[netstate.my_id];
     if (screen_packet_action(nspck) == NetAct_None)
         screen_packet_set_action(nspck, NetAct_OpenLandView);
 }

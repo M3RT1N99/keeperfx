@@ -127,6 +127,7 @@ const struct NamedCommand cmpgn_human_player_options[] = {
   {"PURPLE",     6},
   {"BLACK",      7},
   {"ORANGE",     8},
+  {"CYAN",       9},
   {NULL,         0},
   };
 

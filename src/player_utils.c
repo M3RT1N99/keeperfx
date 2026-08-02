@@ -85,6 +85,19 @@ TbBool player_cannot_win(PlayerNumber plyr_idx)
         return true;
     if (player->victory_state == VicS_LostLevel)
         return true;
+    if (player_is_roaming(plyr_idx))
+    {
+        /* Ordinary roaming factions remain scenario AI and do not become
+         * multiplayer contenders unless a network user controls them. */
+        if ((player->allocflags & PlaF_NetworkPlayer) == 0)
+            return true;
+        /* Give a multiplayer hero map one script tick to create its starting party. */
+        if (get_gameturn() == 0)
+            return false;
+        const struct Dungeon* dungeon = get_players_dungeon(player);
+        return dungeon_invalid(dungeon)
+            || (dungeon->num_active_creatrs + dungeon->num_active_diggers) <= 0;
+    }
     struct Thing* heartng = get_player_soul_container(player->id_number);
     if (!thing_exists(heartng) || (heartng->active_state == ObSt_BeingDestroyed))
         return true;
@@ -863,6 +876,12 @@ void init_players(void)
     for (int i = 0; i < PLAYERS_COUNT; i++)
     {
         struct PlayerInfo* player = get_player(i);
+        player->packet_num = game.packet_save_head.player_packet_num[i];
+        if (player->packet_num >= PACKETS_COUNT)
+        {
+            WARNLOG("Invalid packet slot %u for replay player %d; using slot 0", player->packet_num, i);
+            player->packet_num = 0;
+        }
         if (flag_is_set(game.packet_save_head.players_exist, to_flag(i)))
             player->allocflags |= PlaF_Allocated;
         else

@@ -4913,7 +4913,7 @@ struct Thing *create_creature(struct Coord3d *pos, ThingModel model, PlayerNumbe
     crtng->health = cctrl->max_health;
     add_thing_to_its_class_list(crtng);
     place_thing_in_mapwho(crtng);
-    if (owner <= PLAYERS_COUNT)
+    if (owner >= 0 && owner < PLAYERS_COUNT)
     {
         set_first_creature(crtng);
     }

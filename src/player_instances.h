@@ -36,7 +36,8 @@ enum PlayerNames {
     PLAYER4          =  6,//purple
     PLAYER5          =  7,//black
     PLAYER6          =  8,//orange
-    ALL_PLAYERS      =  9,
+    PLAYER7          =  9,//cyan
+    ALL_PLAYERS      = 10,
 };
 
 enum PlayerInstanceNum {

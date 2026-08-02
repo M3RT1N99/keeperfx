@@ -25,11 +25,18 @@ struct NetState netstate;
 
 TbBool IsUserActive(NetUserId id)
 {
+    if (id < 0 || id >= (NetUserId)netstate.max_players || id >= MAX_NET_USERS) {
+        return false;
+    }
     return (netstate.users[id].progress == USER_LOGGEDIN);
 }
 
 void UpdateLocalPlayerInfo(NetUserId id)
 {
+    if (local_player_info == NULL || id < 0 || id >= (NetUserId)netstate.max_players || id >= MAX_NET_USERS) {
+        WARNLOG("Ignoring local player update for invalid user %d", id);
+        return;
+    }
     local_player_info[id].network_user_active = (netstate.users[id].progress != USER_UNUSED);
     if (!local_player_info[id].network_user_active) {
         memset(local_player_info[id].name, 0, sizeof(local_player_info[id].name));
@@ -47,6 +54,11 @@ char *begin_net_message(enum NetMessageType msg_type)
 
 void send_message_buffer(NetUserId dest, const char *end_ptr)
 {
+    if (dest < 0 || dest >= (NetUserId)netstate.max_players || end_ptr < netstate.msg_buffer
+        || end_ptr > netstate.msg_buffer + sizeof(netstate.msg_buffer)) {
+        WARNLOG("Refusing to send invalid network message to user %d", dest);
+        return;
+    }
     size_t message_size = end_ptr - netstate.msg_buffer;
     netstate.sp->sendmsg_single(dest, netstate.msg_buffer, message_size);
 }
@@ -70,6 +82,11 @@ void send_remote_buffer(const char *end_ptr)
 
 void SendUserUpdate(NetUserId dest, NetUserId updated_user)
 {
+    if (dest < 0 || dest >= (NetUserId)netstate.max_players
+        || updated_user < 0 || updated_user >= (NetUserId)netstate.max_players) {
+        WARNLOG("Refusing invalid USERUPDATE destination=%d user=%d", dest, updated_user);
+        return;
+    }
     char *write_pos = begin_net_message(NETMSG_USERUPDATE);
     *write_pos = updated_user;
     write_pos += 1;
@@ -84,11 +101,16 @@ void SendUserUpdate(NetUserId dest, NetUserId updated_user)
 
 TbError LbNetwork_Init(uint32_t srvcindex, uint32_t maxplayrs, struct TbNetworkPlayerInfo *locplayr, struct ServiceInitData *)
 {
+    if (locplayr == NULL || maxplayrs < 2 || maxplayrs > MAX_NET_USERS) {
+        ERRORLOG("Invalid network player capacity %u (supported: 2-%d)", maxplayrs, MAX_NET_USERS);
+        return Lb_FAIL;
+    }
     local_player_info = locplayr;
     memset(&netstate, 0, sizeof(netstate));
     netstate.max_players = maxplayrs;
     for (NetUserId user_id = 0; user_id < (NetUserId)netstate.max_players; user_id += 1) {
         netstate.users[user_id].id = user_id;
+        netstate.users[user_id].ack = -1;
     }
     if (srvcindex == NS_ENET_UDP) {
         netstate.sp = InitEnetSP();
@@ -121,8 +143,10 @@ TbBool OnNewUser(NetUserId *assigned_id)
 
 void OnDroppedUser(NetUserId id, enum NetDropReason reason)
 {
-    assert(id >= 0);
-    assert(id < (int)netstate.max_players);
+    if (id < 0 || id >= (NetUserId)netstate.max_players || id >= MAX_NET_USERS) {
+        WARNLOG("Ignoring drop callback for invalid user %d", id);
+        return;
+    }
     if (netstate.my_id == id) {
         NETMSG("Warning: Trying to drop local user. There's a bug in code somewhere, probably server trying to send message to itself.");
         return;

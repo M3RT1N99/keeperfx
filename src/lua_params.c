@@ -282,7 +282,7 @@ PlayerNumber luaL_checkPlayerSingle(lua_State *L, int index)
     {
         luaL_argerror(L,index,"player range not supported for this command");
     }
-    if(playerId > PLAYERS_COUNT || playerId < 0)
+    if(playerId >= PLAYERS_COUNT || playerId < 0)
     {
         luaL_argerror(L,index,"expected a valid player");
     }

@@ -91,6 +91,16 @@ struct GuiButtonInit frontend_net_session_buttons[] = {
   {-1,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,               0,   0,   0,   0,   0,  0,  0, NULL,                              0,           0,  0,       {0},            0, NULL },
 };
 
+#define MP_ALLIANCE_BUTTON(ROW, COL) \
+  { LbBtnT_NormalBtn, BID_DEFAULT, 0, 0, frontnet_select_alliance, NULL, frontend_over_button, COL, \
+    431 + 10 * (COL), 108 + 11 * (ROW), 431 + 10 * (COL), 108 + 11 * (ROW), 10, 11, \
+    frontnet_draw_alliance_button, 0, GUIStr_Empty, 0, {74 + (ROW)}, 0, frontnet_maintain_alliance }
+
+#define MP_ALLIANCE_ROW(ROW) \
+  MP_ALLIANCE_BUTTON(ROW, 0), MP_ALLIANCE_BUTTON(ROW, 1), MP_ALLIANCE_BUTTON(ROW, 2), MP_ALLIANCE_BUTTON(ROW, 3), \
+  MP_ALLIANCE_BUTTON(ROW, 4), MP_ALLIANCE_BUTTON(ROW, 5), MP_ALLIANCE_BUTTON(ROW, 6), MP_ALLIANCE_BUTTON(ROW, 7), \
+  MP_ALLIANCE_BUTTON(ROW, 8)
+
 struct GuiButtonInit frontend_net_start_buttons[] = {
   { LbBtnT_NormalBtn,  BID_MENU_TITLE, 0, 0, NULL,               NULL,   NULL,                    0, 999,  30, 999,  30, 371, 46, frontend_draw_large_menu_button,   0, GUIStr_Empty, 0,  {11},    0, NULL },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,   NULL,                    0,  82,  78,  82,  78, 220, 26, frontnet_draw_scroll_box_tab,      0, GUIStr_Empty, 0,  {28},    0, NULL },
@@ -98,23 +108,16 @@ struct GuiButtonInit frontend_net_start_buttons[] = {
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,   NULL,                    0,  82, 104,  82, 104, 450, 70, frontnet_draw_scroll_box,          0, GUIStr_Empty, 0,  {90},    0, NULL },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,   NULL,                    0, 102,  79, 102,  79, 220, 26, frontend_draw_text,                0, GUIStr_Empty, 0,  {31},    0, NULL },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,   NULL,                    0,  95, 105,  82, 105, 432,104, frontnet_draw_net_start_players,   0, GUIStr_Empty, 0,  {21},    0, NULL },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  0, 431, 107, 431, 116, 432, 88, frontnet_draw_alliance_grid,       0, GUIStr_Empty, 0,  {74},    0, NULL },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  0, 431, 108, 431, 108,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {74},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  1, 453, 108, 453, 108,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {74},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  2, 475, 108, 475, 108,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {74},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  3, 497, 108, 497, 108,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {74},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  0, 431, 134, 431, 134,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {75},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  1, 453, 134, 453, 134,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {75},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  2, 475, 134, 475, 134,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {75},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  3, 497, 134, 497, 134,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {75},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  0, 431, 160, 431, 160,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {76},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  1, 453, 160, 453, 160,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {76},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  2, 475, 160, 475, 160,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {76},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  3, 497, 160, 497, 160,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {76},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  0, 431, 186, 431, 183,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {77},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  1, 453, 186, 453, 186,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {77},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  2, 475, 186, 475, 186,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {77},    0, frontnet_maintain_alliance },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_select_alliance,NULL,frontend_over_button,  3, 497, 186, 497, 186,  22, 26, frontnet_draw_alliance_button,     0, GUIStr_Empty, 0,  {77},    0, frontnet_maintain_alliance },
+  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,                    NULL,frontend_over_button,  0, 431, 108, 431, 108,  90, 99, frontnet_draw_alliance_grid,       0, GUIStr_Empty, 0,  {74},    0, NULL },
+  MP_ALLIANCE_ROW(0),
+  MP_ALLIANCE_ROW(1),
+  MP_ALLIANCE_ROW(2),
+  MP_ALLIANCE_ROW(3),
+  MP_ALLIANCE_ROW(4),
+  MP_ALLIANCE_ROW(5),
+  MP_ALLIANCE_ROW(6),
+  MP_ALLIANCE_ROW(7),
+  MP_ALLIANCE_ROW(8),
   
   { LbBtnT_HoldableBtn,BID_DEFAULT, 0, 0, NULL,                    NULL,   NULL,                     0,305,217,305,217,220,26, frontnet_draw_bottom_scroll_box_tab,0,GUIStr_Empty, 0,  {28},    0, NULL },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontend_toggle_computer_players,NULL,frontend_over_button,0,315,214,315,214,200,26, frontend_draw_computer_players,    0, GUIStr_Empty, 0, {103},    0, NULL },
@@ -135,6 +138,12 @@ struct GuiButtonInit frontend_net_start_buttons[] = {
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_return_to_session_menu,NULL,frontend_over_button,1, 345,412,345,412,247,46, frontend_draw_small_menu_button,   0, GUIStr_Empty, 0,  {16},    0, NULL },
   {-1,  BID_DEFAULT, 0, 0, NULL,               NULL,   NULL,                    0,   0,   0,   0,   0,   0,  0, NULL,                              0,           0,  0,   {0},    0, NULL },
 };
+
+static_assert((sizeof(frontend_net_start_buttons) / sizeof(frontend_net_start_buttons[0])) <= ACTIVE_BUTTONS_COUNT,
+    "The nine-player alliance grid exceeds the frontend active-button pool");
+
+#undef MP_ALLIANCE_ROW
+#undef MP_ALLIANCE_BUTTON
 
 struct GuiButtonInit frontend_add_session_buttons[] = {//TODO GUI prepare add session screen
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,               0, 999, 0, 999, 0,450,180, frontnet_draw_scroll_box,               0, GUIStr_Empty, 0,      {26},            0, NULL },
@@ -257,7 +266,7 @@ void frontnet_session_create(struct GuiButton *gbtn)
         process_network_error(-801);
         return;
     }
-    frontend_set_player_number(plyr_num);
+    frontend_set_player_number(network_user_to_player_number(plyr_num));
     fe_computer_players = 0;
     frontend_set_state(FeSt_NET_START);
 }

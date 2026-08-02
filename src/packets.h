@@ -263,6 +263,9 @@ enum ChecksumKind {
 
 #define INVALID_PACKET (&bad_packet)
 
+/* Increment whenever the on-disk packet/replay layout changes. */
+#define PACKET_SAVE_FORMAT_VERSION 2
+
 /******************************************************************************/
 #pragma pack(1)
 
@@ -293,6 +296,7 @@ struct Packet {
 };
 
 struct PacketSaveHead {
+    uint16_t format_version;
     unsigned short game_ver_major;
     unsigned short game_ver_minor;
     unsigned short game_ver_release;
@@ -300,6 +304,7 @@ struct PacketSaveHead {
     uint32_t level_num;
     PlayerBitFlags players_exist;
     PlayerBitFlags players_comp;
+    uint8_t player_packet_num[PLAYERS_COUNT];
     uint32_t isometric_view_zoom_level;
     uint32_t frontview_zoom_level;
     int isometric_tilt;
@@ -323,6 +328,7 @@ struct PacketEx
 /******************************************************************************/
 struct Packet *get_packet_direct(long pckt_idx);
 struct Packet *get_packet(long plyr_idx);
+struct PlayerInfo *get_packet_player(long pckt_idx);
 void set_packet_action(struct Packet *pckt, unsigned char pcktype, long par1, long par2, unsigned short par3, unsigned short par4);
 TbBool is_packet_empty(const struct Packet *pckt);
 void set_players_packet_action(struct PlayerInfo *player, unsigned char pcktype, unsigned long par1, unsigned long par2, unsigned short par3, unsigned short par4);

@@ -231,17 +231,19 @@ void draw_out_of_sync_box(long a1, long a2, long box_width)
 
 void setup_alliances(void)
 {
-    for (int i = 0; i < MAX_NET_USERS; i++) {
-        if (!player_exists(get_player(i))) {
+    for (NetUserId first_user = 0; first_user < MAX_NET_USERS; first_user++) {
+        PlayerNumber first_player = network_user_to_player_number(first_user);
+        if (!network_player_active(first_user) || !player_exists(get_player(first_player))) {
             continue;
         }
-        for (int k = i + 1; k < MAX_NET_USERS; k++) {
-            if (!player_exists(get_player(k))) {
+        for (NetUserId second_user = first_user + 1; second_user < MAX_NET_USERS; second_user++) {
+            PlayerNumber second_player = network_user_to_player_number(second_user);
+            if (!network_player_active(second_user) || !player_exists(get_player(second_player))) {
                 continue;
             }
-            if (frontend_is_player_allied(i, k)) {
-                set_ally_with_player(i, k, true);
-                set_ally_with_player(k, i, true);
+            if (frontend_is_player_allied(first_user, second_user)) {
+                set_ally_with_player(first_player, second_player, true);
+                set_ally_with_player(second_player, first_player, true);
             }
         }
     }
@@ -265,7 +267,7 @@ void frontnet_service_update(void)
 
 static void enum_players_callback(struct TbNetworkCallbackData *netcdat, void *a2)
 {
-    if (net_number_of_enum_players >= 4)
+    if (net_number_of_enum_players >= MAX_NET_USERS)
     {
         ERRORLOG("Too many players in enumeration");
         return;
@@ -394,11 +396,12 @@ void frontnet_rewite_net_messages(void)
     for (i=0; i < net_number_of_messages; i++)
     {
         struct NetMessage* nmsg = &net_message[i];
-        if (network_player_active(nmsg->plyr_idx))
+        NetUserId user_id = player_number_to_network_user(nmsg->plyr_idx);
+        if (network_player_active(user_id))
         {
             memcpy(&lmsg[k], nmsg, sizeof(struct NetMessage));
             k++;
-      }
+        }
     }
     net_number_of_messages = k;
     for (i=0; i < NET_MESSAGES_COUNT; i++)
@@ -421,7 +424,7 @@ static TbBool check_frontend_version_mismatch(void)
     if (action == NetAct_OpenLandView || action == NetAct_HostStartLevel) {
       start_requested = true;
     }
-    if (i != SERVER_ID && !net_versions_match(&host_user->version, &netstate.users[i].version) && (remote_id == -1 || i == my_player_number)) {
+    if (i != SERVER_ID && !net_versions_match(&host_user->version, &netstate.users[i].version) && (remote_id == -1 || i == netstate.my_id)) {
       remote_id = i;
     }
   }
@@ -432,10 +435,10 @@ static TbBool check_frontend_version_mismatch(void)
   }
   const struct NetUser *remote_user = &netstate.users[remote_id];
   char text[MESSAGE_TEXT_LEN];
-  snprintf(text, sizeof(text), "%s\n%s: %d.%d.%d.%d\n%s: %d.%d.%d.%d",
+  snprintf(text, sizeof(text), "%s\n%s: %d.%d.%d.%d (net %u)\n%s: %d.%d.%d.%d (net %u)",
       get_string(GUIStr_VersionMismatch),
-      network_player_name(SERVER_ID), (int)host_user->version.major, (int)host_user->version.minor, (int)host_user->version.release, (int)host_user->version.build,
-      network_player_name(remote_id), (int)remote_user->version.major, (int)remote_user->version.minor, (int)remote_user->version.release, (int)remote_user->version.build);
+      network_player_name(SERVER_ID), (int)host_user->version.major, (int)host_user->version.minor, (int)host_user->version.release, (int)host_user->version.build, host_user->version.protocol,
+      network_player_name(remote_id), (int)remote_user->version.major, (int)remote_user->version.minor, (int)remote_user->version.release, (int)remote_user->version.build, remote_user->version.protocol);
   create_frontend_error_box(10000, text);
   return true;
 }
@@ -446,7 +449,7 @@ static void process_frontend_packets(void)
   for (i = 0; i < MAX_NET_USERS; i++) {
     net_screen_packet[i].networkstatus_flags &= ~NetStat_PlayerConnected;
   }
-  struct ScreenPacket* nspckt = &net_screen_packet[my_player_number];
+  struct ScreenPacket* nspckt = &net_screen_packet[netstate.my_id];
   nspckt->networkstatus_flags |= NetStat_PlayerConnected;
   nspckt->frontend_alliances = frontend_alliances;
   nspckt->networkstatus_flags &= ~NetStat_ComputerPlayersMask;
@@ -469,8 +472,8 @@ static void process_frontend_packets(void)
   for (i = 0; i < MAX_NET_USERS; i++) {
     nspckt = &net_screen_packet[i];
     if ((nspckt->networkstatus_flags & NetStat_PlayerConnected) != 0) {
-      if (frontend_alliances == -1) {
-        if (nspckt->frontend_alliances != -1) {
+      if (frontend_alliances == FRONTEND_ALLIANCES_UNSET) {
+        if (nspckt->frontend_alliances != FRONTEND_ALLIANCES_UNSET) {
           frontend_alliances = nspckt->frontend_alliances;
         }
       }
@@ -494,6 +497,10 @@ static void process_frontend_packets(void)
             frontend_set_state(FeSt_NETLAND_VIEW);
             break;
         case NetAct_SetAlliance:
+            if (nspckt->action_par1 != i && nspckt->action_par2 != i) {
+                WARNLOG("Network user %d tried to change another pair's alliance", i);
+                break;
+            }
             frontend_set_alliance(nspckt->action_par1, nspckt->action_par2);
             break;
         case NetAct_SetComputerPlayers:
@@ -511,13 +518,12 @@ static void process_frontend_packets(void)
     }
     screen_packet_set_action(nspckt, NetAct_None);
   }
-  if (frontend_alliances == -1) {
+  if (frontend_alliances == FRONTEND_ALLIANCES_UNSET) {
     frontend_alliances = 0;
   }
   for (i = 0; i < MAX_NET_USERS; i++) {
     if (!network_player_active(i)) {
-      const int32_t alliances_to_clear = alliance_grid[i][0] | alliance_grid[i][1] | alliance_grid[i][2] | alliance_grid[i][3];
-      frontend_alliances = frontend_alliances & ~alliances_to_clear;
+      frontend_alliances &= ~frontend_player_alliance_mask(i);
     }
   }
 }
@@ -550,10 +556,10 @@ void handle_autostart_multiplayer_messaging(void)
         return;
     }
 
-    if (player_joined && my_player_number == get_host_player_id()) {
+    if (player_joined && netstate.my_id == SERVER_ID) {
         frontnet_send_campaign_change_message(campaign.fname);
     }
-    if (my_player_number != get_host_player_id() || get_selected_level_number() > SINGLEPLAYER_NOTSTARTED) {
+    if (netstate.my_id != SERVER_ID || get_selected_level_number() > SINGLEPLAYER_NOTSTARTED) {
         return;
     }
     if (autostart_multiplayer_campaign[0] == '\0' && autostart_multiplayer_level <= 0) {
@@ -703,7 +709,7 @@ void frontnet_start_setup(void)
     set_selected_level_number(SINGLEPLAYER_NOTSTARTED);
     previous_active_players = 0;
     memset(net_screen_packet, 0, sizeof(net_screen_packet));
-    frontend_alliances = -1;
+    frontend_alliances = FRONTEND_ALLIANCES_UNSET;
     net_number_of_messages = 0;
     net_player_scroll_offset = 0;
     net_message_scroll_offset = 0;

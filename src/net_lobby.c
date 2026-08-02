@@ -80,14 +80,22 @@ void LbNetwork_SetServerPort(int port)
     server_port = port;
 }
 
-TbError process_login_message(NetUserId source, char *read_pos)
+TbError process_login_message(NetUserId source, char *read_pos, const char *end_pos)
 {
     if (source == SERVER_ID) {
-        netstate.my_id = (NetUserId)read_pos[0];
+        if ((size_t)(end_pos - read_pos) < 1 + sizeof(struct GameVersionPacket)) {
+            WARNLOG("Login reply from host was truncated");
+            return Lb_FAIL;
+        }
+        NetUserId assigned_id = (NetUserId)(uint8_t)read_pos[0];
         read_pos += 1;
+        if (assigned_id <= SERVER_ID || assigned_id >= (NetUserId)netstate.max_players) {
+            WARNLOG("Login reply contained invalid user ID %d", assigned_id);
+            return Lb_FAIL;
+        }
+        netstate.my_id = assigned_id;
         netstate.users[netstate.my_id].version = net_current_version;
-        const struct GameVersionPacket *server_version = (const struct GameVersionPacket *)read_pos;
-        netstate.users[SERVER_ID].version = *server_version;
+        memcpy(&netstate.users[SERVER_ID].version, read_pos, sizeof(struct GameVersionPacket));
         return Lb_OK;
     }
     struct NetUser *user = &netstate.users[source];
@@ -96,18 +104,19 @@ TbError process_login_message(NetUserId source, char *read_pos)
         return Lb_OK;
     }
     const char *password;
-    if (!read_network_message_text(&read_pos, &password, sizeof(netstate.password))) {
+    if (!read_network_message_text(&read_pos, end_pos, &password, sizeof(netstate.password) - 1)) {
         NETDBG(6, "Connected peer sent invalid password");
         netstate.sp->drop_user(source);
         return Lb_OK;
     }
     if (netstate.password[0] != 0 && strncmp(password, netstate.password, sizeof(netstate.password)) != 0) {
         NETMSG("Peer chose wrong password");
+        netstate.sp->drop_user(source);
         return Lb_OK;
     }
 
     const char *name;
-    if (!read_network_message_text(&read_pos, &name, sizeof(user->name) - 1) || name[0] == '\0') {
+    if (!read_network_message_text(&read_pos, end_pos, &name, sizeof(user->name) - 1) || name[0] == '\0') {
         NETDBG(6, "Connected peer sent invalid name");
         netstate.sp->drop_user(source);
         return Lb_OK;
@@ -118,8 +127,12 @@ TbError process_login_message(NetUserId source, char *read_pos)
         netstate.sp->drop_user(source);
         return Lb_OK;
     }
-    const struct GameVersionPacket *user_version = (const struct GameVersionPacket *)read_pos;
-    user->version = *user_version;
+    if ((size_t)(end_pos - read_pos) < sizeof(struct GameVersionPacket)) {
+        NETDBG(6, "Connected peer sent a truncated version packet");
+        netstate.sp->drop_user(source);
+        return Lb_OK;
+    }
+    memcpy(&user->version, read_pos, sizeof(struct GameVersionPacket));
     NETMSG("User %s successfully logged in", user->name);
     user->progress = USER_LOGGEDIN;
     play_non_3d_sample(snd_spell_stars);
@@ -148,24 +161,35 @@ TbError process_user_update_message(NetUserId source, char *read_pos, const char
         WARNLOG("Unexpected USERUPDATE");
         return Lb_OK;
     }
-    NetUserId user_id = (NetUserId)read_pos[0];
+    if ((size_t)(end_pos - read_pos) < 2) {
+        WARNLOG("Truncated USERUPDATE");
+        return Lb_OK;
+    }
+    NetUserId user_id = (NetUserId)(uint8_t)read_pos[0];
     read_pos += 1;
     if (user_id < 0 || user_id >= netstate.max_players) {
-        ERRORLOG("Critical error: Out of range user ID %i received from server, could be used for buffer overflow attack", user_id);
-        abort();
+        WARNLOG("Ignoring out-of-range user ID %i in USERUPDATE", user_id);
+        return Lb_OK;
     }
     struct NetUser *user = &netstate.users[user_id];
-    user->progress = (enum NetUserProgress)read_pos[0];
+    enum NetUserProgress progress = (enum NetUserProgress)(uint8_t)read_pos[0];
     read_pos += 1;
+    if (progress < USER_UNUSED || progress > USER_LOGGEDIN) {
+        WARNLOG("Ignoring invalid user progress %d in USERUPDATE", (int)progress);
+        return Lb_OK;
+    }
     const char *name;
-    if (!read_network_message_text(&read_pos, &name, sizeof(user->name) - 1)) {
-        ERRORLOG("Critical error: Unterminated name in USERUPDATE");
-        abort();
+    if (!read_network_message_text(&read_pos, end_pos, &name, sizeof(user->name) - 1)) {
+        WARNLOG("Ignoring unterminated name in USERUPDATE");
+        return Lb_OK;
     }
+    if ((size_t)(end_pos - read_pos) < sizeof(user->version)) {
+        WARNLOG("Ignoring truncated version in USERUPDATE");
+        return Lb_OK;
+    }
+    user->progress = progress;
     strcpy(user->name, name);
-    if (read_pos + sizeof(user->version) <= end_pos) {
-        memcpy(&user->version, read_pos, sizeof(user->version));
-    }
+    memcpy(&user->version, read_pos, sizeof(user->version));
     UpdateLocalPlayerInfo(user_id);
     return Lb_OK;
 }
@@ -225,13 +249,13 @@ TbError LbNetwork_ExchangeLogin(char *player_name)
 
 TbError LbNetwork_ExchangeFrontend(void *send_buf, void *server_buf, size_t frame_size)
 {
-    if ((my_player_number == get_host_player_id()) && frontnet_service_selected(FrontendNetSvc_Online)) {
+    if (netstate.my_id == SERVER_ID && frontnet_service_selected(FrontendNetSvc_Online)) {
         enet_matchmaking_host_update();
     }
     TbError result = exchange_frame_block(NETMSG_FRONTEND, send_buf, server_buf, frame_size);
     TbClockMSec now = LbTimerClock();
     if (network_lobby_ping == 0 || now - lobby_ping_last_sample >= 1000) {
-        unsigned long ping = GetPing(my_player_number);
+        unsigned long ping = GetPing(netstate.my_id);
         if (ping > 0) {
             network_lobby_ping = ping;
         }

@@ -152,12 +152,12 @@ void input_lag_update(struct Packet *packet)
         }
     }
     packet->input_lag_turns = local_input_lag_request;
-    if (my_player_number != get_host_player_id() || !netstate.sp) { return; }
+    if (netstate.my_id != SERVER_ID || !netstate.sp) { return; }
     int32_t remote_player_count = 0;
     for (NetUserId id = 0; id < netstate.max_players; id += 1) {
         if (id == netstate.my_id || netstate.users[id].progress != USER_LOGGEDIN) { continue; }
         remote_player_count += 1;
-        const struct Packet *peer_packet = get_latest_history_packet((PlayerNumber)id);
+        const struct Packet *peer_packet = get_latest_history_packet(id);
         if (peer_packet != NULL && (uint8_t)peer_packet->input_lag_turns <= MAXIMUM_INPUT_LAG_TURNS && peer_packet->input_lag_turns > packet->input_lag_turns) {
             packet->input_lag_turns = peer_packet->input_lag_turns;
         }

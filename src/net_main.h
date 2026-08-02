@@ -36,11 +36,14 @@ extern "C" {
 #define PEER_TIMEOUT_MIN_MS 5000
 #define PEER_TIMEOUT_MAX_MS 30000
 
-#define MAX_NET_USERS 4
+#define MAX_NET_KEEPERS 8
+#define HERO_NET_USER_ID MAX_NET_KEEPERS
+#define MAX_NET_USERS (MAX_NET_KEEPERS + 1)
 #define MAX_NET_PEERS (MAX_NET_USERS - 1)
 #define SERVER_ID 0
 #define NET_MSG_BUFFER_SIZE 5000
 #define INVALID_USER_ID 23456
+#define NET_PROTOCOL_VERSION 2
 
 typedef int NetUserId;
 
@@ -93,6 +96,7 @@ struct GameVersionPacket {
     int32_t minor;
     int32_t release;
     int32_t build;
+    uint32_t protocol;
 };
 
 struct NetUser {
@@ -141,14 +145,17 @@ enum TbNetworkService {
 
 extern struct NetState netstate;
 
-static const struct GameVersionPacket net_current_version = { VER_MAJOR, VER_MINOR, VER_RELEASE, VER_BUILD };
+static const struct GameVersionPacket net_current_version = {
+    VER_MAJOR, VER_MINOR, VER_RELEASE, VER_BUILD, NET_PROTOCOL_VERSION
+};
 
 static inline TbBool net_versions_match(const struct GameVersionPacket *version_a, const struct GameVersionPacket *version_b)
 {
     return (version_a->major == version_b->major) &&
         (version_a->minor == version_b->minor) &&
         (version_a->release == version_b->release) &&
-        (version_a->build == version_b->build);
+        (version_a->build == version_b->build) &&
+        (version_a->protocol == version_b->protocol);
 }
 
 TbError LbNetwork_Init(uint32_t srvcindex, uint32_t maxplayrs, struct TbNetworkPlayerInfo *locplayr, struct ServiceInitData *init_data);

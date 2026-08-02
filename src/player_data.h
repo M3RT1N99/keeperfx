@@ -29,8 +29,8 @@
 extern "C" {
 #endif
 /******************************************************************************/
-#define PLAYERS_COUNT       9
-#define COLOURS_COUNT       9
+#define PLAYERS_COUNT      10
+#define COLOURS_COUNT      10
 
 #define INVALID_PLAYER (&bad_player)
 
@@ -40,7 +40,8 @@ extern "C" {
 
 enum PlayerInitFlags {
     PlaF_Allocated               = 0x01,
-    PlaF_unusedparam             = 0x02,
+    /** Player was controlled by a network user when the match started. */
+    PlaF_NetworkPlayer           = 0x02,
     PlaF_NewMPMessage            = 0x04,
     PlaF_CreaturePassengerMode   = 0x08,
     PlaF_KeyboardInputDisabled   = 0x10,

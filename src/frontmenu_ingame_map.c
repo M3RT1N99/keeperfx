@@ -73,11 +73,11 @@ enum PanelColourIds
     PnC_Tagged_Gems   = 10,
     PnC_Gems          = 11,
     //12-255 left free for future use
-    PnC_RoomsStart    = 256,  //rooms 256-2559  (9*256 entries) TERRAIN_ITEMS_MAX
-    PnC_DoorsStart    = 2560, //doors 2560-38559 (9*2000*2 entries) TRAPDOOR_TYPES_MAX
-    PnC_DoorsStartLocked  = 2569,
-    PnC_PathStart     = 38560,  // path (9 entries)
-    PnC_End           = 38569,
+    PnC_RoomsStart        = 256,
+    PnC_DoorsStart        = PnC_RoomsStart + PLAYERS_COUNT * TERRAIN_ITEMS_MAX,
+    PnC_DoorsStartLocked  = PnC_DoorsStart + PLAYERS_COUNT,
+    PnC_PathStart         = PnC_DoorsStart + 2 * PLAYERS_COUNT * TRAPDOOR_TYPES_MAX,
+    PnC_End               = PnC_PathStart + PLAYERS_COUNT,
 };
 
 enum TbPixelsColours
@@ -1037,29 +1037,17 @@ void setup_panel_colors(void)
         int k;
         for (i=TERRAIN_ITEMS_MAX; i > 0; i--)
         {
-            PanelColours[n + 0] = player_room_colours[get_player_color_idx(PLAYER0)];
-            PanelColours[n + 1] = player_room_colours[get_player_color_idx(PLAYER1)];
-            PanelColours[n + 2] = player_room_colours[get_player_color_idx(PLAYER2)];
-            PanelColours[n + 3] = player_room_colours[get_player_color_idx(PLAYER3)];
-            PanelColours[n + 4] = player_room_colours[get_player_color_idx(PLAYER_GOOD)];
-            PanelColours[n + 5] = frcol;
-            PanelColours[n + 6] = player_room_colours[get_player_color_idx(PLAYER4)];
-            PanelColours[n + 7] = player_room_colours[get_player_color_idx(PLAYER5)];
-            PanelColours[n + 8] = player_room_colours[get_player_color_idx(PLAYER6)];
+            for (PlayerNumber player = 0; player < PLAYERS_COUNT; player++) {
+                PanelColours[n + player] = (player == PLAYER_NEUTRAL) ? frcol : player_room_colours[get_player_color_idx(player)];
+            }
             n += PLAYERS_COUNT;
         }
 
         n = pncol_idx + PnC_PathStart;
         {
-            PanelColours[n + 0] = player_path_colours[get_player_color_idx(PLAYER0)];
-            PanelColours[n + 1] = player_path_colours[get_player_color_idx(PLAYER1)];
-            PanelColours[n + 2] = player_path_colours[get_player_color_idx(PLAYER2)];
-            PanelColours[n + 3] = player_path_colours[get_player_color_idx(PLAYER3)];
-            PanelColours[n + 4] = player_path_colours[get_player_color_idx(PLAYER_GOOD)];
-            PanelColours[n + 5] = player_path_colours[PLAYER_NEUTRAL];
-            PanelColours[n + 6] = player_path_colours[get_player_color_idx(PLAYER4)];
-            PanelColours[n + 7] = player_path_colours[get_player_color_idx(PLAYER5)];
-            PanelColours[n + 8] = player_path_colours[get_player_color_idx(PLAYER6)];
+            for (PlayerNumber player = 0; player < PLAYERS_COUNT; player++) {
+                PanelColours[n + player] = player_path_colours[get_player_color_idx(player)];
+            }
         }
         n = pncol_idx + PnC_DoorsStart;
         for (i=TRAPDOOR_TYPES_MAX; i > 0; i--)
@@ -1151,15 +1139,9 @@ void update_panel_colors(void)
             n = PLAYERS_COUNT * PrevRoomHighlight + PnC_RoomsStart;
             for (i=NumBackColours; i > 0; i--)
             {
-                PanelColours[n + 0] = player_room_colours[get_player_color_idx(0)];
-                PanelColours[n + 1] = player_room_colours[get_player_color_idx(1)];
-                PanelColours[n + 2] = player_room_colours[get_player_color_idx(2)];
-                PanelColours[n + 3] = player_room_colours[get_player_color_idx(3)];
-                PanelColours[n + 4] = player_room_colours[get_player_color_idx(4)];
-                PanelColours[n + 5] = frcol;
-                PanelColours[n + 6] = player_room_colours[get_player_color_idx(6)];
-                PanelColours[n + 7] = player_room_colours[get_player_color_idx(7)];
-                PanelColours[n + 8] = player_room_colours[get_player_color_idx(8)];
+                for (PlayerNumber player = 0; player < PLAYERS_COUNT; player++) {
+                    PanelColours[n + player] = (player == PLAYER_NEUTRAL) ? frcol : player_room_colours[get_player_color_idx(player)];
+                }
                 n += PnC_End;
             }
         }
@@ -1171,15 +1153,9 @@ void update_panel_colors(void)
             n = PLAYERS_COUNT * highlight + PnC_RoomsStart;
             for (i=NumBackColours; i > 0; i--)
             {
-                PanelColours[n + 0] = 31;
-                PanelColours[n + 1] = 31;
-                PanelColours[n + 2] = 31;
-                PanelColours[n + 3] = 31;
-                PanelColours[n + 4] = 31;
-                PanelColours[n + 5] = 31;
-                PanelColours[n + 6] = 31;
-                PanelColours[n + 7] = 31;
-                PanelColours[n + 8] = 31;
+                for (PlayerNumber player = 0; player < PLAYERS_COUNT; player++) {
+                    PanelColours[n + player] = 31;
+                }
                 n += PnC_End;
             }
         }

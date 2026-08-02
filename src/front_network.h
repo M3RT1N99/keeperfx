@@ -57,6 +57,7 @@ extern struct TbNetworkSessionNameEntry *net_session[SESSION_ENTRIES_COUNT];
 extern long net_number_of_sessions;
 extern long net_session_index_active;
 extern struct TbNetworkPlayerName net_player[MAX_NET_USERS];
+extern const unsigned char net_player_colours[MAX_NET_USERS];
 extern struct ConfigInfo net_config_info;
 extern char net_service[16][NET_SERVICE_LEN];
 extern char net_player_name[20];

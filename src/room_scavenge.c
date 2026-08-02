@@ -32,8 +32,8 @@
 extern "C" {
 #endif
 /******************************************************************************/
-long const scavenge_effect[] = {TngEff_BallPuffRed, TngEff_BallPuffBlue, TngEff_BallPuffGreen, TngEff_BallPuffYellow, TngEff_BallPuffWhite, TngEff_BallPuffWhite,
-                                TngEff_BallPuffPurple, TngEff_BallPuffBlack, TngEff_BallPuffOrange};
+long const scavenge_effect[COLOURS_COUNT] = {TngEff_BallPuffRed, TngEff_BallPuffBlue, TngEff_BallPuffGreen, TngEff_BallPuffYellow, TngEff_BallPuffWhite, TngEff_BallPuffWhite,
+                                TngEff_BallPuffPurple, TngEff_BallPuffBlack, TngEff_BallPuffOrange, TngEff_BallPuffBlue};
 /******************************************************************************/
 long get_scavenge_effect(PlayerNumber owner)
 {

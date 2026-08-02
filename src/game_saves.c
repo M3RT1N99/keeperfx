@@ -232,9 +232,15 @@ int load_game_chunks(TbFileHandle fhandle, struct CatalogueEntry *centry)
             }
             if (LbFileRead(fhandle, &game.packet_save_head, sizeof(struct PacketSaveHead))
                 == sizeof(struct PacketSaveHead)) {
-                chunks_done |= SGF_PacketHeader;
+                if (game.packet_save_head.format_version == PACKET_SAVE_FORMAT_VERSION) {
+                    chunks_done |= SGF_PacketHeader;
+                } else {
+                    WARNLOG("Unsupported packet format version %u (expected %u)",
+                        (unsigned int)game.packet_save_head.format_version,
+                        (unsigned int)PACKET_SAVE_FORMAT_VERSION);
+                }
             } else {
-                WARNLOG("Could not read GameOrig chunk");
+                WARNLOG("Could not read PacketHeader chunk");
             }
             break;
         case SGC_PacketData:

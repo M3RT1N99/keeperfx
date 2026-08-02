@@ -790,7 +790,7 @@ static bool IsPeerConnected(const ENetPeer *peer) {
 }
 
 static bool IsLocalPeer(NetUserId id) {
-    return id == SERVER_ID || id == my_player_number;
+    return id == SERVER_ID || id == netstate.my_id;
 }
 
 unsigned long GetPing(NetUserId id) {

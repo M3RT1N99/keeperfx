@@ -869,9 +869,9 @@ void draw_network_stats()
     if (tx_units_per_px < 16)
         tx_units_per_px = 16;
 
-    unsigned long ping = GetPing(my_player_number);
+    unsigned long ping = GetPing(netstate.my_id);
     unsigned long half_ping = ping / 2;
-    unsigned int packet_loss_percent = GetPacketLoss(my_player_number);
+    unsigned int packet_loss_percent = GetPacketLoss(netstate.my_id);
     unsigned int transit = GetClientDataInTransit();
     unsigned int lost_packet_count = GetClientPacketsLost();
     unsigned int outgoing_rate_kb10 = (GetUploadRateBytesPerSecond() * 10) / 1024;

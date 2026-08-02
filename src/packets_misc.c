@@ -124,6 +124,26 @@ struct Packet *get_packet_direct(long pckt_idx)
     return &game.packets[pckt_idx];
 }
 
+/**
+ * Returns the human player whose input is stored in a packet slot.
+ * Network user IDs and game player IDs diverge after the first four keepers,
+ * so callers must not assume that packet slot N belongs to player N.
+ */
+struct PlayerInfo *get_packet_player(long pckt_idx)
+{
+    if ((pckt_idx < 0) || (pckt_idx >= PACKETS_COUNT)) {
+        return INVALID_PLAYER;
+    }
+    for (PlayerNumber player_idx = 0; player_idx < PLAYERS_COUNT; player_idx++) {
+        struct PlayerInfo *player = get_player(player_idx);
+        if (player_exists(player) && ((player->allocflags & PlaF_CompCtrl) == 0)
+            && player->packet_num == pckt_idx) {
+            return player;
+        }
+    }
+    return INVALID_PLAYER;
+}
+
 void clear_packets(void)
 {
     for (int i = 0; i < PACKETS_COUNT; i++)
@@ -230,7 +250,16 @@ short save_packets(void)
     }
     for (int i = 0; i < PACKETS_COUNT; i++) {
         if (game.packets[i].action == PckA_PlyrMsgEnd) {
-            if (LbFileWrite(game.packet_save_fp, get_player(i)->mp_pending_message, PLAYER_MP_MESSAGE_LEN) != PLAYER_MP_MESSAGE_LEN) {
+            struct PlayerInfo *player = get_packet_player(i);
+            if (player_invalid(player)) {
+                WARNLOG("No player owns chat packet slot %d", i);
+                const char empty_message[PLAYER_MP_MESSAGE_LEN] = {0};
+                if (LbFileWrite(game.packet_save_fp, empty_message, PLAYER_MP_MESSAGE_LEN) != PLAYER_MP_MESSAGE_LEN) {
+                    ERRORLOG("Chat message placeholder write error");
+                }
+                continue;
+            }
+            if (LbFileWrite(game.packet_save_fp, player->mp_pending_message, PLAYER_MP_MESSAGE_LEN) != PLAYER_MP_MESSAGE_LEN) {
                 ERRORLOG("Chat message file write error");
             }
         }
@@ -290,6 +319,7 @@ TbBool open_new_packet_file_for_save(void)
 {
     // Filling the header
     SYNCMSG("Starting packet saving, turn %lu",(unsigned long)get_gameturn());
+    game.packet_save_head.format_version = PACKET_SAVE_FORMAT_VERSION;
     game.packet_save_head.game_ver_major = VER_MAJOR;
     game.packet_save_head.game_ver_minor = VER_MINOR;
     game.packet_save_head.game_ver_release = VER_RELEASE;
@@ -310,6 +340,7 @@ TbBool open_new_packet_file_for_save(void)
     for (int i = 0; i < PLAYERS_COUNT; i++)
     {
         struct PlayerInfo* player = get_player(i);
+        game.packet_save_head.player_packet_num[i] = player->packet_num;
         if (player_exists(player))
         {
             set_flag(game.packet_save_head.players_exist, to_flag(i));
@@ -362,7 +393,14 @@ void load_packets_for_turn(GameTurn nturn)
         memcpy(&game.packets[i], &pckt_buf[i * sizeof(struct Packet)], sizeof(struct Packet));
     for (long i = 0; i < PACKETS_COUNT; i++) {
         if (game.packets[i].action == PckA_PlyrMsgEnd) {
-            if (LbFileRead(game.packet_save_fp, get_player(i)->mp_pending_message, PLAYER_MP_MESSAGE_LEN) == PLAYER_MP_MESSAGE_LEN) {
+            struct PlayerInfo *player = get_packet_player(i);
+            if (player_invalid(player)) {
+                WARNLOG("No player owns chat packet slot %ld", i);
+                LbFileSeek(game.packet_save_fp, PLAYER_MP_MESSAGE_LEN, Lb_FILE_SEEK_CURRENT);
+                game.packet_file_pos += PLAYER_MP_MESSAGE_LEN;
+                continue;
+            }
+            if (LbFileRead(game.packet_save_fp, player->mp_pending_message, PLAYER_MP_MESSAGE_LEN) == PLAYER_MP_MESSAGE_LEN) {
                 game.packet_file_pos += PLAYER_MP_MESSAGE_LEN;
             } else {
                 ERRORDBG(18,"Cannot read chat message from Packet File");

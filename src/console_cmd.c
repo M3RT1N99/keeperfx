@@ -878,8 +878,8 @@ TbBool cmd_comp_kill(PlayerNumber plyr_idx, char * args)
         return false;
     }
     int id = atoi(pr1str);
-    if (id < 0 || id > PLAYERS_COUNT) {
-        targeted_message_add(MsgType_Player, plyr_idx, plyr_idx, GUI_MESSAGES_DELAY, "player idx [%d] exceeds [%d,%d]", id, 0, PLAYERS_COUNT);
+    if (id < 0 || id >= PLAYERS_COUNT) {
+        targeted_message_add(MsgType_Player, plyr_idx, plyr_idx, GUI_MESSAGES_DELAY, "player idx [%d] exceeds [%d,%d]", id, 0, PLAYERS_COUNT - 1);
         return false;
     }
     struct Thing * thing = get_player_soul_container(id);
@@ -3282,4 +3282,3 @@ static char get_door_number_for_command(char* msg)
 #ifdef __cplusplus
 }
 #endif
-

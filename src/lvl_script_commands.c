@@ -85,6 +85,7 @@ const struct NamedCommand player_desc[] = {
   {"PLAYER4",          PLAYER4},
   {"PLAYER5",          PLAYER5},
   {"PLAYER6",          PLAYER6},
+  {"PLAYER7",          PLAYER7},
   {NULL,               0},
 };
 
@@ -5966,6 +5967,12 @@ static void computer_player_process(struct ScriptContext* context)
     {
         if (i == PLAYER_NEUTRAL)
         {
+            continue;
+        }
+        player = get_player(i);
+        if ((player->allocflags & PlaF_NetworkPlayer) != 0)
+        {
+            SCRPTWRNLOG("Ignoring COMPUTER_PLAYER for network-controlled player %d", i);
             continue;
         }
         if (playertype == PT_Roaming)

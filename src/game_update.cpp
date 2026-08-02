@@ -76,7 +76,8 @@ static void check_players_won(void)
     for (PlayerNumber playerIdx = 0; playerIdx < PLAYERS_COUNT; ++playerIdx)
     {
         curPlayer = get_player(playerIdx);
-        if (!player_exists(curPlayer) || (curPlayer->is_active != 1) || (curPlayer->victory_state != VicS_Undecided))
+        if (!player_exists(curPlayer) || (curPlayer->is_active != 1)
+            || (curPlayer->victory_state != VicS_Undecided) || player_cannot_win(playerIdx))
             continue;
 
         // check if any other player is still alive
@@ -87,20 +88,16 @@ static void check_players_won(void)
                 continue;
 
             struct PlayerInfo* otherPlayer = get_player(secondPlayerIdx);
-            if (player_exists(otherPlayer) && otherPlayer->victory_state == VicS_Undecided)
+            if (player_exists(otherPlayer) && otherPlayer->victory_state == VicS_Undecided
+                && players_are_enemies(playerIdx, secondPlayerIdx) && !player_cannot_win(secondPlayerIdx))
             {
-                struct Thing* heartng = get_player_soul_container(secondPlayerIdx);
-                if (heartng->active_state != ObSt_BeingDestroyed)
-                {
-                    LivingOpponent = true;
-                    break;
-                }
+                LivingOpponent = true;
+                break;
             }
         }
         if (LivingOpponent == false)
         {
             set_player_as_won_level(curPlayer);
-            return;
         }
     }
 }
@@ -117,6 +114,16 @@ static void check_players_lost(void)
       dungeon = get_players_dungeon(player);
       if (player_exists(player) && (player->is_active == 1))
       {
+          if (player_is_roaming(i))
+          {
+              if (((player->allocflags & PlaF_NetworkPlayer) != 0)
+                  && (player->victory_state == VicS_Undecided) && player_cannot_win(i))
+              {
+                  event_kill_all_players_events(i);
+                  set_player_as_lost_level(player);
+              }
+              continue;
+          }
           struct Thing *heartng;
           heartng = get_player_soul_container(i);
           if (heartng->owner != i)
@@ -139,6 +146,43 @@ static void check_players_lost(void)
           }
       }
   }
+}
+
+/**
+ * Focus a network-controlled roaming player on its first creature after the
+ * map's turn-zero scripts have run. This also reveals the starting party, so
+ * a human hero commander without a dungeon heart can immediately possess it.
+ */
+static void initialize_network_roaming_players(void)
+{
+    for (PlayerNumber player_idx = 0; player_idx < PLAYERS_COUNT; player_idx++)
+    {
+        struct PlayerInfo *player = get_player(player_idx);
+        if (!player_exists(player) || (player->allocflags & PlaF_NetworkPlayer) == 0
+            || !player_is_roaming(player_idx))
+        {
+            continue;
+        }
+        struct Dungeon *dungeon = get_players_dungeon(player);
+        if (dungeon_invalid(dungeon)
+            || (dungeon->creatr_list_start == 0 && dungeon->digger_list_start == 0))
+        {
+            continue;
+        }
+        ThingIndex creature_idx = (dungeon->creatr_list_start != 0)
+            ? dungeon->creatr_list_start : dungeon->digger_list_start;
+        struct Thing *creature = thing_get(creature_idx);
+        if (!thing_is_creature(creature) || creature->owner != player_idx)
+        {
+            continue;
+        }
+        dungeon->mappos = creature->mappos;
+        player->cameras[CamIV_Isometric].mappos.x.val = creature->mappos.x.val;
+        player->cameras[CamIV_Isometric].mappos.y.val = creature->mappos.y.val;
+        player->cameras[CamIV_FrontView].mappos.x.val = creature->mappos.x.val;
+        player->cameras[CamIV_FrontView].mappos.y.val = creature->mappos.y.val;
+        init_keeper_map_exploration_by_creatures(player);
+    }
 }
 
 static void blast_slab(MapSlabCoord slb_x, MapSlabCoord slb_y, PlayerNumber plyr_idx)
@@ -546,6 +590,9 @@ void update(void)
         process_level_script();
         process_fx_lines();
         lua_on_game_tick();
+        if (get_gameturn() == 0) {
+            initialize_network_roaming_players();
+        }
         if ((game.view_mode_flags & GNFldD_ComputerPlayerProcessing) != 0)
             process_computer_players2();
         process_players();

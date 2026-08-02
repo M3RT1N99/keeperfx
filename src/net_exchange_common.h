@@ -31,7 +31,7 @@ enum NetworkPeerSendMode {
     NetSend_Unsequenced,
 };
 
-TbBool read_network_message_text(char **read_pos, const char **text, size_t max_len);
+TbBool read_network_message_text(char **read_pos, const char *end_pos, const char **text, size_t max_len);
 void send_network_chat_message(int player_id, const char *message);
 struct PlayerInfo *prepare_network_chat_message(int player_id, const char *message);
 TbBool can_send_to_peer(NetUserId peer_id);

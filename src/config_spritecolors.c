@@ -46,7 +46,7 @@ const struct ConfigFileData keeper_spritecolors_file_data = {
 };
 /******************************************************************************/
 #define MAX_COLORED_SPRITES 255
-#define PLAYER_COLORS_COUNT (COLOURS_COUNT + 2)
+#define PLAYER_COLORS_COUNT (COLOURS_COUNT + 1) /* base sprite plus every player colour */
 static short gui_panel_sprites_eq[MAX_COLORED_SPRITES * PLAYER_COLORS_COUNT];
 static short pointer_sprites_eq[MAX_COLORED_SPRITES * PLAYER_COLORS_COUNT];
 static short button_sprite_eq[MAX_COLORED_SPRITES * PLAYER_COLORS_COUNT];
@@ -108,7 +108,7 @@ static TbBool load_spritecolors_config_file(const char *fname, unsigned short fl
     load_array(&file_root,"objects",objects_eq,flags,get_anim_id_);
 
     extern struct CallToArmsGraphics call_to_arms_graphics[];
-    for (size_t plr_idx = 0; plr_idx < PLAYER_COLORS_COUNT; plr_idx++)
+    for (size_t plr_idx = 0; plr_idx < COLOURS_COUNT; plr_idx++)
     {
         call_to_arms_graphics[plr_idx].birth_anim_idx = get_player_colored_idx(867,plr_idx + 1,animationIds_eq);
         call_to_arms_graphics[plr_idx].alive_anim_idx = get_player_colored_idx(868,plr_idx + 1,animationIds_eq);
@@ -131,7 +131,12 @@ static short get_player_colored_idx(short base_icon_idx,unsigned char color_idx,
     {
         if (arr[i * PLAYER_COLORS_COUNT] == base_icon_idx)
         {
-            return arr[i * PLAYER_COLORS_COUNT + color_idx];
+            short coloured_idx = arr[i * PLAYER_COLORS_COUNT + color_idx];
+            if (coloured_idx == 0 && color_idx == PLAYER7 + 1) {
+                /* Cyan-specific art can be supplied by a resource pack; blue is a safe fallback. */
+                coloured_idx = arr[i * PLAYER_COLORS_COUNT + PLAYER1 + 1];
+            }
+            return coloured_idx;
         }
         else if (arr[i * PLAYER_COLORS_COUNT] == 0)
         {

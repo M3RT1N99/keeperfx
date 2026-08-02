@@ -25,8 +25,8 @@ extern "C" {
 
 TbBool ftest_util_replace_slabs(MapSlabCoord slb_x_from, MapSlabCoord slb_y_from, MapSlabCoord slb_x_to, MapSlabCoord slb_y_to, SlabKind slab_kind, PlayerNumber owner)
 {
-    TbBool valid_player_number = owner >= 0 && owner <= PLAYERS_COUNT;
-    if(owner < PLAYERS_COUNT) // check players that can exist on map
+    TbBool valid_player_number = owner >= 0 && owner < PLAYERS_COUNT;
+    if(valid_player_number) // check players that can exist on map
     {
         valid_player_number = player_exists(get_player(owner));
     }

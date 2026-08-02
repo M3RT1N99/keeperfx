@@ -80,14 +80,14 @@ const struct NamedFieldSet effects_effectgenerator_named_fields_set = {
     get_effectgen_base,
 };
 
-int32_t const imp_spangle_effects[] = {
+int32_t const imp_spangle_effects[COLOURS_COUNT] = {
     TngEff_ImpSpangleRed, TngEff_ImpSpangleBlue, TngEff_ImpSpangleGreen, TngEff_ImpSpangleYellow, TngEff_ImpSpangleWhite,
-    TngEff_None, TngEff_ImpSpanglePurple, TngEff_ImpSpangleBlack, TngEff_ImpSpangleOrange
+    TngEff_None, TngEff_ImpSpanglePurple, TngEff_ImpSpangleBlack, TngEff_ImpSpangleOrange, TngEff_ImpSpangleBlue
 };
 
-int32_t const ball_puff_effects[] = {
+int32_t const ball_puff_effects[COLOURS_COUNT] = {
     TngEff_BallPuffRed, TngEff_BallPuffBlue, TngEff_BallPuffGreen, TngEff_BallPuffYellow, TngEff_BallPuffWhite,
-    TngEff_BallPuffWhite, TngEff_BallPuffPurple, TngEff_BallPuffBlack, TngEff_BallPuffOrange
+    TngEff_BallPuffWhite, TngEff_BallPuffPurple, TngEff_BallPuffBlack, TngEff_BallPuffOrange, TngEff_BallPuffBlue
 };
 
 /******************************************************************************/

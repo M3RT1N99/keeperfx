@@ -1610,11 +1610,12 @@ void process_packets(void)
     write_debug_packets();
     #endif
     // Process the packets
-    for (int i=0; i<PACKETS_COUNT; i++)
+    for (PlayerNumber player_idx = 0; player_idx < PLAYERS_COUNT; player_idx++)
     {
-        struct PlayerInfo* packet_player = get_player(i);
-        if (player_exists(packet_player) && ((packet_player->allocflags & PlaF_CompCtrl) == 0)) {
-            process_players_packet(i);
+        struct PlayerInfo* packet_player = get_player(player_idx);
+        if (player_exists(packet_player) && ((packet_player->allocflags & PlaF_CompCtrl) == 0)
+            && packet_player->packet_num < PACKETS_COUNT) {
+            process_players_packet(player_idx);
         }
     }
     update_local_dig_prediction_cursor_preview();
