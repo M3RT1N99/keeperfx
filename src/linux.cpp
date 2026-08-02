@@ -11,6 +11,7 @@
 #include <vector>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <fnmatch.h>
@@ -24,7 +25,14 @@ extern "C" char keeper_defaults_directory[640];
 #endif
 
 extern "C" const char * get_os_version() {
-#ifdef __APPLE__
+    static char buffer[256];
+    struct utsname system_info;
+    if (uname(&system_info) == 0) {
+        snprintf(buffer, sizeof(buffer), "%s %s (%s)",
+            system_info.sysname, system_info.release, system_info.machine);
+        return buffer;
+    }
+#if defined(__APPLE__)
     return "macOS";
 #else
     return "Linux";
@@ -97,6 +105,23 @@ bool filespec_is_pattern(const char * filespec) {
 	return strchr(filespec, '*') != nullptr;
 }
 
+static std::string lowercase_ascii(std::string value) {
+	for (char &ch : value) {
+		ch = (char)tolower((unsigned char)ch);
+	}
+	return value;
+}
+
+static int case_insensitive_fnmatch(const char *pattern, const std::string &path) {
+#if defined(FNM_CASEFOLD)
+	return fnmatch(pattern, path.c_str(), FNM_PATHNAME | FNM_CASEFOLD);
+#else
+	const std::string folded_pattern = lowercase_ascii(pattern);
+	const std::string folded_path = lowercase_ascii(path);
+	return fnmatch(folded_pattern.c_str(), folded_path.c_str(), FNM_PATHNAME);
+#endif
+}
+
 std::string directory_from_filespec(const char * filespec) {
 	const auto sep = strrchr(filespec, '/');
 	if (sep && sep != filespec) {
@@ -132,7 +157,7 @@ extern "C" TbFileFind * LbFileFindFirst(const char * filespec, TbFileEntry * fe)
 				}
 				const std::string file_path = path + "/" + de->d_name;
 				if (is_pattern) {
-					if (fnmatch(filespec, file_path.c_str(), FNM_FILE_NAME | FNM_CASEFOLD) != 0) {
+					if (case_insensitive_fnmatch(filespec, file_path) != 0) {
 						continue;
 					}
 				}
@@ -143,10 +168,7 @@ extern "C" TbFileFind * LbFileFindFirst(const char * filespec, TbFileEntry * fe)
 				if (!S_ISREG(sb.st_mode)) {
 					continue;
 				}
-				std::string key = de->d_name;
-				for (size_t i = 0; i < key.size(); i++) {
-					key[i] = (char)tolower((unsigned char)key[i]);
-				}
+				std::string key = lowercase_ascii(de->d_name);
 				ff->names.emplace_back(key, de->d_name);
 			}
 			closedir(handle);

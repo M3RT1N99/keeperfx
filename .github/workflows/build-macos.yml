@@ -1,0 +1,106 @@
+name: Build macOS arm64
+
+on:
+  push:
+    branches:
+      - master
+      - feature/macos-support
+    paths:
+      - 'src/**'
+      - 'config/**'
+      - 'res/**'
+      - 'macos.mk'
+      - 'version.mk'
+      - 'tools/build_macos_deps.sh'
+      - 'tools/make_macos_app.sh'
+      - '.github/workflows/build-macos.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'config/**'
+      - 'res/**'
+      - 'macos.mk'
+      - 'version.mk'
+      - 'tools/build_macos_deps.sh'
+      - 'tools/make_macos_app.sh'
+      - '.github/workflows/build-macos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos:
+    name: Native Apple Silicon build
+    runs-on: macos-15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Homebrew dependencies
+        run: |
+          set -euxo pipefail
+          brew install \
+            pkg-config \
+            sdl2 sdl2_image sdl2_mixer sdl2_net \
+            ffmpeg \
+            luajit \
+            openal-soft \
+            libspng \
+            minizip \
+            miniupnpc \
+            libnatpmp \
+            zlib \
+            curl \
+            dylibbundler
+
+      - name: Cache source-only dependencies
+        id: deps-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/astronomy
+            deps/centijson
+            deps/enet6
+          key: macos-arm64-deps-${{ hashFiles('tools/build_macos_deps.sh') }}
+
+      - name: Build source-only dependencies
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: ./tools/build_macos_deps.sh
+
+      - name: Build KeeperFX
+        run: |
+          set -euxo pipefail
+          BUILD_NUMBER=$(git rev-list --count HEAD)
+          VER_SUFFIX=CI_$(git rev-parse --short=7 HEAD)
+          make -f macos.mk \
+            BUILD_NUMBER="$BUILD_NUMBER" \
+            VER_SUFFIX="$VER_SUFFIX" \
+            -j"$(sysctl -n hw.ncpu)"
+
+      - name: Verify native binary
+        run: |
+          set -euxo pipefail
+          file bin/keeperfx
+          lipo -archs bin/keeperfx | grep -qw arm64
+
+      - name: Build and verify app bundle
+        run: |
+          set -euxo pipefail
+          ./tools/make_macos_app.sh
+          test -f dist/KeeperFX.app/Contents/Resources/fxdata/sounds.cfg
+          otool -L dist/KeeperFX.app/Contents/MacOS/keeperfx \
+            | grep -q '@executable_path/../libs'
+          codesign --verify --verbose=2 dist/KeeperFX.app
+          ditto -c -k --keepParent dist/KeeperFX.app dist/KeeperFX.app.zip
+
+      - name: Upload macOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: keeperfx-macos-arm64-${{ github.sha }}
+          path: dist/KeeperFX.app.zip
+          if-no-files-found: error
+

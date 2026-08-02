@@ -131,6 +131,14 @@ What it does, and the non-obvious bits it handles:
 CI runs this and uploads the `.app` as an artifact
 (`.github/workflows/build-macos.yml`).
 
+## Port lineage
+
+This implementation builds on the native Apple Silicon work from
+[dkfans/keeperfx#4984](https://github.com/dkfans/keeperfx/pull/4984). The strict
+alignment and packed-data fixes originate from
+[moretti/keeperfx `macos-port`](https://github.com/moretti/keeperfx/tree/macos-port).
+Their original authorship is preserved in this branch's commit history.
+
 ## Optional enhancements
 
 - **Crash register dump.** Add an `#elif defined(__APPLE__) && defined(__aarch64__)`
