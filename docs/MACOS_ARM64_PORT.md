@@ -131,6 +131,35 @@ What it does, and the non-obvious bits it handles:
 CI runs this and uploads the `.app` as an artifact
 (`.github/workflows/build-macos.yml`).
 
+## Complete macOS distribution
+
+The CI workflow also creates
+`KeeperFX-macOS-arm64-complete.zip`. It combines `KeeperFX.app` with the
+platform-neutral KeeperFX content used by the Windows release pipeline:
+
+- generated engine, menu and land-view graphics;
+- compiled translations;
+- campaigns, map packs and multiplayer maps;
+- creature, engine, mod and Lua configuration.
+
+The shared data is built in a separate Ubuntu job. This separation is
+intentional: the same asset artifact can later be consumed by Windows, Linux
+and macOS packaging jobs, with each platform adding only its native executable
+and runtime libraries. `tools/make_platform_assets.sh` is the shared assembly
+entrypoint for those packaging jobs.
+
+The archive never contains the copyrighted files listed in
+`docs/files_required_from_original_dk.txt`. The packaging script checks for
+those files case-insensitively and fails the build if any are present. Users
+must copy them from a legitimate Dungeon Keeper installation.
+
+To assemble the complete archive locally after building `KeeperFX.app`, place
+the platform-neutral artifact in `macos-assets/` and run:
+
+```sh
+bash tools/make_macos_distribution.sh macos-assets
+```
+
 ## Port lineage
 
 This implementation builds on the native Apple Silicon work from

@@ -7,22 +7,50 @@ on:
       - feature/macos-support
     paths:
       - 'src/**'
+      - 'campgns/**'
       - 'config/**'
+      - 'gfx/**'
+      - 'lang/**'
+      - 'levels/**'
+      - 'multiplayer/**'
       - 'res/**'
+      - 'docs/MACOS_ARM64_PORT.md'
+      - 'docs/files_required_from_original_dk.txt'
+      - 'docs/keeperfx_readme.txt'
       - 'macos.mk'
+      - 'package.mk'
+      - 'pkg_gfx.mk'
+      - 'pkg_lang.mk'
+      - 'prebuilds.mk'
       - 'version.mk'
       - 'tools/build_macos_deps.sh'
       - 'tools/make_macos_app.sh'
+      - 'tools/make_macos_distribution.sh'
+      - 'tools/make_platform_assets.sh'
       - '.github/workflows/build-macos.yml'
   pull_request:
     paths:
       - 'src/**'
+      - 'campgns/**'
       - 'config/**'
+      - 'gfx/**'
+      - 'lang/**'
+      - 'levels/**'
+      - 'multiplayer/**'
       - 'res/**'
+      - 'docs/MACOS_ARM64_PORT.md'
+      - 'docs/files_required_from_original_dk.txt'
+      - 'docs/keeperfx_readme.txt'
       - 'macos.mk'
+      - 'package.mk'
+      - 'pkg_gfx.mk'
+      - 'pkg_lang.mk'
+      - 'prebuilds.mk'
       - 'version.mk'
       - 'tools/build_macos_deps.sh'
       - 'tools/make_macos_app.sh'
+      - 'tools/make_macos_distribution.sh'
+      - 'tools/make_platform_assets.sh'
       - '.github/workflows/build-macos.yml'
   workflow_dispatch:
 
@@ -30,9 +58,59 @@ permissions:
   contents: read
 
 jobs:
+  build-assets:
+    name: Build platform-neutral game data
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dkfans/setup-cpp@master
+
+      - name: Install build dependencies
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            g++-mingw-w64-i686 \
+            libpng16-16t64 \
+            7zip
+
+      - name: Cache graphics sources
+        uses: actions/cache@v4
+        with:
+          path: gfx
+          key: keeperfx-fxgraphics-${{ hashFiles('prebuilds.mk', 'pkg_gfx.mk') }}
+
+      - name: Build generated data and package files
+        run: |
+          set -euxo pipefail
+          BUILD_NUMBER=$(git rev-list --count HEAD)
+          make BUILD_NUMBER="$BUILD_NUMBER" PACKAGE_SUFFIX= pkg-gfx
+          make BUILD_NUMBER="$BUILD_NUMBER" PACKAGE_SUFFIX= heavylog DEBUG=1 -k
+          make BUILD_NUMBER="$BUILD_NUMBER" PACKAGE_SUFFIX= standard
+          make BUILD_NUMBER="$BUILD_NUMBER" PACKAGE_SUFFIX= package
+
+      - name: Assemble platform-neutral assets
+        run: |
+          set -euxo pipefail
+          bash tools/make_platform_assets.sh pkg
+
+      - name: Upload platform-neutral assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: keeperfx-platform-assets-${{ github.sha }}
+          path: pkg/
+          if-no-files-found: error
+
   build-macos:
     name: Native Apple Silicon build
     runs-on: macos-15
+    needs: build-assets
 
     steps:
       - name: Check out source
@@ -97,9 +175,32 @@ jobs:
           codesign --verify --verbose=2 dist/KeeperFX.app
           ditto -c -k --keepParent dist/KeeperFX.app dist/KeeperFX.app.zip
 
+      - name: Download platform-neutral assets
+        uses: actions/download-artifact@v4
+        with:
+          name: keeperfx-platform-assets-${{ github.sha }}
+          path: macos-assets
+
+      - name: Build and verify complete macOS distribution
+        run: |
+          set -euxo pipefail
+          bash ./tools/make_macos_distribution.sh macos-assets
+          test -f dist/KeeperFX-macOS-arm64-complete.zip
+          test -d dist/KeeperFX-macOS-arm64/KeeperFX.app
+          test -f dist/KeeperFX-macOS-arm64/data/creature.jty
+          test -f dist/KeeperFX-macOS-arm64/fxdata/sounds.cfg
+          test ! -f dist/KeeperFX-macOS-arm64/data/bluepal.dat
+
       - name: Upload macOS app
         uses: actions/upload-artifact@v4
         with:
           name: keeperfx-macos-arm64-${{ github.sha }}
           path: dist/KeeperFX.app.zip
+          if-no-files-found: error
+
+      - name: Upload complete macOS distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: keeperfx-macos-arm64-complete-${{ github.sha }}
+          path: dist/KeeperFX-macOS-arm64-complete.zip
           if-no-files-found: error
