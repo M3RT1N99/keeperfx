@@ -202,5 +202,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: keeperfx-macos-arm64-complete-${{ github.sha }}
-          path: dist/KeeperFX-macOS-arm64-complete.zip
+          # Upload the distribution contents directly. GitHub already wraps
+          # artifacts in a ZIP, so uploading our ZIP here would force users to
+          # unpack twice and leave an unnecessary extra directory level.
+          path: dist/KeeperFX-macOS-arm64/*
           if-no-files-found: error

@@ -148,6 +148,11 @@ and macOS packaging jobs, with each platform adding only its native executable
 and runtime libraries. `tools/make_platform_assets.sh` is the shared assembly
 entrypoint for those packaging jobs.
 
+The GitHub Actions artifact uploads the contents of that distribution directly,
+rather than nesting the distribution ZIP inside GitHub's own artifact ZIP.
+After one extraction, users therefore see `KeeperFX.app`, `data/`, `sound/`,
+`campgns/` and the other game folders at the top level.
+
 The archive never contains the copyrighted files listed in
 `docs/files_required_from_original_dk.txt`. The packaging script checks for
 those files case-insensitively and fails the build if any are present. Users
