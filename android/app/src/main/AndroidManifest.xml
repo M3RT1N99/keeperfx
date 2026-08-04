@@ -4,6 +4,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!--
+      Games on the local network announce themselves by broadcasting to
+      255.255.255.255. Wi-Fi hardware drops packets that are not addressed to
+      the device unless a multicast lock is held, so without this the game list
+      stays empty on both ends. GameActivity holds the lock only while playing.
+    -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!--
       The app is sideloaded, so nothing else will ever offer it a newer build.
       This lets the launcher hand a downloaded APK to the system installer; the
       player still has to confirm both the one-off permission and the install.

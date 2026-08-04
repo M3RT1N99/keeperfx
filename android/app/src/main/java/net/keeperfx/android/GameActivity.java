@@ -19,7 +19,10 @@
 /******************************************************************************/
 package net.keeperfx.android;
 
+import android.content.Context;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -37,7 +40,10 @@ public class GameActivity extends SDLActivity {
     /** Extra carrying the full argv the launcher wants the engine to see. */
     public static final String EXTRA_ARGUMENTS = "net.keeperfx.android.ARGUMENTS";
 
+    private static final String TAG = "KeeperFX";
+
     private String[] arguments = new String[0];
+    private WifiManager.MulticastLock multicastLock;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,6 +107,61 @@ public class GameActivity extends SDLActivity {
     private void sendEscape(View button) {
         SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE);
         button.postDelayed(() -> SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE), 80);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        acquireMulticastLock();
+    }
+
+    @Override
+    protected void onPause() {
+        releaseMulticastLock();
+        super.onPause();
+    }
+
+    /**
+     * Lets the device see local network game announcements.
+     *
+     * Games on a LAN find each other by broadcasting to 255.255.255.255 once a
+     * second. Wi-Fi hardware drops everything that is not addressed to the
+     * device while it is saving power, so without this lock the game list stays
+     * empty even though both machines are on the same network. It is tied to
+     * the activity being in the foreground, which is also the only time the
+     * engine is running - SDL_HINT_ANDROID_BLOCK_ON_PAUSE stops it otherwise.
+     */
+    private void acquireMulticastLock() {
+        if (multicastLock != null) {
+            return;
+        }
+        try {
+            final WifiManager wifi =
+                (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wifi == null) {
+                return;
+            }
+            multicastLock = wifi.createMulticastLock("keeperfx-lan");
+            multicastLock.setReferenceCounted(false);
+            multicastLock.acquire();
+        } catch (Exception e) {
+            // A device without Wi-Fi, or a manufacturer that refuses the lock.
+            // Local network play is then simply unavailable; nothing else is.
+            Log.w(TAG, "Cannot hold a multicast lock: " + e);
+            multicastLock = null;
+        }
+    }
+
+    private void releaseMulticastLock() {
+        if (multicastLock == null) {
+            return;
+        }
+        try {
+            multicastLock.release();
+        } catch (Exception e) {
+            Log.w(TAG, "Cannot release the multicast lock: " + e);
+        }
+        multicastLock = null;
     }
 
     @Override
