@@ -95,8 +95,13 @@ PR #4657.
 | Drag two fingers | Pan the map; the world follows the fingers |
 | Pinch two fingers | Zoom in and out |
 | Twist two fingers | Rotate the camera |
+| Two finger tap | Back — leaves the open menu |
 | Three finger tap | Toggle the map view |
 | Four finger tap | Pause menu |
+
+The system back button and the back gesture do the same as a two finger tap.
+SDL would otherwise close the activity on back, dropping the player straight
+out of the game, so it is trapped and mapped to Escape.
 
 Positioning is **absolute**: the in-game pointer jumps to the finger through
 `LbMouseSetPositionInitial()`, which does not warp the host cursor. Camera

@@ -225,6 +225,13 @@ void init_inputcontrol(void)
     keymap_sdl_to_bf.insert(pair<int, TbKeyCode>(SDLK_MENU, KC_APPS));
     keymap_sdl_to_bf.insert(pair<int, TbKeyCode>(SDLK_POWER, KC_POWER));
     keymap_sdl_to_bf.insert(pair<int, TbKeyCode>(SDLK_UNDO, KC_UNASSIGNED));
+#if defined(__ANDROID__)
+    // The system back button and the back gesture. Every Android user expects
+    // them to leave whatever is open, which here is what Escape does. Only
+    // mapped on Android: on the desktop the same code comes from a browser
+    // back key, where turning it into Escape would be a surprise.
+    keymap_sdl_to_bf.insert(pair<int, TbKeyCode>(SDLK_AC_BACK, KC_ESCAPE));
+#endif
 
     init_controller_input();
     init_touch_input();

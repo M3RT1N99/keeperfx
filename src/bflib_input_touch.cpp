@@ -34,6 +34,7 @@
 #include "bflib_touch.h"
 #include "bflib_basics.h"
 #include "bflib_inputctrl.h"
+#include "bflib_keybrd.h"
 #include "bflib_mouse.h"
 #include "bflib_planar.h"
 #include "bflib_video.h"
@@ -142,6 +143,12 @@ static float touch_axis_rotate_cw, touch_axis_rotate_ccw;
 /* One shot gestures, consumed by touch_game_key_pressed(). */
 static TbBool touch_tapped_map_toggle = false;
 static TbBool touch_tapped_pause_menu = false;
+
+/* Two finger tap: leaves whatever is open. Emitted as Escape rather than as a
+   game key because that is the one the menus themselves listen for, and it is
+   what the system back button produces too. */
+static TbBool touch_tapped_back = false;
+static int touch_back_key_frames = 0;
 
 /** What a running two finger gesture has committed to. */
 enum TouchTwoFingerMode {
@@ -257,6 +264,8 @@ static void touch_reset_state(void)
     touch_reset_gesture_axes();
     touch_tapped_map_toggle = false;
     touch_tapped_pause_menu = false;
+    touch_tapped_back = false;
+    touch_back_key_frames = 0;
 }
 
 void init_touch_input(void)
@@ -594,7 +603,9 @@ void TEvent(const SDL_Event *ev)
                 // Multi finger taps that never turned into a drag act as shortcuts.
                 if (!was_moved && (held_ms <= TOUCH_TAP_MAX_MS))
                 {
-                    if (touch_max_fingers_this_contact == 3)
+                    if (touch_max_fingers_this_contact == 2)
+                        touch_tapped_back = true;
+                    else if (touch_max_fingers_this_contact == 3)
                         touch_tapped_map_toggle = true;
                     else if (touch_max_fingers_this_contact >= 4)
                         touch_tapped_pause_menu = true;
@@ -676,6 +687,22 @@ void update_touch_inputs(void)
             }
             break;
         }
+    }
+
+    // Escape is held for a frame so the menu code sees a complete keypress,
+    // the same shape the controller path uses for its pause button.
+    if (touch_back_key_frames > 0)
+    {
+        touch_back_key_frames--;
+        if (touch_back_key_frames == 0)
+            lbKeyOn[KC_ESCAPE] = 0;
+    }
+    if (touch_tapped_back)
+    {
+        touch_tapped_back = false;
+        lbKeyOn[KC_ESCAPE] = 1;
+        lbInkey = KC_ESCAPE;
+        touch_back_key_frames = 2;
     }
 
     touch_apply_pan_accumulator();

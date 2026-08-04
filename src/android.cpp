@@ -258,6 +258,10 @@ extern "C" int main(int argc, char *argv[])
     // Keep the engine running while the activity is in the background rather
     // than tearing down the GL context on every notification shade pull.
     SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1");
+    // Left alone, the back button closes the activity, which drops the player
+    // out of the game entirely. Trapped, it arrives as SDLK_AC_BACK and the
+    // input layer turns it into Escape, which is what leaves a menu.
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 
     args.push_back(nullptr);
     const int result = kfxmain((int)(args.size() - 1), args.data());
