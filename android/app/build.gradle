@@ -34,7 +34,10 @@ android {
         minSdk 28
         targetSdk 34
         versionCode verMajor * 1000000 + verMinor * 10000 + verRelease * 1000 + buildNumber
-        versionName "${verMajor}.${verMinor}.${verRelease}.${buildNumber}"
+        // KeeperFX's own version, an underscore, then this port's build number.
+        // The separator is what makes the two halves tellable apart at a glance:
+        // everything before it comes from upstream, everything after is ours.
+        versionName "${verMajor}.${verMinor}.${verRelease}_${buildNumber}"
 
         ndk {
             abiFilters.addAll(

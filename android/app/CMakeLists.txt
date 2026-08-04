@@ -66,7 +66,10 @@ endif()
 if(NOT DEFINED GIT_REVISION OR GIT_REVISION STREQUAL "")
     set(GIT_REVISION "unknown")
 endif()
-set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${VER_BUILD} ${PACKAGE_SUFFIX}")
+# KeeperFX's own version, an underscore, then this port's build number, so the
+# log header says which half is which. The desktop builds keep the plain dotted
+# form; this composition is the Android port's alone.
+set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}_${VER_BUILD} ${PACKAGE_SUFFIX}")
 
 set(KFX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${KFX_GENERATED_DIR}")
