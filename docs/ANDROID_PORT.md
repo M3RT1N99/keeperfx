@@ -8,6 +8,20 @@ how to build it.
 
 ---
 
+## Status
+
+**Verified:** the APK builds end to end in CI. `libkeeperfx.so` is a 4.7 MB
+aarch64 ELF that exports `SDL_main`; every `DT_NEEDED` entry resolves either
+inside the package (SDL2, SDL2_image, SDL2_mixer, SDL2_net, OpenAL,
+`libc++_shared`) or against a system library. The manifest declares both
+activities, and all launcher classes plus `SDLActivity` are in `classes.dex`.
+The same workflow builds the Linux x86_64 target, which stays green.
+
+**Not verified:** the engine has never been executed on Android. Nobody has
+launched this APK on a device or emulator. Expect runtime work on at least the
+video mode setup, the touch gestures against the real GUI, and the data paths.
+Treat the current state as "compiles, links and installs", not "plays".
+
 ## What is in the APK
 
 | Component | Notes |
