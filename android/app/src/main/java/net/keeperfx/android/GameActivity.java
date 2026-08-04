@@ -45,8 +45,9 @@ public class GameActivity extends SDLActivity {
     }
 
     /**
-     * Load order matters on older Android releases, where transitive
-     * dependencies of a shared object are not resolved automatically.
+     * Listed in dependency order. The dynamic linker would resolve most of
+     * these on its own, but SDL expects its own library to be loaded before
+     * nativeRunMain() is reached.
      */
     @Override
     protected String[] getLibraries() {

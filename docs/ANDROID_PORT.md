@@ -148,6 +148,10 @@ nothing — these builds are for sideloading, not for the Play Store.
 
 ## Installing and running
 
+Requires **Android 9 (API 28)** or newer on an arm64 device. The floor is set by
+`iconv`, which `bflib_text.c` uses for the double byte languages and which
+bionic only gained in API 28.
+
 1. Build or download the APK and install it (allow installation from unknown
    sources).
 2. Put a complete KeeperFX installation somewhere on the device — internal

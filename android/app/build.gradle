@@ -24,7 +24,9 @@ android {
 
     defaultConfig {
         applicationId "net.keeperfx.android"
-        minSdk 21
+        // Android 9. bflib_text.c needs iconv for the double byte languages
+        // (CP932, CP936, EUC-KR) and bionic only gained it in API 28.
+        minSdk 28
         targetSdk 34
         versionCode verMajor * 1000000 + verMinor * 10000 + verRelease * 1000 + buildNumber
         versionName "${verMajor}.${verMinor}.${verRelease}.${buildNumber}"
