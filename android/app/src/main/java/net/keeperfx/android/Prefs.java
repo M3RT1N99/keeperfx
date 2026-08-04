@@ -35,6 +35,7 @@ public final class Prefs {
     public static final int INPUT_POINTER = 2;
 
     private static final String KEY_INPUT_MODE = "input_mode";
+    private static final String KEY_BACK_BUTTON = "back_button";
     private static final String KEY_NO_INTRO = "no_intro";
     private static final String KEY_NO_SOUND = "no_sound";
     private static final String KEY_EXTRA_ARGS = "extra_args";
@@ -52,6 +53,15 @@ public final class Prefs {
 
     public void setInputMode(int mode) {
         prefs.edit().putInt(KEY_INPUT_MODE, mode).apply();
+    }
+
+    /** Whether the game draws a back arrow over its top right corner. */
+    public boolean isBackButtonShown() {
+        return prefs.getBoolean(KEY_BACK_BUTTON, true);
+    }
+
+    public void setBackButtonShown(boolean value) {
+        prefs.edit().putBoolean(KEY_BACK_BUTTON, value).apply();
     }
 
     public boolean isNoIntro() {

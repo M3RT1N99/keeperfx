@@ -189,6 +189,13 @@
                         android:textColor="@color/kfx_text" />
                 </RadioGroup>
 
+                <CheckBox
+                    android:id="@+id/backButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:text="@string/option_back_button"
+                    android:textColor="@color/kfx_text" />
+
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

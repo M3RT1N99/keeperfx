@@ -20,9 +20,15 @@
 package net.keeperfx.android;
 
 import android.os.Bundle;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 
 import org.libsdl.app.SDLActivity;
 
@@ -49,6 +55,52 @@ public class GameActivity extends SDLActivity {
         getWindow().getAttributes().layoutInDisplayCutoutMode =
             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         goImmersive();
+        if (new Prefs(this).isBackButtonShown()) {
+            addBackButton();
+        }
+    }
+
+    /**
+     * Puts a back arrow over the top right corner of the game.
+     *
+     * The engine leaves menus on Escape, which a phone has no key for. The
+     * system back gesture is mapped onto it and so is a two finger tap, but
+     * neither is discoverable, and a player who cannot find the way out of a
+     * menu is stuck in it. The status panel is anchored to the left, so the
+     * opposite corner is the one place the button covers nothing but scenery.
+     */
+    private void addBackButton() {
+        final float density = getResources().getDisplayMetrics().density;
+        final int size = Math.round(48 * density);
+        final int margin = Math.round(10 * density);
+        final ImageButton button = new ImageButton(this);
+        button.setImageResource(R.drawable.ic_game_back);
+        button.setBackgroundResource(R.drawable.overlay_round);
+        button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        button.setContentDescription(getString(R.string.game_back));
+        // Present but not competing with the game for attention.
+        button.setAlpha(0.55f);
+        button.setOnClickListener(view -> sendEscape(view));
+        final FrameLayout.LayoutParams params =
+            new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.END);
+        params.topMargin = margin;
+        params.rightMargin = margin;
+        // addContentView() stacks onto the window's own frame, so SDL's view
+        // hierarchy is left exactly as SDLActivity built it.
+        addContentView(button, params);
+    }
+
+    /**
+     * Feeds the engine an Escape press.
+     *
+     * SDL translates the Android key code into its own, so this arrives as an
+     * ordinary keyboard event and no engine code has to know about it. The
+     * release is delayed because the game samples the keyboard once per frame
+     * and would otherwise see a key that was never held.
+     */
+    private void sendEscape(View button) {
+        SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE);
+        button.postDelayed(() -> SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE), 80);
     }
 
     @Override

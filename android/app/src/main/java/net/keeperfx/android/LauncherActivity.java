@@ -63,6 +63,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private Button playButton;
     private Button updateAppButton;
     private RadioGroup inputModeGroup;
+    private CheckBox backButtonBox;
     private CheckBox noIntroBox;
     private CheckBox noSoundBox;
     private EditText extraArgsField;
@@ -89,6 +90,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         updateAppButton.setText(getString(R.string.button_update_app,
             AppUpdater.installedVersionName(this)));
         inputModeGroup = findViewById(R.id.inputMode);
+        backButtonBox = findViewById(R.id.backButton);
         noIntroBox = findViewById(R.id.noIntro);
         noSoundBox = findViewById(R.id.noSound);
         extraArgsField = findViewById(R.id.extraArgs);
@@ -104,6 +106,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 inputModeGroup.check(R.id.inputAuto);
                 break;
         }
+        backButtonBox.setChecked(prefs.isBackButtonShown());
         noIntroBox.setChecked(prefs.isNoIntro());
         noSoundBox.setChecked(prefs.isNoSound());
         extraArgsField.setText(prefs.getExtraArguments());
@@ -117,6 +120,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 prefs.setInputMode(Prefs.INPUT_AUTO);
             }
         });
+        backButtonBox.setOnCheckedChangeListener((v, checked) -> prefs.setBackButtonShown(checked));
         noIntroBox.setOnCheckedChangeListener((v, checked) -> prefs.setNoIntro(checked));
         noSoundBox.setOnCheckedChangeListener((v, checked) -> prefs.setNoSound(checked));
         extraArgsField.addTextChangedListener(new TextWatcher() {
