@@ -52,22 +52,39 @@ public final class BundledConfig {
     }
 
     /**
-     * Copies the bundled configuration into the installation.
+     * Copies the bundled configuration into the installation, keeping the
+     * player's own keeperfx.cfg.
      *
      * @return the number of files written.
      */
     public static int install(Context context) throws IOException {
+        return install(context, false);
+    }
+
+    /**
+     * Copies the bundled configuration into the installation.
+     *
+     * @param replaceUserSettings replace keeperfx.cfg as well. True right after
+     *        an install or import, where it belongs to the data that just
+     *        arrived and may come from a version whose options this engine does
+     *        not parse. False on a normal launch, where it holds settings the
+     *        player has since changed.
+     * @return the number of files written.
+     */
+    public static int install(Context context, boolean replaceUserSettings) throws IOException {
         final File destination = GameData.gameDirectory(context);
         if (!destination.isDirectory() && !destination.mkdirs()) {
             throw new IOException("Cannot create " + destination.getAbsolutePath());
         }
-        final int written = copyDirectory(context.getAssets(), ASSET_ROOT, destination);
-        Log.i(TAG, "Applied " + written + " bundled configuration files");
+        final int written = copyDirectory(
+            context.getAssets(), ASSET_ROOT, destination, replaceUserSettings);
+        Log.i(TAG, "Applied " + written + " bundled configuration files"
+            + (replaceUserSettings ? " including keeperfx.cfg" : ""));
         return written;
     }
 
-    private static int copyDirectory(AssetManager assets, String assetPath, File target)
-            throws IOException {
+    private static int copyDirectory(AssetManager assets, String assetPath, File target,
+            boolean replaceUserSettings) throws IOException {
         final String[] entries = assets.list(assetPath);
         if (entries == null || entries.length == 0) {
             return 0;
@@ -85,12 +102,13 @@ public final class BundledConfig {
             // directory, and anything else is treated as a file.
             final String[] grandChildren = assets.list(childAsset);
             if (grandChildren != null && grandChildren.length > 0) {
-                written += copyDirectory(assets, childAsset, childFile);
+                written += copyDirectory(assets, childAsset, childFile, replaceUserSettings);
                 continue;
             }
 
-            if (USER_SETTINGS.equalsIgnoreCase(entry) && childFile.isFile()) {
-                continue; // the player's own settings win
+            if (USER_SETTINGS.equalsIgnoreCase(entry) && childFile.isFile()
+                && !replaceUserSettings) {
+                continue; // the player's own settings win on a normal launch
             }
             copyFile(assets, childAsset, childFile);
             written++;

@@ -385,7 +385,7 @@ public final class ReleaseDownloader {
         // The release predates the engine we just built, so its configuration
         // can be missing files or carry values this parser rejects.
         listener.onStage("Applying configuration", -1, "");
-        BundledConfig.install(context);
+        BundledConfig.install(context, true);
     }
 
     private static boolean isSkipped(String name) {
