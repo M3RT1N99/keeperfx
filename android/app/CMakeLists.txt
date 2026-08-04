@@ -377,6 +377,7 @@ target_include_directories(keeperfx PRIVATE
     "${KFX_ROOT}/src"
     "${KFX_GENERATED_DIR}"
     "${KFX_SDL2_COMPAT_INC}"
+    "${KFX_UPNP_COMPAT_INC}"
     ${KFX_ZLIB_INCLUDES})
 
 target_compile_definitions(keeperfx PRIVATE
