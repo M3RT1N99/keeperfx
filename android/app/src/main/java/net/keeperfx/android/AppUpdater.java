@@ -92,6 +92,10 @@ public final class AppUpdater {
         cancelled = true;
     }
 
+    private boolean isCancelled() {
+        return cancelled || DownloadService.isCancelRequested();
+    }
+
     // ------------------------------------------------------------ version check
 
     /** Build number of the running app, taken from the last part of the version name. */
@@ -154,18 +158,22 @@ public final class AppUpdater {
     /** Runs synchronously; the caller provides the thread. */
     public void downloadAndInstall(Available available) {
         try {
-            final File dir = new File(context.getCacheDir(), "updates");
+            final File dir = new File(context.getFilesDir(), "updates");
             //noinspection ResultOfMethodCallIgnored
             dir.mkdirs();
+            // Named after the version so a partial download of an older build
+            // is never mistaken for this one and resumed into nonsense.
+            final File target = new File(dir, "keeperfx-" + available.versionName + ".apk");
             for (File stale : dir.listFiles() != null ? dir.listFiles() : new File[0]) {
-                //noinspection ResultOfMethodCallIgnored
-                stale.delete();
+                if (!stale.equals(target)) {
+                    //noinspection ResultOfMethodCallIgnored
+                    stale.delete();
+                }
             }
-            final File target = new File(dir, "keeperfx-update.apk");
 
             listener.onProgress(-1, "");
             download(available.apkUrl, target);
-            if (cancelled) {
+            if (isCancelled()) {
                 //noinspection ResultOfMethodCallIgnored
                 target.delete();
                 listener.onFinished(false, "Download cancelled");
@@ -173,7 +181,7 @@ public final class AppUpdater {
             }
 
             final Uri uri = FileProvider.getUriForFile(
-                context, context.getPackageName() + ".logs", target);
+                context, context.getPackageName() + ".files", target);
             final Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, "application/vnd.android.package-archive");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -188,32 +196,19 @@ public final class AppUpdater {
     }
 
     private void download(String url, File target) throws IOException {
-        final HttpURLConnection connection = openFollowingRedirects(url);
-        try {
-            final long total = connection.getContentLengthLong();
-            long done = 0;
-            int lastPercent = -1;
-            try (InputStream in = new BufferedInputStream(connection.getInputStream());
-                 OutputStream out = new FileOutputStream(target)) {
-                final byte[] buffer = new byte[128 * 1024];
-                int read;
-                while ((read = in.read(buffer)) > 0) {
-                    if (cancelled) {
-                        return;
-                    }
-                    out.write(buffer, 0, read);
-                    done += read;
-                    final int percent = (total > 0) ? (int) (done * 100 / total) : -1;
-                    if (percent != lastPercent) {
-                        lastPercent = percent;
-                        listener.onProgress(percent, String.format(Locale.US, "%s of %s",
-                            GameData.describeBytes(done), GameData.describeBytes(total)));
-                    }
-                }
+        ResumableDownload.fetch(url, target, new ResumableDownload.Progress() {
+            @Override
+            public void onBytes(long done, long total) {
+                final int percent = (total > 0) ? (int) (done * 100 / total) : -1;
+                listener.onProgress(percent, String.format(Locale.US, "%s of %s",
+                    GameData.describeBytes(done), GameData.describeBytes(total)));
             }
-        } finally {
-            connection.disconnect();
-        }
+
+            @Override
+            public boolean isCancelled() {
+                return AppUpdater.this.isCancelled();
+            }
+        });
     }
 
     /**

@@ -20,9 +20,11 @@
 /******************************************************************************/
 package net.keeperfx.android;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -37,10 +39,11 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.RadioGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.List;
 
-public class LauncherActivity extends Activity {
+public class LauncherActivity extends Activity implements DownloadService.Observer {
 
     private static final int REQUEST_PICK_KEEPERFX = 1001;
     private static final int REQUEST_PICK_ORIGINAL_DK = 1002;
@@ -63,8 +66,6 @@ public class LauncherActivity extends Activity {
     private EditText extraArgsField;
 
     private DataImporter runningImport;
-    private ReleaseDownloader runningDownload;
-    private AppUpdater runningAppUpdate;
     private boolean busy = false;
 
     @Override
@@ -137,10 +138,17 @@ public class LauncherActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        DownloadService.addObserver(this);
         refreshStatus();
-        if (!busy) {
+        if (!busy && !DownloadService.isRunning()) {
             checkForUpdateInBackground();
         }
+    }
+
+    @Override
+    protected void onPause() {
+        DownloadService.removeObserver(this);
+        super.onPause();
     }
 
     // ---------------------------------------------------------------- status
@@ -220,6 +228,10 @@ public class LauncherActivity extends Activity {
      * the background music and a newer build of this app.
      */
     private void confirmInstallOrUpdate() {
+        if (DownloadService.isRunning()) {
+            Toast.makeText(this, R.string.updates_running, Toast.LENGTH_SHORT).show();
+            return;
+        }
         setBusy(true);
         progressBar.setIndeterminate(true);
         keeperfxStatus.setText(R.string.status_checking_updates);
@@ -263,78 +275,24 @@ public class LauncherActivity extends Activity {
             .setTitle(getString(R.string.updates_available_title, items.size()))
             .setMessage(body.toString().trim())
             .setPositiveButton(R.string.updates_download_all,
-                (dialog, which) -> runUpdates(items, 0))
+                (dialog, which) -> runUpdates(items))
             .setNegativeButton(android.R.string.cancel, null)
             .show();
     }
 
-    /** Works through the list one item at a time; the app update comes last. */
-    private void runUpdates(List<UpdateManager.Item> items, int index) {
-        if (index >= items.size()) {
-            setBusy(false);
-            refreshStatus();
-            return;
+    /**
+     * Hands the whole list to the foreground service. It keeps running when the
+     * launcher is closed, which a 360 MB transfer needs, and reports back
+     * through onDownloadState().
+     */
+    private void runUpdates(List<UpdateManager.Item> items) {
+        boolean needsInstallPermission = false;
+        for (UpdateManager.Item item : items) {
+            if (item.kind == UpdateManager.Kind.APP) {
+                needsInstallPermission = true;
+            }
         }
-        final UpdateManager.Item item = items.get(index);
-        setBusy(true);
-        progressBar.setIndeterminate(true);
-        detailView.setText("");
-
-        switch (item.kind) {
-            case GAME_DATA:
-                runDownloader(downloader -> downloader.run(), items, index);
-                break;
-            case MUSIC:
-                runDownloader(downloader -> downloader.runMusic(), items, index);
-                break;
-            case APP:
-                runAppUpdate(item, items, index);
-                break;
-        }
-    }
-
-    private interface DownloaderAction {
-        void run(ReleaseDownloader downloader);
-    }
-
-    private void runDownloader(DownloaderAction action, List<UpdateManager.Item> items, int index) {
-        final ReleaseDownloader downloader = new ReleaseDownloader(this,
-            new ReleaseDownloader.Listener() {
-                @Override
-                public void onStage(String stage, int percent, String detail) {
-                    mainHandler.post(() -> {
-                        keeperfxStatus.setText(stage);
-                        detailView.setText(detail);
-                        if (percent >= 0) {
-                            progressBar.setIndeterminate(false);
-                            progressBar.setProgress(percent);
-                        } else {
-                            progressBar.setIndeterminate(true);
-                        }
-                    });
-                }
-
-                @Override
-                public void onFinished(boolean success, String message) {
-                    mainHandler.post(() -> {
-                        runningDownload = null;
-                        if (!success) {
-                            setBusy(false);
-                            refreshStatus();
-                            showError(R.string.install_failed, message);
-                            return;
-                        }
-                        runUpdates(items, index + 1);
-                    });
-                }
-            });
-        runningDownload = downloader;
-        new Thread(() -> action.run(downloader), "kfx-download").start();
-    }
-
-    private void runAppUpdate(UpdateManager.Item item, List<UpdateManager.Item> items, int index) {
-        if (!AppUpdater.canInstallPackages(this)) {
-            setBusy(false);
+        if (needsInstallPermission && !AppUpdater.canInstallPackages(this)) {
             new AlertDialog.Builder(this)
                 .setTitle(R.string.updates_permission_title)
                 .setMessage(R.string.updates_permission)
@@ -345,121 +303,40 @@ public class LauncherActivity extends Activity {
                 .show();
             return;
         }
-
-        final AppUpdater updater = new AppUpdater(this, new AppUpdater.Listener() {
-            @Override
-            public void onProgress(int percent, String detail) {
-                mainHandler.post(() -> {
-                    keeperfxStatus.setText(R.string.status_downloading_app);
-                    detailView.setText(detail);
-                    if (percent >= 0) {
-                        progressBar.setIndeterminate(false);
-                        progressBar.setProgress(percent);
-                    } else {
-                        progressBar.setIndeterminate(true);
-                    }
-                });
-            }
-
-            @Override
-            public void onFinished(boolean success, String message) {
-                mainHandler.post(() -> {
-                    runningAppUpdate = null;
-                    if (!success) {
-                        setBusy(false);
-                        refreshStatus();
-                        showError(R.string.install_failed, message);
-                        return;
-                    }
-                    // The system installer is now in front; continuing the list
-                    // behind it would be confusing, and it is the last item.
-                    runUpdates(items, index + 1);
-                });
-            }
-        });
-        runningAppUpdate = updater;
-        new Thread(() -> updater.downloadAndInstall(item.appUpdate), "kfx-app-update").start();
+        requestNotificationPermission();
+        DownloadService.start(this, items);
     }
 
-    // ---------------------------------------------------------------- import
-
-    private void pickFolder(int requestCode, int titleRes, int explanationRes) {
-        new AlertDialog.Builder(this)
-            .setTitle(titleRes)
-            .setMessage(explanationRes)
-            .setPositiveButton(R.string.import_choose, (dialog, which) -> {
-                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivityForResult(intent, requestCode);
-            })
-            .setNegativeButton(android.R.string.cancel, null)
-            .show();
+    /**
+     * Without this the progress notification is silently dropped on Android 13
+     * and newer. The download itself still runs either way, so the result is
+     * not checked.
+     */
+    private void requestNotificationPermission() {
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 2001);
+        }
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK || data == null) {
-            return;
-        }
-        if (requestCode != REQUEST_PICK_KEEPERFX && requestCode != REQUEST_PICK_ORIGINAL_DK) {
-            return;
-        }
-        final Uri treeUri = data.getData();
-        if (treeUri == null) {
-            return;
-        }
-        try {
-            getContentResolver().takePersistableUriPermission(
-                treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        } catch (SecurityException ignored) {
-            // Not every provider offers persistable permissions; the copy below
-            // only needs the grant that is alive for this activity result.
-        }
-        startImport(treeUri, requestCode == REQUEST_PICK_KEEPERFX);
-    }
-
-    private void startImport(Uri treeUri, boolean keeperfxRelease) {
-        setBusy(true);
-        progressBar.setIndeterminate(true);
-        detailView.setText("");
-        if (keeperfxRelease) {
-            keeperfxStatus.setText(R.string.status_importing);
-        } else {
-            originalDkStatus.setText(R.string.status_searching_original);
-        }
-
-        final DataImporter importer = new DataImporter(this, new DataImporter.Listener() {
-            @Override
-            public void onProgress(int filesCopied, String currentPath) {
-                mainHandler.post(() -> detailView.setText(
-                    getString(R.string.status_import_progress, filesCopied, currentPath)));
-            }
-
-            @Override
-            public void onFinished(boolean success, String message) {
-                mainHandler.post(() -> {
-                    runningImport = null;
-                    setBusy(false);
-                    if (success && keeperfxRelease) {
-                        // A hand picked folder carries no version we can trust.
-                        prefs.setInstalledVersion("");
-                    }
-                    refreshStatus();
-                    if (!success) {
-                        showError(R.string.import_failed, message);
-                    }
-                });
-            }
-        });
-        runningImport = importer;
-        new Thread(() -> {
-            if (keeperfxRelease) {
-                importer.importKeeperfxTree(treeUri);
+    public void onDownloadState(DownloadService.State state) {
+        setBusy(state.running);
+        if (state.running) {
+            keeperfxStatus.setText(state.stage);
+            detailView.setText(state.detail);
+            if (state.percent >= 0) {
+                progressBar.setIndeterminate(false);
+                progressBar.setProgress(state.percent);
             } else {
-                importer.importOriginalDkTree(treeUri);
+                progressBar.setIndeterminate(true);
             }
-        }, "kfx-import").start();
+            return;
+        }
+        refreshStatus();
+        if (state.error != null) {
+            showError(R.string.install_failed, state.error);
+        }
     }
 
     // ----------------------------------------------------------------- misc
@@ -527,12 +404,6 @@ public class LauncherActivity extends Activity {
     protected void onDestroy() {
         if (runningImport != null) {
             runningImport.cancel();
-        }
-        if (runningDownload != null) {
-            runningDownload.cancel();
-        }
-        if (runningAppUpdate != null) {
-            runningAppUpdate.cancel();
         }
         super.onDestroy();
     }

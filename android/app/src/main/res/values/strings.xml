@@ -52,6 +52,12 @@
     <string name="updates_permission">To install its own update, KeeperFX needs permission to install apps. Grant it once in the settings screen that follows, then start the update again.</string>
     <string name="updates_permission_open">Open settings</string>
 
+    <string name="notification_channel_downloads">Downloads</string>
+    <string name="notification_preparing">Preparing…</string>
+    <string name="notification_done">Download finished</string>
+    <string name="notification_cancelled">Download cancelled</string>
+    <string name="updates_running">A download is already running.</string>
+
     <string name="install_title">Install KeeperFX</string>
     <string name="install_update_title">Update KeeperFX</string>
     <string name="install_explanation">Downloads %1$s from keeperfx.net and unpacks it. The archive is around 360 MB, so use Wi-Fi.\n\nThis replaces the current installation, including the files copied from the original game — import those again afterwards. Save games are lost.</string>

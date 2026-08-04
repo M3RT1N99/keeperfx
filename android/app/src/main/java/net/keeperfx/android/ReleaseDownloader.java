@@ -98,6 +98,11 @@ public final class ReleaseDownloader {
         cancelled = true;
     }
 
+    /** A cancel can also come from the notification while the app is closed. */
+    private boolean isCancelled() {
+        return cancelled || DownloadService.isCancelRequested();
+    }
+
     /**
      * Downloads the background music archive and unpacks it into music/.
      *
@@ -114,9 +119,9 @@ public final class ReleaseDownloader {
                 return;
             }
 
-            archive = new File(context.getCacheDir(), "keeperfx-music.zip");
+            archive = new File(downloadDirectory(), "keeperfx-music.zip");
             download(url, archive, -1, "music");
-            if (cancelled) {
+            if (isCancelled()) {
                 finish(false, "Download cancelled");
                 return;
             }
@@ -132,7 +137,9 @@ public final class ReleaseDownloader {
             Log.e(TAG, "Music download failed", e);
             finish(false, "Failed: " + e.getMessage());
         } finally {
-            if (archive != null && archive.exists()) {
+            // Only a completed archive is removed. A partial one is what the
+            // next attempt resumes from.
+            if (archive != null && archive.exists() && !isCancelled()) {
                 //noinspection ResultOfMethodCallIgnored
                 archive.delete();
             }
@@ -170,7 +177,7 @@ public final class ReleaseDownloader {
             java.util.zip.ZipEntry entry;
             final byte[] buffer = new byte[128 * 1024];
             while ((entry = zip.getNextEntry()) != null) {
-                if (cancelled) {
+                if (isCancelled()) {
                     return files;
                 }
                 // The archive carries a music/ prefix on some releases; flatten
@@ -216,15 +223,15 @@ public final class ReleaseDownloader {
             // version until the new one is fully unpacked.
             new Prefs(context).setInstalledVersion("");
 
-            archive = new File(context.getCacheDir(), "keeperfx-release.7z");
+            archive = new File(downloadDirectory(), "keeperfx-release.7z");
             download(release.downloadUrl, archive, release.sizeInBytes, version);
-            if (cancelled) {
+            if (isCancelled()) {
                 finish(false, "Download cancelled");
                 return;
             }
 
             extract(archive);
-            if (cancelled) {
+            if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
                 return;
             }
@@ -272,58 +279,33 @@ public final class ReleaseDownloader {
 
     private void download(String url, File target, long expectedSize, String version)
             throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setInstanceFollowRedirects(true);
-        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        connection.setReadTimeout(READ_TIMEOUT_MS);
-        try {
-            int status = connection.getResponseCode();
-            // HttpURLConnection does not follow a redirect across protocols,
-            // and the release URL hops to a CDN.
-            int hops = 0;
-            while ((status == HttpURLConnection.HTTP_MOVED_PERM
-                 || status == HttpURLConnection.HTTP_MOVED_TEMP
-                 || status == HttpURLConnection.HTTP_SEE_OTHER
-                 || status == 307 || status == 308) && hops++ < 5) {
-                final String next = connection.getHeaderField("Location");
-                connection.disconnect();
-                if (next == null) {
-                    throw new IOException("Redirect without a Location header");
-                }
-                connection = (HttpURLConnection) new URL(next).openConnection();
-                connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-                connection.setReadTimeout(READ_TIMEOUT_MS);
-                status = connection.getResponseCode();
-            }
-            if (status != HttpURLConnection.HTTP_OK) {
-                throw new IOException("Download returned HTTP " + status);
+        final String stage = "music".equals(version)
+            ? "Downloading the music"
+            : "Downloading KeeperFX " + version;
+        ResumableDownload.fetch(url, target, new ResumableDownload.Progress() {
+            @Override
+            public void onBytes(long done, long total) {
+                final long known = (total > 0) ? total : expectedSize;
+                final int percent = (known > 0) ? (int) (done * 100 / known) : -1;
+                listener.onStage(stage, percent, String.format(Locale.US, "%s of %s",
+                    GameData.describeBytes(done), GameData.describeBytes(known)));
             }
 
-            final long total = (expectedSize > 0) ? expectedSize : connection.getContentLengthLong();
-            long done = 0;
-            long lastReport = -1;
-            try (InputStream in = new BufferedInputStream(connection.getInputStream());
-                 OutputStream out = new FileOutputStream(target)) {
-                final byte[] buffer = new byte[256 * 1024];
-                int read;
-                while ((read = in.read(buffer)) > 0) {
-                    if (cancelled) {
-                        return;
-                    }
-                    out.write(buffer, 0, read);
-                    done += read;
-                    final int percent = (total > 0) ? (int) (done * 100 / total) : -1;
-                    if (percent != lastReport) {
-                        lastReport = percent;
-                        listener.onStage("Downloading KeeperFX " + version, percent,
-                            String.format(Locale.US, "%s of %s",
-                                GameData.describeBytes(done), GameData.describeBytes(total)));
-                    }
-                }
+            @Override
+            public boolean isCancelled() {
+                return ReleaseDownloader.this.isCancelled();
             }
-        } finally {
-            connection.disconnect();
+        });
+    }
+
+    private File downloadDirectory() throws IOException {
+        // Not the cache directory: Android may clear that while a 360 MB
+        // transfer is in flight, throwing away everything fetched so far.
+        final File dir = new File(context.getFilesDir(), "downloads");
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            throw new IOException("Cannot create " + dir.getAbsolutePath());
         }
+        return dir;
     }
 
     private void extract(File archive) throws IOException {
@@ -344,7 +326,7 @@ public final class ReleaseDownloader {
             SevenZArchiveEntry entry;
             final byte[] buffer = new byte[256 * 1024];
             while ((entry = sevenZ.getNextEntry()) != null) {
-                if (cancelled) {
+                if (isCancelled()) {
                     return;
                 }
                 final String name = entry.getName();

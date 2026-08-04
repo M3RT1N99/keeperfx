@@ -180,7 +180,7 @@ public class LogActivity extends Activity {
                     writer.write(currentLog);
                 }
                 final android.net.Uri uri = FileProvider.getUriForFile(
-                    this, getPackageName() + ".logs", out);
+                    this, getPackageName() + ".files", out);
                 final Intent intent = new Intent(Intent.ACTION_SEND);
                 intent.setType("text/plain");
                 intent.putExtra(Intent.EXTRA_STREAM, uri);

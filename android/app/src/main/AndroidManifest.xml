@@ -9,6 +9,13 @@
       player still has to confirm both the one-off permission and the install.
     -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!--
+      Downloads keep running when the launcher is closed. A foreground service
+      is the only supported way to do that, and it needs a visible notification.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Touch is the primary input, but a keyboard, mouse or pad may be attached. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -38,10 +45,15 @@
             android:label="@string/log_title"
             android:parentActivityName=".LauncherActivity" />
 
-        <!-- Hands the shared copy of keeperfx.log to another app, nothing else. -->
+        <service
+            android:name=".DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Hands out the shared log copy and the downloaded APK, nothing else. -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.logs"
+            android:authorities="${applicationId}.files"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
