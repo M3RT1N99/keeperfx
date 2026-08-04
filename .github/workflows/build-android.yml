@@ -54,7 +54,10 @@ jobs:
       working-directory: android
       run: |
         set -eux
-        BUILD_NUMBER=$(git rev-list --count origin/master)
+        # Counted over HEAD, not origin/master: the fork's master never moves,
+        # so every APK would otherwise carry the same versionCode and the
+        # installed build would be impossible to tell apart.
+        BUILD_NUMBER=$(git rev-list --count HEAD)
         GIT_REVISION=$(git describe --always)
         echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
         echo "GIT_REVISION=$GIT_REVISION" >> $GITHUB_ENV
