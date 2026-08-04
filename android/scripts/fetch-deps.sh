@@ -35,7 +35,9 @@ SDL2_NET_VERSION=2.4.0
 
 ZLIB_TAG=v1.3.1
 SPNG_TAG=v0.7.4
-OPENAL_TAG=1.25.2
+# 1.25 needs std::format and std::lexicographical_compare_three_way, which the
+# libc++ shipped with NDK r26 does not provide. 1.24.3 is C++17 and builds clean.
+OPENAL_TAG=1.24.3
 ENET6_TAG=v6.1.3
 ASTRONOMY_TAG=v2.1.19
 LUAJIT_COMMIT=1edc3e52b67eaf6ce5f809be8e17d6862594b8bc
