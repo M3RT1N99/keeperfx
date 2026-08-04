@@ -388,10 +388,22 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                         .show();
                     return;
                 }
+                final StringBuilder text = new StringBuilder(
+                    getString(R.string.app_update_available, found.versionName,
+                        AppUpdater.installedVersionName(this)));
+                final String changelog = found.changelog();
+                if (!changelog.isEmpty()) {
+                    text.append("
+
+")
+                        .append(getString(R.string.app_update_changes))
+                        .append('
+')
+                        .append(changelog);
+                }
                 new AlertDialog.Builder(this)
                     .setTitle(R.string.app_update_title)
-                    .setMessage(getString(R.string.app_update_available, found.versionName,
-                        AppUpdater.installedVersionName(this)))
+                    .setMessage(text.toString())
                     .setPositiveButton(R.string.app_update_install, (d, w) -> {
                         final List<UpdateManager.Item> only = new ArrayList<>();
                         only.add(new UpdateManager.Item(UpdateManager.Kind.APP,

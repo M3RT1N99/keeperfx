@@ -96,48 +96,78 @@ jobs:
         path: out/*.apk
         if-no-files-found: error
 
-    # A rolling release gives a permanent, login-free download URL. Action
-    # artifacts expire after 90 days and cannot be fetched without a GitHub
-    # account, so the in-app updater could not use them.
-    - name: Publish the rolling development release
+    # One release per build, tagged with its version, so there is a history to
+    # go back through. Action artifacts expire after 90 days and cannot be
+    # fetched without a GitHub account; a release is a permanent, login-free URL.
+    - name: Publish the release
       if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -eux
-        VERSION_NAME=$(grep -E '^VER_MAJOR=' version.mk | cut -d= -f2).$(grep -E '^VER_MINOR=' version.mk | cut -d= -f2).$(grep -E '^VER_RELEASE=' version.mk | cut -d= -f2).${BUILD_NUMBER}
+        VER_MAJOR=$(grep -E '^VER_MAJOR=' version.mk | cut -d= -f2)
+        VER_MINOR=$(grep -E '^VER_MINOR=' version.mk | cut -d= -f2)
+        VER_RELEASE=$(grep -E '^VER_RELEASE=' version.mk | cut -d= -f2)
+        VERSION_NAME="${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${BUILD_NUMBER}"
+        TAG="android-v${VERSION_NAME}"
+
         cat > out/version.json <<JSON
         {
           "versionName": "${VERSION_NAME}",
           "buildNumber": ${BUILD_NUMBER},
           "commit": "${GIT_REVISION}",
-          "apk": "https://github.com/${GITHUB_REPOSITORY}/releases/download/android-latest/keeperfx-android-arm64.apk"
+          "tag": "${TAG}",
+          "apk": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/keeperfx-android-arm64.apk"
         }
         JSON
-        cat out/version.json
 
-        # Recreated rather than edited so the tag follows the current commit.
-        gh release delete android-latest --yes --cleanup-tag || true
-        gh release create android-latest \
+        # Changelog since the previous Android release. The tags are created by
+        # this workflow, so the newest one that is an ancestor is the last build.
+        git fetch --tags --quiet || true
+        PREVIOUS=$(git tag --list 'android-v*' --sort=-creatordate | grep -v "^${TAG}$" | head -n1 || true)
+        if [ -n "$PREVIOUS" ]; then
+          RANGE="${PREVIOUS}..HEAD"
+          HEADING="Changes since ${PREVIOUS#android-v}"
+        else
+          RANGE="HEAD~20..HEAD"
+          HEADING="Recent changes"
+        fi
+        # Subject lines only; the bodies explain the why and belong in the log.
+        CHANGES=$(git log --no-merges --pretty=format:'- %s' "$RANGE" 2>/dev/null | head -n 40)
+        [ -n "$CHANGES" ] || CHANGES="- No source changes"
+
+        {
+          echo "Development build of the \`feature/android-support\` branch."
+          echo
+          echo "| | |"
+          echo "|---|---|"
+          echo "| Version | \`${VERSION_NAME}\` |"
+          echo "| Commit | \`${GIT_REVISION}\` |"
+          echo "| ABI | \`arm64-v8a\` |"
+          echo "| Requires | Android 9 (API 28) or newer |"
+          echo
+          echo "## ${HEADING}"
+          echo
+          echo "${CHANGES}"
+          echo
+          echo "---"
+          echo
+          echo "Install straight over a previous build; game data and settings are kept."
+          echo "Play Protect warns about an unknown developer, which is expected for a"
+          echo "self signed APK."
+          echo
+          echo "Contains the engine only. Use **Check for downloads** in the launcher to"
+          echo "fetch the game data and the music, then **Import original Dungeon Keeper**"
+          echo "for the files that must come from the original game."
+        } > out/notes.md
+
+        # A re-run of the same commit would clash with its own tag.
+        gh release delete "$TAG" --yes --cleanup-tag || true
+        gh release create "$TAG" \
           out/keeperfx-android-arm64.apk out/version.json \
           --target "${GITHUB_SHA}" \
           --title "KeeperFX for Android ${VERSION_NAME}" \
-          --notes "Development build of the \`feature/android-support\` branch.
-
-        | | |
-        |---|---|
-        | Version | \`${VERSION_NAME}\` |
-        | Commit | \`${GIT_REVISION}\` |
-        | ABI | \`arm64-v8a\` |
-        | Requires | Android 9 (API 28) or newer |
-
-        Install straight over a previous build; game data and settings are kept.
-        Play Protect will warn about an unknown developer, which is expected for
-        a self signed APK.
-
-        Contains the engine only. Use **Install KeeperFX** in the launcher to
-        fetch the game data, then **Import original Dungeon Keeper** for the
-        files that must come from the original game."
+          --notes-file out/notes.md
 
   # The Android port must not change how the desktop ports build. This job is the
   # regression guard for the shared source files the port touches.

@@ -60,6 +60,7 @@ You are on %2$s.
 
 The update installs over this one; game data and settings are kept.</string>
     <string name="app_update_none">You are on the newest build (%1$s).</string>
+    <string name="app_update_changes">What changed:</string>
     <string name="app_update_check">Checking…</string>
     <string name="app_update_offline">Could not reach the update server.</string>
     <string name="app_update_install">Download and install</string>

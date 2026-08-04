@@ -45,15 +45,25 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public final class AppUpdater {
 
     private static final String TAG = "KeeperFX";
 
-    /** Rolling release published by .github/workflows/build-android.yml. */
-    private static final String VERSION_URL =
-        "https://github.com/M3RT1N99/keeperfx/releases/download/android-latest/version.json";
+    /**
+     * Newest release published by .github/workflows/build-android.yml. Each
+     * build gets its own tag so there is a history, so there is no fixed asset
+     * URL to read any more; the API points at the current one and carries the
+     * release notes in the same response.
+     */
+    private static final String LATEST_RELEASE_URL =
+        "https://api.github.com/repos/M3RT1N99/keeperfx/releases/latest";
+
+    private static final String TAG_PREFIX = "android-v";
+    private static final String APK_ASSET = "keeperfx-android-arm64.apk";
 
     private static final int CONNECT_TIMEOUT_MS = 15000;
     private static final int READ_TIMEOUT_MS = 60000;
@@ -64,18 +74,32 @@ public final class AppUpdater {
         void onFinished(boolean success, String message);
     }
 
-    /** What the rolling release currently offers. */
+    /** What the newest release offers. */
     public static final class Available {
         public final String versionName;
         public final int buildNumber;
-        public final String commit;
         public final String apkUrl;
+        /** Changelog lines from the release notes, without their bullets. */
+        public final List<String> changes;
 
-        Available(String versionName, int buildNumber, String commit, String apkUrl) {
+        Available(String versionName, int buildNumber, String apkUrl, List<String> changes) {
             this.versionName = versionName;
             this.buildNumber = buildNumber;
-            this.commit = commit;
             this.apkUrl = apkUrl;
+            this.changes = changes;
+        }
+
+        /** Ready to drop into a dialog; empty when the notes carried no list. */
+        public String changelog() {
+            if (changes.isEmpty()) {
+                return "";
+            }
+            final StringBuilder sb = new StringBuilder();
+            for (String line : changes) {
+                sb.append("• ").append(line).append('
+');
+            }
+            return sb.toString().trim();
         }
     }
 
@@ -122,10 +146,10 @@ public final class AppUpdater {
     /** Blocking; call from a background thread. Returns null when up to date. */
     public static Available checkForUpdate(Context context) throws IOException,
             org.json.JSONException {
-        final HttpURLConnection connection = openFollowingRedirects(VERSION_URL);
+        final HttpURLConnection connection = openFollowingRedirects(LATEST_RELEASE_URL);
         final StringBuilder body = new StringBuilder();
         try (InputStream in = connection.getInputStream()) {
-            final byte[] buffer = new byte[4096];
+            final byte[] buffer = new byte[8192];
             int read;
             while ((read = in.read(buffer)) > 0) {
                 body.append(new String(buffer, 0, read, "UTF-8"));
@@ -134,18 +158,61 @@ public final class AppUpdater {
             connection.disconnect();
         }
 
-        final JSONObject json = new JSONObject(body.toString());
-        final Available available = new Available(
-            json.optString("versionName", ""),
-            json.optInt("buildNumber", 0),
-            json.optString("commit", ""),
-            json.optString("apk", ""));
+        final JSONObject release = new JSONObject(body.toString());
+        final String tag = release.optString("tag_name", "");
+        final String version = tag.startsWith(TAG_PREFIX) ? tag.substring(TAG_PREFIX.length()) : tag;
+        if (version.isEmpty()) {
+            return null;
+        }
 
-        if (available.buildNumber <= installedBuildNumber(context) || available.apkUrl.isEmpty()) {
+        String apkUrl = "";
+        final org.json.JSONArray assets = release.optJSONArray("assets");
+        if (assets != null) {
+            for (int i = 0; i < assets.length(); i++) {
+                final JSONObject asset = assets.getJSONObject(i);
+                if (APK_ASSET.equals(asset.optString("name"))) {
+                    apkUrl = asset.optString("browser_download_url", "");
+                    break;
+                }
+            }
+        }
+        if (apkUrl.isEmpty()) {
+            return null;
+        }
+
+        final Available available = new Available(version, buildNumberOf(version), apkUrl,
+            parseChangelog(release.optString("body", "")));
+        if (available.buildNumber <= installedBuildNumber(context)) {
             return null;
         }
         Log.i(TAG, "Update available: " + available.versionName);
         return available;
+    }
+
+    /**
+     * Pulls the bullet list out of the release notes. The workflow writes one
+     * line per commit subject, so this is the changelog without having to
+     * understand the rest of the markdown around it.
+     */
+    private static List<String> parseChangelog(String notes) {
+        final List<String> changes = new ArrayList<>();
+        for (String raw : notes.split("
+")) {
+            final String line = raw.trim();
+            if (line.startsWith("- ") && line.length() > 2) {
+                changes.add(line.substring(2).trim());
+            }
+        }
+        return changes;
+    }
+
+    private static int buildNumberOf(String versionName) {
+        try {
+            final int dot = versionName.lastIndexOf('.');
+            return (dot >= 0) ? Integer.parseInt(versionName.substring(dot + 1)) : 0;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     // ------------------------------------------------------------ download
