@@ -63,10 +63,16 @@ jobs:
         GIT_REVISION=$(git describe --always)
         echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
         echo "GIT_REVISION=$GIT_REVISION" >> $GITHUB_ENV
+        # Passing a suffix here overrides the one the CMake side would compose,
+        # so the marker from version.mk has to be carried along or the APK ends
+        # up looking like an official build. See AGENTS.md.
+        VERSION_MK_SUFFIX=$(cd .. && grep -E '^PACKAGE_SUFFIX=' version.mk | cut -d= -f2- || true)
+        PACKAGE_SUFFIX="Android${VERSION_MK_SUFFIX:+-$VERSION_MK_SUFFIX}_$GIT_REVISION"
+        echo "PACKAGE_SUFFIX=$PACKAGE_SUFFIX" >> $GITHUB_ENV
         gradle --no-daemon assembleRelease \
           -Pkeeperfx.buildNumber="$BUILD_NUMBER" \
           -Pkeeperfx.gitRevision="$GIT_REVISION" \
-          -Pkeeperfx.packageSuffix="Android_$GIT_REVISION"
+          -Pkeeperfx.packageSuffix="$PACKAGE_SUFFIX"
 
     - name: Inspect the APK
       run: |
@@ -139,8 +145,9 @@ jobs:
         {
           echo "**Unofficial community build.** Not produced by the KeeperFX team and"
           echo "not supported by them, so report anything you find here rather than to"
-          echo "them. The game reports itself as \`Android-Unofficial\` for the same"
-          echo "reason: a screenshot or a log cannot be mistaken for an official release."
+          echo "them. The game says so itself: it reports its version as"
+          echo "\`${VERSION_NAME} ${PACKAGE_SUFFIX}\`, in the title bar and at the top of"
+          echo "every log, so a screenshot cannot be mistaken for an official release."
           echo
           echo "Development build of the \`feature/android-support\` branch."
           echo

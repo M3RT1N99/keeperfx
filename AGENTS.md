@@ -25,6 +25,16 @@ reaches the version string there too:
   deliberately passes an empty `-DPACKAGE_SUFFIX` so that
   `android/app/CMakeLists.txt` can combine `version.mk`'s value with the
   platform name.
+- The **Android CI workflow** passes `-Pkeeperfx.packageSuffix` explicitly, to
+  get the commit into the version string, and that overrides the composition
+  above. It therefore reads `version.mk` itself and produces
+  `Android-Unofficial_<sha>`. An APK built by CI once carried a plain
+  `Android_<sha>` for exactly this reason — check the built artifact, not the
+  source, when changing any of this:
+
+  ```bash
+  unzip -p app.apk lib/arm64-v8a/libkeeperfx.so | strings | grep -E '^1\.4\.'
+  ```
 
 Anything published from here — GitHub releases, artifacts, forum posts — says
 "unofficial" in its title and its notes for the same reason.
