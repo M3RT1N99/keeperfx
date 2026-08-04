@@ -20,9 +20,6 @@
 package net.keeperfx.android;
 
 import android.os.Bundle;
-import android.util.DisplayMetrics;
-import android.util.Log;
-import android.view.SurfaceHolder;
 import android.view.WindowManager;
 
 import org.libsdl.app.SDLActivity;
@@ -45,40 +42,6 @@ public class GameActivity extends SDLActivity {
         }
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        applyRenderScale();
-    }
-
-    /**
-     * Renders below the panel's native resolution and lets the compositor scale
-     * the result up.
-     *
-     * The engine draws straight into the window surface - lbScreenSurface and
-     * lbDrawSurface are the same SDL surface - so it has no scaling of its own,
-     * and on Android SDL always hands out the full display size. On a phone
-     * that puts a interface designed around a 640x480 screen onto 1544x720
-     * physical pixels, which is what makes the buttons too small to hit.
-     *
-     * Fixing the SurfaceView size is the Android-native answer: the surface is
-     * smaller, the compositor scales it in hardware, and SDL reports the smaller
-     * size, so pointer coordinates and the touch layer follow without any
-     * engine change.
-     */
-    private void applyRenderScale() {
-        final int percent = new Prefs(this).getRenderScalePercent();
-        if (percent >= 100 || mSurface == null) {
-            return;
-        }
-        final SurfaceHolder holder = mSurface.getHolder();
-        if (holder == null) {
-            return;
-        }
-        final DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getRealMetrics(metrics);
-        // Even dimensions keep the scaler on whole pixels.
-        final int width = Math.max(640, (metrics.widthPixels * percent / 100) & ~1);
-        final int height = Math.max(400, (metrics.heightPixels * percent / 100) & ~1);
-        Log.i("KeeperFX", "Render scale " + percent + "%: " + width + "x" + height);
-        holder.setFixedSize(width, height);
     }
 
     /**
