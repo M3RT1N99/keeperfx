@@ -173,9 +173,25 @@ jobs:
           echo "for the files that must come from the original game."
         } > out/notes.md
 
+        # The releases API answers 403 under secondary rate limiting, which is
+        # easy to hit when several builds land close together or the releases
+        # are being edited at the same time. One build was lost to it, so give
+        # every publish a few attempts before calling it a failure.
+        publish() {
+          local attempt
+          for attempt in 1 2 3 4; do
+            if "$@"; then
+              return 0
+            fi
+            echo "publish attempt ${attempt} failed, retrying in $((attempt * 20))s"
+            sleep $((attempt * 20))
+          done
+          return 1
+        }
+
         # A re-run of the same commit would clash with its own tag.
         gh release delete "$TAG" --yes --cleanup-tag || true
-        gh release create "$TAG" \
+        publish gh release create "$TAG" \
           out/keeperfx-android-arm64.apk out/version.json \
           --target "${GITHUB_SHA}" \
           --title "KeeperFX for Android ${VERSION_NAME} (unofficial)" \
@@ -187,7 +203,7 @@ jobs:
         # keeps /releases/latest returning the newest android-v* instead of this
         # one - that is what newer builds follow.
         gh release delete android-latest --yes --cleanup-tag || true
-        gh release create android-latest \
+        publish gh release create android-latest \
           out/keeperfx-android-arm64.apk out/version.json \
           --target "${GITHUB_SHA}" \
           --prerelease \
