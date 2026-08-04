@@ -12,7 +12,7 @@
     <string name="log_copy">Copy</string>
     <string name="log_refresh">Reload</string>
     <string name="log_copied">Log copied to the clipboard</string>
-    <string name="button_log">Engine log</string>
+    <string name="button_log">Log</string>
 
     <string name="version_unknown">imported folder</string>
     <string name="version_latest">the current release</string>
@@ -32,8 +32,10 @@
     <string name="button_update_keeperfx">Check for KeeperFX updates</string>
     <string name="button_update_to">Update to KeeperFX %1$s</string>
     <string name="button_import_original">Import original Dungeon Keeper</string>
-    <string name="button_import_keeperfx">Import KeeperFX folder</string>
-    <string name="button_remove">Delete everything</string>
+    <!-- Utility row: short labels, the buttons are a third of the width each
+         and carry an icon. The dialogs behind them spell out what they do. -->
+    <string name="button_import_keeperfx">Folder</string>
+    <string name="button_remove">Reset</string>
     <string name="button_play">Play</string>
 
     <string name="install_title">Install KeeperFX</string>
