@@ -208,8 +208,18 @@ set(MBEDTLS_LIBRARY     mbedtls                       CACHE STRING "" FORCE)
 set(MBEDX509_LIBRARY    mbedx509                      CACHE STRING "" FORCE)
 set(MBEDCRYPTO_LIBRARY  mbedcrypto                    CACHE STRING "" FORCE)
 
+# The check curl runs for this links against an imported target, which a
+# try_compile cannot see, so it would answer "no" after a confusing link error.
+# Answer it directly: DES is only used for NTLM, which is disabled below.
+set(HAVE_MBEDTLS_DES_CRYPT_ECB 0 CACHE INTERNAL "")
+
+# SDL and its satellites are shared libraries, so BUILD_SHARED_LIBS is on at
+# this point. curl belongs inside libkeeperfx.so instead of being one more file
+# to package, so it is turned off for this one subdirectory and restored after.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(BUILD_CURL_EXE   OFF CACHE BOOL "" FORCE)
 set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
+set(CURL_DISABLE_NTLM ON CACHE BOOL "" FORCE)
 set(CURL_USE_MBEDTLS ON  CACHE BOOL "" FORCE)
 set(CURL_USE_OPENSSL OFF CACHE BOOL "" FORCE)
 set(CURL_USE_LIBPSL  OFF CACHE BOOL "" FORCE)
@@ -227,6 +237,7 @@ set(BUILD_TESTING    OFF CACHE BOOL "" FORCE)
 set(CURL_CA_PATH "/system/etc/security/cacerts" CACHE STRING "" FORCE)
 set(CURL_CA_BUNDLE "none" CACHE STRING "" FORCE)
 add_subdirectory("${KFX_DEPS}/curl" "${CMAKE_CURRENT_BINARY_DIR}/curl" EXCLUDE_FROM_ALL)
+set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
 
 #******************************************************************************
 # enet6
@@ -322,15 +333,14 @@ target_include_directories(kfx_luajit INTERFACE "${LUAJIT_WORK}/src")
 file(GLOB KFX_SOURCES_C   "${KFX_ROOT}/src/*.c")
 file(GLOB KFX_SOURCES_CXX "${KFX_ROOT}/src/*.cpp" "${KFX_ROOT}/src/kfx/lense/*.cpp")
 
-# Platform files of the other ports, plus the three modules replaced by Android
-# specific stubs (FFmpeg, libcurl and UPnP are not bundled).
+# Platform files of the other ports, plus the two modules replaced by Android
+# specific stubs (FFmpeg and UPnP are not bundled).
 set(KFX_EXCLUDED
     "${KFX_ROOT}/src/linux.cpp"
     "${KFX_ROOT}/src/windows.cpp"
     "${KFX_ROOT}/src/cdrom.cpp"
     "${KFX_ROOT}/src/steam_api.cpp"
     "${KFX_ROOT}/src/bflib_fmvids.cpp"
-    "${KFX_ROOT}/src/net_matchmaking.c"
     "${KFX_ROOT}/src/net_portforward.cpp")
 list(REMOVE_ITEM KFX_SOURCES_C   ${KFX_EXCLUDED})
 list(REMOVE_ITEM KFX_SOURCES_CXX ${KFX_EXCLUDED})
