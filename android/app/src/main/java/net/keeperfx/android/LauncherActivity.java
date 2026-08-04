@@ -393,12 +393,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                         AppUpdater.installedVersionName(this)));
                 final String changelog = found.changelog();
                 if (!changelog.isEmpty()) {
-                    text.append("
-
-")
+                    text.append("\n\n")
                         .append(getString(R.string.app_update_changes))
-                        .append('
-')
+                        .append('\n')
                         .append(changelog);
                 }
                 new AlertDialog.Builder(this)

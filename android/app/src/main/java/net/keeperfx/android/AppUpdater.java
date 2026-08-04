@@ -96,8 +96,7 @@ public final class AppUpdater {
             }
             final StringBuilder sb = new StringBuilder();
             for (String line : changes) {
-                sb.append("• ").append(line).append('
-');
+                sb.append("• ").append(line).append('\n');
             }
             return sb.toString().trim();
         }
@@ -196,8 +195,7 @@ public final class AppUpdater {
      */
     private static List<String> parseChangelog(String notes) {
         final List<String> changes = new ArrayList<>();
-        for (String raw : notes.split("
-")) {
+        for (String raw : notes.split("\n")) {
             final String line = raw.trim();
             if (line.startsWith("- ") && line.length() > 2) {
                 changes.add(line.substring(2).trim());
