@@ -30,7 +30,8 @@ android {
         versionName "${verMajor}.${verMinor}.${verRelease}.${buildNumber}"
 
         ndk {
-            abiFilters project.property("keeperfx.abiFilters").split(",").collect { it.trim() }
+            abiFilters.addAll(
+                project.property("keeperfx.abiFilters").split(",").collect { it.trim() })
         }
 
         externalNativeBuild {

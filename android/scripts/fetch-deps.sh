@@ -109,4 +109,9 @@ fetch_git astronomy  https://github.com/cosinekitty/astronomy.git "${ASTRONOMY_T
 fetch_git luajit     https://github.com/LuaJIT/LuaJIT.git         "${LUAJIT_COMMIT}"
 fetch_git centijson  https://github.com/mity/centijson.git        "${CENTIJSON_COMMIT}"
 
+# Several upstream projects ship their own Gradle wrapper for their samples and
+# demos. We never run those, but a stray gradle-wrapper.jar in the workspace
+# trips wrapper validation in CI, so drop them.
+find "${DEPS_DIR}" -name 'gradle-wrapper.jar' -delete 2>/dev/null || true
+
 log "all dependencies ready in ${DEPS_DIR}"

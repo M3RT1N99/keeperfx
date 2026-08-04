@@ -107,6 +107,9 @@ set(SDL2NET_INSTALL OFF CACHE BOOL "" FORCE)
 set(SDL2NET_SAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory("${KFX_DEPS}/SDL2_net" "${CMAKE_CURRENT_BINARY_DIR}/SDL2_net" EXCLUDE_FROM_ALL)
 
+# Everything from here on is linked straight into libkeeperfx.so.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
 #******************************************************************************
 # zlib + minizip
 #******************************************************************************
@@ -134,10 +137,16 @@ target_link_libraries(kfx_minizip PRIVATE zlibstatic)
 
 #******************************************************************************
 # libspng
+#
+# Built directly rather than through its CMakeLists, which insists on
+# find_package(ZLIB REQUIRED) and would not see the zlib we just built. The
+# library is a single translation unit, so there is nothing else to configure.
 #******************************************************************************
-set(SPNG_SHARED OFF CACHE BOOL "" FORCE)
-set(SPNG_STATIC ON  CACHE BOOL "" FORCE)
-add_subdirectory("${KFX_DEPS}/libspng" "${CMAKE_CURRENT_BINARY_DIR}/libspng" EXCLUDE_FROM_ALL)
+add_library(kfx_spng STATIC "${KFX_DEPS}/libspng/spng/spng.c")
+target_include_directories(kfx_spng PUBLIC "${KFX_DEPS}/libspng/spng")
+target_include_directories(kfx_spng PRIVATE ${KFX_ZLIB_INCLUDES})
+target_compile_definitions(kfx_spng PUBLIC SPNG_STATIC=1)
+target_link_libraries(kfx_spng PRIVATE zlibstatic)
 
 #******************************************************************************
 # OpenAL Soft
@@ -157,8 +166,8 @@ add_subdirectory("${KFX_DEPS}/openal" "${CMAKE_CURRENT_BINARY_DIR}/openal" EXCLU
 #******************************************************************************
 # enet6
 #******************************************************************************
-set(ENET_STATIC ON  CACHE BOOL "" FORCE)
-set(ENET_SHARED OFF CACHE BOOL "" FORCE)
+# enet6 has no library type option of its own; it follows BUILD_SHARED_LIBS,
+# which is OFF from here on.
 add_subdirectory("${KFX_DEPS}/enet6" "${CMAKE_CURRENT_BINARY_DIR}/enet6" EXCLUDE_FROM_ALL)
 
 #******************************************************************************
@@ -280,10 +289,10 @@ target_link_libraries(keeperfx PRIVATE
     SDL2_mixer::SDL2_mixer
     SDL2_net::SDL2_net
     OpenAL::OpenAL
-    spng_static
+    kfx_spng
     kfx_minizip
     zlibstatic
-    enet
+    enet6
     kfx_centijson
     kfx_centitoml
     kfx_astronomy
