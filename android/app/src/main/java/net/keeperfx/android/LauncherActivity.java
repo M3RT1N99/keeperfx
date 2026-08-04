@@ -272,6 +272,18 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             if (!item.detail.isEmpty()) {
                 body.append("    ").append(item.detail).append('\n');
             }
+            // The point of publishing a release per build is that the player can
+            // see why an update is being offered. This dialog is the one they
+            // actually reach, so the changelog has to be here and not only in
+            // the app-only dialog behind the version button.
+            if (item.appUpdate != null) {
+                final String changelog = item.appUpdate.changelog();
+                if (!changelog.isEmpty()) {
+                    for (String line : changelog.split("\n")) {
+                        body.append("    ").append(line).append('\n');
+                    }
+                }
+            }
             if (item.kind == UpdateManager.Kind.GAME_DATA) {
                 replacesData = true;
             }
