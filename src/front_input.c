@@ -3070,6 +3070,92 @@ void input(void)
     SYNCDBG(7,"Finished");
 }
 
+/**
+ * Pulls the pointer onto the nearest GUI button when a touch lands just off one.
+ *
+ * A finger covers far more of the screen than a mouse pointer does, while the
+ * panel buttons are 32x36 base units, which comes out around five millimetres
+ * on a phone. A tap that looks like a hit therefore often lands in the gap
+ * between two buttons and nothing happens at all. When the pointer is inside a
+ * menu but not on any button, this moves it to the closest button within a
+ * finger's width, keeping it as near to where the finger actually was as the
+ * button allows.
+ *
+ * The search is skipped entirely while the pointer is outside every menu, so
+ * placing rooms and tagging blocks keep the exact position the finger had. It
+ * also does nothing unless the native touch scheme is driving the game, which
+ * leaves the desktop ports untouched.
+ */
+static void touch_assist_gui_pointer(void)
+{
+    if (!touch_controls_active())
+        return;
+    // The minimap sits inside the panel but is not a button, and the sweep below
+    // skips every button while the pointer is over it. Snapping there would send
+    // a jump to the map straight into the zoom buttons next to it.
+    struct PlayerInfo* player = get_my_player();
+    if ((menu_id_to_number(GMnu_MAIN) >= 0)
+     && mouse_is_over_panel_map(player->minimap_pos_x, player->minimap_pos_y))
+        return;
+    const TbScreenPos pos_x = GetMouseX();
+    const TbScreenPos pos_y = GetMouseY();
+    // Roughly a finger's width. The touch layer derives its own drag threshold
+    // from the screen size in the same way.
+    const long slop = max(8, LbScreenHeight() / 30);
+    TbBool over_menu = false;
+    for (int i = 0; i < ACTIVE_MENUS_COUNT; i++)
+    {
+        const struct GuiMenu *gmnu = &active_menus[i];
+        if ((gmnu->visual_state == 0) || (!gmnu->is_turned_on))
+            continue;
+        if ((pos_x >= gmnu->pos_x - slop) && (pos_x < gmnu->pos_x + gmnu->width + slop)
+         && (pos_y >= gmnu->pos_y - slop) && (pos_y < gmnu->pos_y + gmnu->height + slop))
+        {
+            over_menu = true;
+            break;
+        }
+    }
+    if (!over_menu)
+        return;
+    const struct GuiButton *closest = NULL;
+    long closest_dist = 0;
+    for (int i = 0; i < ACTIVE_BUTTONS_COUNT; i++)
+    {
+        const struct GuiButton *gbtn = &active_buttons[i];
+        if ((gbtn->flags & LbBtnF_Active) == 0)
+            continue;
+        if ((gbtn->flags & LbBtnF_Visible) == 0)
+            continue;
+        if ((gbtn->btype_value & LbBFeF_NoMouseOver) != 0)
+            continue;
+        if (!get_active_menu(gbtn->gmenu_idx)->is_turned_on)
+            continue;
+        if (check_if_pos_is_over_button(gbtn, pos_x, pos_y))
+            return; // The tap was accurate, leave it alone
+        long dx = 0;
+        long dy = 0;
+        if (pos_x < gbtn->pos_x)
+            dx = gbtn->pos_x - pos_x;
+        else if (pos_x >= gbtn->pos_x + gbtn->width)
+            dx = pos_x - (gbtn->pos_x + gbtn->width - 1);
+        if (pos_y < gbtn->pos_y)
+            dy = gbtn->pos_y - pos_y;
+        else if (pos_y >= gbtn->pos_y + gbtn->height)
+            dy = pos_y - (gbtn->pos_y + gbtn->height - 1);
+        const long dist = dx * dx + dy * dy;
+        if ((dist <= slop * slop) && ((closest == NULL) || (dist < closest_dist)))
+        {
+            closest = gbtn;
+            closest_dist = dist;
+        }
+    }
+    if (closest == NULL)
+        return;
+    LbMouseSetPositionInitial(
+        min(max((long)pos_x, (long)closest->pos_x), (long)(closest->pos_x + closest->width - 1)),
+        min(max((long)pos_y, (long)closest->pos_y), (long)(closest->pos_y + closest->height - 1)));
+}
+
 short get_gui_inputs(short gameplay_on)
 {
   static ActiveButtonID over_slider_button = -1;
@@ -3095,6 +3181,7 @@ short get_gui_inputs(short gameplay_on)
       }
   }
   update_busy_doing_gui_on_menu();
+  touch_assist_gui_pointer();
   int fmmenu_idx = first_monopoly_menu();
   struct PlayerInfo* player = get_my_player();
   int gmbtn_idx = -1;
