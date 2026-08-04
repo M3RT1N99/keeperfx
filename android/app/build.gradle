@@ -17,6 +17,11 @@ def buildNumber = (project.findProperty("keeperfx.buildNumber") ?: "0") as int
 
 def sdlJavaDir = file("${rootDir}/.deps/SDL2/android-project/app/src/main/java")
 
+// The engine and the files in config/ have to match. They ship together on the
+// desktop; here the engine is built from source while the data comes from a
+// release, so the tree is packaged into the APK and laid over the installation.
+def bundledConfigStage = layout.buildDirectory.dir("generated/bundled-config")
+
 android {
     namespace "net.keeperfx.android"
     compileSdk 34
@@ -93,6 +98,9 @@ android {
             // SDLActivity and friends are used unmodified from the SDL release
             // that fetch-deps.sh downloads, so no SDL code is vendored here.
             java.srcDirs += sdlJavaDir
+            // The engine's own config/ tree, staged under a kfx-config prefix
+            // by copyBundledConfig below.
+            assets.srcDirs += bundledConfigStage
         }
     }
 
@@ -124,6 +132,12 @@ dependencies {
 // Native dependency sources. CI runs this script explicitly before the build;
 // wiring it in here as well keeps a plain "gradlew assembleRelease" working.
 // ---------------------------------------------------------------------------
+def copyBundledConfig = tasks.register("copyBundledConfig", Copy) {
+    description = "Stages the engine's config/ tree as an APK asset"
+    from("${rootDir}/../config")
+    into(bundledConfigStage.map { it.dir("kfx-config") })
+}
+
 def fetchNativeDeps = tasks.register("fetchNativeDeps", Exec) {
     description = "Downloads the pinned native dependency sources"
     workingDir rootDir
@@ -133,6 +147,7 @@ def fetchNativeDeps = tasks.register("fetchNativeDeps", Exec) {
 
 tasks.named("preBuild").configure {
     dependsOn fetchNativeDeps
+    dependsOn copyBundledConfig
 }
 
 afterEvaluate {
@@ -140,5 +155,8 @@ afterEvaluate {
         it.name.startsWith("configureCMake") || it.name.startsWith("buildCMake")
     }.configureEach {
         dependsOn fetchNativeDeps
+    }
+    tasks.matching { it.name.startsWith("merge") && it.name.contains("Assets") }.configureEach {
+        dependsOn copyBundledConfig
     }
 }

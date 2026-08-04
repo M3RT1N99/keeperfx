@@ -107,6 +107,11 @@ public final class DataImporter {
                 finish(false, "Import cancelled");
                 return;
             }
+
+            // The imported folder can come from any KeeperFX version, so pair
+            // its configuration back up with the engine in this APK.
+            BundledConfig.install(context);
+
             finish(true, "Copied " + filesCopied + " files");
         } catch (Exception e) {
             Log.e(TAG, "Import failed", e);

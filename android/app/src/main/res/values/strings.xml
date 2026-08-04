@@ -51,6 +51,7 @@
     <string name="import_original_explanation">KeeperFX cannot ship a few files that must come from an original Dungeon Keeper. Pick your Dungeon Keeper folder — the one containing DATA and SOUND — and they are picked out and copied automatically.\n\nA mounted or extracted CD image works too. Nothing else from that folder is copied.</string>
     <string name="import_choose">Choose folder</string>
     <string name="import_failed">Import incomplete</string>
+    <string name="config_failed">Could not apply the bundled configuration</string>
 
     <string name="remove_title">Delete everything</string>
     <string name="remove_explanation">Removes the installation including save games. The folders you imported from are not touched.</string>

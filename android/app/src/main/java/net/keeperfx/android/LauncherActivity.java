@@ -387,9 +387,28 @@ public class LauncherActivity extends Activity {
             refreshStatus();
             return;
         }
-        Intent intent = new Intent(this, GameActivity.class);
-        intent.putExtra(GameActivity.EXTRA_ARGUMENTS, prefs.buildArguments(this));
-        startActivity(intent);
+        // Refreshed on every launch rather than only at install time, so that
+        // updating the APK also updates the configuration its engine expects.
+        setBusy(true);
+        new Thread(() -> {
+            String failure = null;
+            try {
+                BundledConfig.install(this);
+            } catch (Exception e) {
+                failure = e.getMessage();
+            }
+            final String message = failure;
+            mainHandler.post(() -> {
+                setBusy(false);
+                if (message != null) {
+                    showError(R.string.config_failed, message);
+                    return;
+                }
+                Intent intent = new Intent(this, GameActivity.class);
+                intent.putExtra(GameActivity.EXTRA_ARGUMENTS, prefs.buildArguments(this));
+                startActivity(intent);
+            });
+        }, "kfx-config").start();
     }
 
     @Override

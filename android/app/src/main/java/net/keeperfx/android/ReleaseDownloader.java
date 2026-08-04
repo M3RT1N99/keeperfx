@@ -277,6 +277,11 @@ public final class ReleaseDownloader {
             }
         }
         Log.i(TAG, "Unpacked " + entries + " files");
+
+        // The release predates the engine we just built, so its configuration
+        // can be missing files or carry values this parser rejects.
+        listener.onStage("Applying configuration", -1, "");
+        BundledConfig.install(context);
     }
 
     private static boolean isSkipped(String name) {
