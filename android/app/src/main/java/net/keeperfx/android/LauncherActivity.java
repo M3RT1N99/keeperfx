@@ -41,6 +41,7 @@ import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class LauncherActivity extends Activity implements DownloadService.Observer {
@@ -60,6 +61,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private Button importKeeperfxButton;
     private Button importOriginalButton;
     private Button playButton;
+    private Button updateAppButton;
     private RadioGroup inputModeGroup;
     private RadioGroup renderScaleGroup;
     private CheckBox noIntroBox;
@@ -84,6 +86,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         importKeeperfxButton = findViewById(R.id.importKeeperfx);
         importOriginalButton = findViewById(R.id.importOriginalDk);
         playButton = findViewById(R.id.play);
+        updateAppButton = findViewById(R.id.updateApp);
+        updateAppButton.setText(getString(R.string.button_update_app,
+            AppUpdater.installedVersionName(this)));
         inputModeGroup = findViewById(R.id.inputMode);
         renderScaleGroup = findViewById(R.id.renderScale);
         noIntroBox = findViewById(R.id.noIntro);
@@ -151,6 +156,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             R.string.import_original_title, R.string.import_original_explanation));
         playButton.setOnClickListener(v -> startGame());
         findViewById(R.id.removeData).setOnClickListener(v -> confirmRemoveData());
+        updateAppButton.setOnClickListener(v -> checkAppUpdate());
         findViewById(R.id.showLog).setOnClickListener(
             v -> startActivity(new Intent(this, LogActivity.class)));
     }
@@ -357,6 +363,65 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         if (state.error != null) {
             showError(R.string.install_failed, state.error);
         }
+    }
+
+    // ------------------------------------------------------------- app update
+
+    /**
+     * Checks only for a newer build of the app. The combined download button
+     * covers this too, but nothing outside the app will ever offer it, so it
+     * gets an entry of its own that also shows which build is running.
+     */
+    private void checkAppUpdate() {
+        if (DownloadService.isRunning()) {
+            Toast.makeText(this, R.string.updates_running, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        updateAppButton.setEnabled(false);
+        updateAppButton.setText(R.string.app_update_check);
+
+        new Thread(() -> {
+            AppUpdater.Available available = null;
+            boolean reachable = true;
+            try {
+                available = AppUpdater.checkForUpdate(this);
+            } catch (Exception e) {
+                reachable = false;
+            }
+            final AppUpdater.Available found = available;
+            final boolean online = reachable;
+            mainHandler.post(() -> {
+                updateAppButton.setEnabled(true);
+                updateAppButton.setText(getString(R.string.button_update_app,
+                    AppUpdater.installedVersionName(this)));
+                if (!online) {
+                    showError(R.string.app_update_title,
+                        getString(R.string.app_update_offline));
+                    return;
+                }
+                if (found == null) {
+                    new AlertDialog.Builder(this)
+                        .setTitle(R.string.app_update_title)
+                        .setMessage(getString(R.string.app_update_none,
+                            AppUpdater.installedVersionName(this)))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show();
+                    return;
+                }
+                new AlertDialog.Builder(this)
+                    .setTitle(R.string.app_update_title)
+                    .setMessage(getString(R.string.app_update_available, found.versionName,
+                        AppUpdater.installedVersionName(this)))
+                    .setPositiveButton(R.string.app_update_install, (d, w) -> {
+                        final List<UpdateManager.Item> only = new ArrayList<>();
+                        only.add(new UpdateManager.Item(UpdateManager.Kind.APP,
+                            found.versionName, "", found));
+                        runUpdates(only);
+                    })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            });
+        }, "kfx-app-update-check").start();
     }
 
     // ---------------------------------------------------------------- import

@@ -52,6 +52,18 @@
     <string name="updates_permission">To install its own update, KeeperFX needs permission to install apps. Grant it once in the settings screen that follows, then start the update again.</string>
     <string name="updates_permission_open">Open settings</string>
 
+    <string name="button_update_app">Update app · %1$s</string>
+    <string name="app_update_title">App update</string>
+    <string name="app_update_available">Version %1$s is available.
+
+You are on %2$s.
+
+The update installs over this one; game data and settings are kept.</string>
+    <string name="app_update_none">You are on the newest build (%1$s).</string>
+    <string name="app_update_check">Checking…</string>
+    <string name="app_update_offline">Could not reach the update server.</string>
+    <string name="app_update_install">Download and install</string>
+
     <string name="notification_channel_downloads">Downloads</string>
     <string name="notification_preparing">Preparing…</string>
     <string name="notification_done">Download finished</string>

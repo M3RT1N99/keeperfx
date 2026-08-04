@@ -46,7 +46,7 @@ public final class UpdateManager {
         /** Only set for Kind.APP. */
         public final AppUpdater.Available appUpdate;
 
-        Item(Kind kind, String title, String detail, AppUpdater.Available appUpdate) {
+        public Item(Kind kind, String title, String detail, AppUpdater.Available appUpdate) {
             this.kind = kind;
             this.title = title;
             this.detail = detail;
