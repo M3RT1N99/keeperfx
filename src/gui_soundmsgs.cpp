@@ -64,6 +64,11 @@ struct Message {
 	: type(_type), duration(_duration)
 	{}
 
+	// Messages are held and deleted through unique_ptr<Message>. Without this
+	// the derived destructor never runs, which leaked CustomMessage::fname's
+	// buffer on every custom message and is undefined behaviour besides.
+	virtual ~Message() = default;
+
 	virtual bool is(const Message &) const noexcept = 0;
 	virtual void play() const noexcept = 0;
 };
