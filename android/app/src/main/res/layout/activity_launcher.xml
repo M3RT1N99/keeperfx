@@ -196,6 +196,71 @@
                     android:text="@string/input_gestures"
                     android:textColor="@color/kfx_text_dim"
                     android:textSize="12sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@color/kfx_divider" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/settings_scale"
+                    android:textColor="@color/kfx_text"
+                    android:textSize="14sp" />
+
+                <RadioGroup
+                    android:id="@+id/renderScale"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/scale50"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_weight="1"
+                        android:text="@string/scale_50"
+                        android:textColor="@color/kfx_text"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/scale65"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_weight="1"
+                        android:text="@string/scale_65"
+                        android:textColor="@color/kfx_text"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/scale80"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_weight="1"
+                        android:text="@string/scale_80"
+                        android:textColor="@color/kfx_text"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/scale100"
+                        android:layout_width="0dp"
+                        android:layout_height="46dp"
+                        android:layout_weight="1"
+                        android:text="@string/scale_100"
+                        android:textColor="@color/kfx_text"
+                        android:textSize="13sp" />
+                </RadioGroup>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_scale_hint"
+                    android:textColor="@color/kfx_text_dim"
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <TextView

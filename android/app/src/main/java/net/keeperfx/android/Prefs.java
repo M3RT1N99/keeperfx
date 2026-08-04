@@ -39,6 +39,7 @@ public final class Prefs {
     private static final String KEY_NO_SOUND = "no_sound";
     private static final String KEY_EXTRA_ARGS = "extra_args";
     private static final String KEY_INSTALLED_VERSION = "installed_version";
+    private static final String KEY_RENDER_SCALE = "render_scale";
 
     private final SharedPreferences prefs;
 
@@ -81,6 +82,22 @@ public final class Prefs {
 
     public void setInstalledVersion(String version) {
         prefs.edit().putString(KEY_INSTALLED_VERSION, version == null ? "" : version).apply();
+    }
+
+    /**
+     * Percentage of the display resolution the engine renders at.
+     *
+     * The interface is laid out for a 640x480 era screen and the engine draws
+     * straight into the window surface, so at a phone's native resolution the
+     * buttons end up far too small to hit. 65 percent is a reasonable default
+     * for a handset; a tablet may prefer 100.
+     */
+    public int getRenderScalePercent() {
+        return prefs.getInt(KEY_RENDER_SCALE, 65);
+    }
+
+    public void setRenderScalePercent(int percent) {
+        prefs.edit().putInt(KEY_RENDER_SCALE, percent).apply();
     }
 
     public String getExtraArguments() {

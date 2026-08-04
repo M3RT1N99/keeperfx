@@ -61,6 +61,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private Button importOriginalButton;
     private Button playButton;
     private RadioGroup inputModeGroup;
+    private RadioGroup renderScaleGroup;
     private CheckBox noIntroBox;
     private CheckBox noSoundBox;
     private EditText extraArgsField;
@@ -84,6 +85,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         importOriginalButton = findViewById(R.id.importOriginalDk);
         playButton = findViewById(R.id.play);
         inputModeGroup = findViewById(R.id.inputMode);
+        renderScaleGroup = findViewById(R.id.renderScale);
         noIntroBox = findViewById(R.id.noIntro);
         noSoundBox = findViewById(R.id.noSound);
         extraArgsField = findViewById(R.id.extraArgs);
@@ -99,6 +101,24 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 inputModeGroup.check(R.id.inputAuto);
                 break;
         }
+        switch (prefs.getRenderScalePercent()) {
+            case 50:  renderScaleGroup.check(R.id.scale50);  break;
+            case 80:  renderScaleGroup.check(R.id.scale80);  break;
+            case 100: renderScaleGroup.check(R.id.scale100); break;
+            default:  renderScaleGroup.check(R.id.scale65);  break;
+        }
+        renderScaleGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.scale50) {
+                prefs.setRenderScalePercent(50);
+            } else if (checkedId == R.id.scale80) {
+                prefs.setRenderScalePercent(80);
+            } else if (checkedId == R.id.scale100) {
+                prefs.setRenderScalePercent(100);
+            } else {
+                prefs.setRenderScalePercent(65);
+            }
+        });
+
         noIntroBox.setChecked(prefs.isNoIntro());
         noSoundBox.setChecked(prefs.isNoSound());
         extraArgsField.setText(prefs.getExtraArguments());

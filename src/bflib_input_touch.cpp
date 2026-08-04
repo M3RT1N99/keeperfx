@@ -64,8 +64,11 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
 /** Longest press still counted as a tap. */
 #define TOUCH_TAP_MAX_MS 400
 
-/** Two finger travel in pixels that corresponds to a fully deflected axis. */
-#define TOUCH_PAN_FULL_SPEED_PX 22.0f
+/**
+ * Finger travel per game frame, in pixels, that corresponds to a fully
+ * deflected pan axis. A brisk swipe covers roughly this much between frames.
+ */
+#define TOUCH_PAN_FULL_SPEED_PX 18.0f
 
 /** Pinch distance change in pixels that corresponds to a fully deflected zoom axis. */
 #define TOUCH_PINCH_FULL_SPEED_PX 16.0f
@@ -120,6 +123,9 @@ static float touch_axis_rotate_cw, touch_axis_rotate_ccw;
 /* One shot gestures, consumed by touch_game_key_pressed(). */
 static TbBool touch_tapped_map_toggle = false;
 static TbBool touch_tapped_pause_menu = false;
+
+/* Finger travel collected since the last frame, in screen pixels. */
+static float touch_pan_accum_x, touch_pan_accum_y;
 
 /* Reference values of the running two finger gesture. */
 static float touch_camera_prev_dist = 0.0f;
@@ -187,6 +193,7 @@ TbBool touch_controls_active(void)
 
 static void touch_reset_gesture_axes(void)
 {
+    touch_pan_accum_x = touch_pan_accum_y = 0.0f;
     touch_axis_pan_left = touch_axis_pan_right = 0.0f;
     touch_axis_pan_up = touch_axis_pan_down = 0.0f;
     touch_axis_zoom_in = touch_axis_zoom_out = 0.0f;
@@ -355,16 +362,12 @@ static void touch_update_camera_gesture(void)
     const long cy = (a->y + b->y) / 2;
 
     // Pan: the world follows the fingers, so the camera travels the other way.
-    const float pan_dx = (float)(cx - touch_camera_prev_cx);
-    const float pan_dy = (float)(cy - touch_camera_prev_cy);
-    if (pan_dx > 0.0f)
-        touch_axis_pan_left = touch_clamp01(pan_dx / TOUCH_PAN_FULL_SPEED_PX);
-    else if (pan_dx < 0.0f)
-        touch_axis_pan_right = touch_clamp01(-pan_dx / TOUCH_PAN_FULL_SPEED_PX);
-    if (pan_dy > 0.0f)
-        touch_axis_pan_up = touch_clamp01(pan_dy / TOUCH_PAN_FULL_SPEED_PX);
-    else if (pan_dy < 0.0f)
-        touch_axis_pan_down = touch_clamp01(-pan_dy / TOUCH_PAN_FULL_SPEED_PX);
+    // Only accumulated here. A 120 Hz screen delivers many motion events per
+    // game frame, each a couple of pixels, so turning one event into an axis
+    // value would describe the sampling rate rather than how fast the finger
+    // is actually moving. update_touch_inputs() converts the sum once a frame.
+    touch_pan_accum_x += (float)(cx - touch_camera_prev_cx);
+    touch_pan_accum_y += (float)(cy - touch_camera_prev_cy);
 
     // Pinch to zoom.
     const float dist_delta = dist - touch_camera_prev_dist;
@@ -544,6 +547,8 @@ void TEvent(const SDL_Event *ev)
 
 /******************************************************************************/
 
+static void touch_apply_pan_accumulator(void);
+
 static void touch_decay_axis(float *axis)
 {
     *axis *= TOUCH_AXIS_DECAY;
@@ -586,30 +591,44 @@ void update_touch_inputs(void)
         }
     }
 
-    if (touch_gesture != TGest_Camera)
+    touch_apply_pan_accumulator();
+
+    // Zoom and rotation are pulses set by individual motion events, so they
+    // fade rather than being recomputed. Panning is not decayed: a frame with
+    // no finger travel already yields zero.
+    touch_decay_axis(&touch_axis_zoom_in);
+    touch_decay_axis(&touch_axis_zoom_out);
+    touch_decay_axis(&touch_axis_rotate_cw);
+    touch_decay_axis(&touch_axis_rotate_ccw);
+}
+
+/**
+ * Turns the finger travel collected since the last frame into pan axis values.
+ *
+ * get_movement_inputs() squares the axis before using it, which suits a
+ * controller stick that gets pushed to its limit but would reduce a typical
+ * pan to a hundredth of its intended speed. Taking the square root here undoes
+ * that, so the camera follows the finger at the speed it actually moved.
+ */
+static void touch_apply_pan_accumulator(void)
+{
+    touch_axis_pan_left = touch_axis_pan_right = 0.0f;
+    touch_axis_pan_up = touch_axis_pan_down = 0.0f;
+
+    if (touch_gesture == TGest_Camera)
     {
-        touch_decay_axis(&touch_axis_pan_left);
-        touch_decay_axis(&touch_axis_pan_right);
-        touch_decay_axis(&touch_axis_pan_up);
-        touch_decay_axis(&touch_axis_pan_down);
-        touch_decay_axis(&touch_axis_zoom_in);
-        touch_decay_axis(&touch_axis_zoom_out);
-        touch_decay_axis(&touch_axis_rotate_cw);
-        touch_decay_axis(&touch_axis_rotate_ccw);
+        const float dx = touch_pan_accum_x / TOUCH_PAN_FULL_SPEED_PX;
+        const float dy = touch_pan_accum_y / TOUCH_PAN_FULL_SPEED_PX;
+        if (dx > 0.0f)
+            touch_axis_pan_left = sqrtf(touch_clamp01(dx));
+        else if (dx < 0.0f)
+            touch_axis_pan_right = sqrtf(touch_clamp01(-dx));
+        if (dy > 0.0f)
+            touch_axis_pan_up = sqrtf(touch_clamp01(dy));
+        else if (dy < 0.0f)
+            touch_axis_pan_down = sqrtf(touch_clamp01(-dy));
     }
-    else
-    {
-        // While the gesture runs the axes are refreshed by every motion event;
-        // decaying them here keeps a held but motionless pinch from sticking.
-        touch_decay_axis(&touch_axis_zoom_in);
-        touch_decay_axis(&touch_axis_zoom_out);
-        touch_decay_axis(&touch_axis_rotate_cw);
-        touch_decay_axis(&touch_axis_rotate_ccw);
-        touch_decay_axis(&touch_axis_pan_left);
-        touch_decay_axis(&touch_axis_pan_right);
-        touch_decay_axis(&touch_axis_pan_up);
-        touch_decay_axis(&touch_axis_pan_down);
-    }
+    touch_pan_accum_x = touch_pan_accum_y = 0.0f;
 }
 
 /******************************************************************************/
