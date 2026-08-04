@@ -339,6 +339,87 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         }
     }
 
+    // ---------------------------------------------------------------- import
+
+    private void pickFolder(int requestCode, int titleRes, int explanationRes) {
+        new AlertDialog.Builder(this)
+            .setTitle(titleRes)
+            .setMessage(explanationRes)
+            .setPositiveButton(R.string.import_choose, (dialog, which) -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivityForResult(intent, requestCode);
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null) {
+            return;
+        }
+        if (requestCode != REQUEST_PICK_KEEPERFX && requestCode != REQUEST_PICK_ORIGINAL_DK) {
+            return;
+        }
+        final Uri treeUri = data.getData();
+        if (treeUri == null) {
+            return;
+        }
+        try {
+            getContentResolver().takePersistableUriPermission(
+                treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (SecurityException ignored) {
+            // Not every provider offers persistable permissions; the copy below
+            // only needs the grant that is alive for this activity result.
+        }
+        startImport(treeUri, requestCode == REQUEST_PICK_KEEPERFX);
+    }
+
+    private void startImport(Uri treeUri, boolean keeperfxRelease) {
+        setBusy(true);
+        progressBar.setIndeterminate(true);
+        detailView.setText("");
+        if (keeperfxRelease) {
+            keeperfxStatus.setText(R.string.status_importing);
+        } else {
+            originalDkStatus.setText(R.string.status_searching_original);
+        }
+
+        final DataImporter importer = new DataImporter(this, new DataImporter.Listener() {
+            @Override
+            public void onProgress(int filesCopied, String currentPath) {
+                mainHandler.post(() -> detailView.setText(
+                    getString(R.string.status_import_progress, filesCopied, currentPath)));
+            }
+
+            @Override
+            public void onFinished(boolean success, String message) {
+                mainHandler.post(() -> {
+                    runningImport = null;
+                    setBusy(false);
+                    if (success && keeperfxRelease) {
+                        // A hand picked folder carries no version we can trust.
+                        prefs.setInstalledVersion("");
+                    }
+                    refreshStatus();
+                    if (!success) {
+                        showError(R.string.import_failed, message);
+                    }
+                });
+            }
+        });
+        runningImport = importer;
+        new Thread(() -> {
+            if (keeperfxRelease) {
+                importer.importKeeperfxTree(treeUri);
+            } else {
+                importer.importOriginalDkTree(treeUri);
+            }
+        }, "kfx-import").start();
+    }
+
     // ----------------------------------------------------------------- misc
 
     private void setBusy(boolean value) {

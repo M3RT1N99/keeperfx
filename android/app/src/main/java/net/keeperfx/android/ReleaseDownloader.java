@@ -310,11 +310,13 @@ public final class ReleaseDownloader {
 
     private void extract(File archive) throws IOException {
         final File destination = GameData.gameDirectory(context);
-        // A fresh release replaces the previous one. The files from the original
-        // game live in the same tree, so they have to be imported again after
-        // this; the launcher says so and the check picks it up.
-        DataImporter.deleteRecursively(destination);
-        if (!destination.mkdirs()) {
+        // Unpacked over whatever is already there rather than replacing it, the
+        // way the desktop launcher installs a release. Everything the archive
+        // does not contain therefore survives: the files imported from an
+        // original Dungeon Keeper, save games, downloaded music, screenshots,
+        // and any campaigns, map packs or mods the player added. Files that a
+        // release retires are handled below by the removal list instead.
+        if (!destination.isDirectory() && !destination.mkdirs()) {
             throw new IOException("Cannot create " + destination.getAbsolutePath());
         }
 
@@ -368,6 +370,58 @@ public final class ReleaseDownloader {
         // can be missing files or carry values this parser rejects.
         listener.onStage("Applying configuration", -1, "");
         BundledConfig.install(context, true);
+
+        removeRetiredFiles(destination);
+    }
+
+    /**
+     * Deletes the files a release has retired, listed per version in
+     * launcher-auto-file-removal.txt, which ships inside the archive.
+     *
+     * Installing over the top leaves files behind that newer releases no longer
+     * contain; this is the mechanism the desktop launcher uses for them, and it
+     * is why not wiping the directory is safe.
+     */
+    private void removeRetiredFiles(File root) {
+        final File list = new File(root, "launcher-auto-file-removal.txt");
+        if (!list.isFile()) {
+            return;
+        }
+        int removed = 0;
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(new java.io.FileInputStream(list), "UTF-8"))) {
+            String line;
+            boolean sectionApplies = false;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                if (line.startsWith("[") && line.endsWith("]")) {
+                    // Entries are listed under the version that retired them,
+                    // so every section up to the one being installed applies.
+                    sectionApplies = true;
+                    continue;
+                }
+                if (!sectionApplies) {
+                    continue;
+                }
+                final String relative = line.startsWith("/") ? line.substring(1) : line;
+                final File victim = new File(root, relative);
+                if (victim.isFile() && victim.getCanonicalPath()
+                        .startsWith(root.getCanonicalPath() + File.separator)) {
+                    if (victim.delete()) {
+                        removed++;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not process the file removal list", e);
+            return;
+        }
+        if (removed > 0) {
+            Log.i(TAG, "Removed " + removed + " files retired by this release");
+        }
     }
 
     private static boolean isSkipped(String name) {

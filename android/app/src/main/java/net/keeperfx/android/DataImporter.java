@@ -81,14 +81,18 @@ public final class DataImporter {
     // ------------------------------------------------------- KeeperFX release
 
     /**
-     * Replaces the current installation with the contents of the picked tree.
+     * Copies the picked tree into the installation, over whatever is already
+     * there. Save games, the files imported from an original Dungeon Keeper,
+     * downloaded music and any added campaigns, map packs or mods therefore
+     * survive, the same way installing a release does. "Reset" is there for a
+     * player who does want to start from nothing.
+     *
      * Runs synchronously; the caller provides the thread.
      */
     public void importKeeperfxTree(Uri treeUri) {
         final File destination = GameData.gameDirectory(context);
         try {
-            deleteRecursively(destination);
-            if (!destination.mkdirs()) {
+            if (!destination.isDirectory() && !destination.mkdirs()) {
                 finish(false, "Cannot create " + destination.getAbsolutePath());
                 return;
             }
@@ -103,7 +107,6 @@ public final class DataImporter {
             copyDirectory(treeUri, start.documentUri, start.target);
 
             if (cancelled) {
-                deleteRecursively(destination);
                 finish(false, "Import cancelled");
                 return;
             }
@@ -115,7 +118,6 @@ public final class DataImporter {
             finish(true, "Copied " + filesCopied + " files");
         } catch (Exception e) {
             Log.e(TAG, "Import failed", e);
-            deleteRecursively(destination);
             finish(false, "Import failed: " + e.getMessage());
         }
     }

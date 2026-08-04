@@ -45,7 +45,7 @@
     <string name="updates_none">The app, the game data and the music are all current.\n\nFiles from an original Dungeon Keeper cannot be downloaded — use "Import original Dungeon Keeper" for those.</string>
     <string name="updates_available_title">%1$d download(s) available</string>
     <string name="updates_download_all">Download all</string>
-    <string name="updates_replaces_data">Installing the game data replaces the current installation, so the files from the original game have to be imported again afterwards.</string>
+    <string name="updates_replaces_data">The game data is unpacked over the current installation. Save games, the files from the original game, music, and anything you added are kept.</string>
     <string name="updates_use_wifi">Best done on Wi-Fi.</string>
 
     <string name="updates_permission_title">Permission needed</string>
@@ -60,12 +60,12 @@
 
     <string name="install_title">Install KeeperFX</string>
     <string name="install_update_title">Update KeeperFX</string>
-    <string name="install_explanation">Downloads %1$s from keeperfx.net and unpacks it. The archive is around 360 MB, so use Wi-Fi.\n\nThis replaces the current installation, including the files copied from the original game — import those again afterwards. Save games are lost.</string>
+    <string name="install_explanation">Downloads %1$s from keeperfx.net and unpacks it over the current installation. The archive is around 360 MB, so use Wi-Fi.\n\nSave games, the files from the original game, downloaded music and any campaigns, map packs or mods you added are kept.</string>
     <string name="install_start">Download</string>
     <string name="install_failed">Installation failed</string>
 
     <string name="import_keeperfx_title">Import KeeperFX folder</string>
-    <string name="import_keeperfx_explanation">Use this instead of downloading if you already have a KeeperFX installation on this device. Pick its folder; it is copied into the app\'s private storage.</string>
+    <string name="import_keeperfx_explanation">Use this instead of downloading if you already have a KeeperFX installation on this device. Its folder is copied over the current installation, so save games and the files from the original game are kept.\n\nUse "Reset" first if you want to start from nothing.</string>
 
     <string name="import_original_title">Import original Dungeon Keeper</string>
     <string name="import_original_explanation">KeeperFX cannot ship a few files that must come from an original Dungeon Keeper. Pick your Dungeon Keeper folder — the one containing DATA and SOUND — and they are picked out and copied automatically.\n\nA mounted or extracted CD image works too. Nothing else from that folder is copied.</string>
