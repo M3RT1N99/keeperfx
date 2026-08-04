@@ -147,7 +147,18 @@ TbResult LbScreenSwap(void)
         // Update pointer to window surface on every frame
         // to avoid problems with alt tab
         lbScreenSurface = SDL_GetWindowSurface(lbWindow);
-        blresult = SDL_BlitSurface(lbDrawSurface, NULL, lbScreenSurface, NULL);
+        // The two surfaces normally have the same size and only differ in depth,
+        // so a plain blit is both correct and cheaper. They can differ in size
+        // when the window could not be created at the requested resolution -
+        // Android hands out the whole display no matter what is asked for - and
+        // an unscaled copy would then leave the picture in the top left corner
+        // with the rest of the window untouched.
+        if ((lbDrawSurface->w != lbScreenSurface->w)
+         || (lbDrawSurface->h != lbScreenSurface->h)) {
+            blresult = SDL_BlitScaled(lbDrawSurface, NULL, lbScreenSurface, NULL);
+        } else {
+            blresult = SDL_BlitSurface(lbDrawSurface, NULL, lbScreenSurface, NULL);
+        }
         if (blresult < 0) {
             ERRORLOG("Blit failed: %s",SDL_GetError());
             ret = Lb_FAIL;

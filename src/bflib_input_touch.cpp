@@ -55,8 +55,16 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
 /** Fingers tracked at the same time; more than this is ignored. */
 #define TOUCH_MAX_FINGERS 5
 
-/** Movement in screen pixels before a press turns into a drag. */
-#define TOUCH_DRAG_THRESHOLD_PX 14
+/**
+ * Fraction of the screen width a finger may wander and still count as a tap.
+ * An absolute pixel count is useless here: the same physical wobble is 14
+ * pixels on one panel and 40 on another, and a thumb never lands still.
+ */
+#define TOUCH_DRAG_THRESHOLD_DIVISOR 50
+#define TOUCH_DRAG_THRESHOLD_MIN_PX 12
+
+/** Safety net in case update_mouse() is not running; keeps a tap from sticking. */
+#define TOUCH_CLICK_MAX_HOLD_MS 250
 
 /** Hold time in milliseconds before a motionless press becomes a right click. */
 #define TOUCH_LONGPRESS_MS 420
@@ -79,6 +87,17 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
 /** Deadzones, so that a slightly imprecise two finger drag does not zoom or rotate. */
 #define TOUCH_PINCH_DEADZONE_PX 2.5f
 #define TOUCH_TWIST_DEADZONE_RAD 0.012f
+
+/**
+ * Travel a two finger gesture has to accumulate before it commits to being a
+ * pan, a pinch or a twist. Two fingers on a screen always produce a little of
+ * all three at once, and acting on all of them together is what makes the
+ * camera feel like it is fighting back. Rotation needs the largest margin
+ * because an accidental twist while dragging is the easiest one to trigger.
+ */
+#define TOUCH_COMMIT_PAN_PX 26.0f
+#define TOUCH_COMMIT_PINCH_PX 26.0f
+#define TOUCH_COMMIT_TWIST_RAD 0.22f
 
 /** How quickly gesture axes fall back to zero once the fingers stop moving. */
 #define TOUCH_AXIS_DECAY 0.55f
@@ -124,17 +143,29 @@ static float touch_axis_rotate_cw, touch_axis_rotate_ccw;
 static TbBool touch_tapped_map_toggle = false;
 static TbBool touch_tapped_pause_menu = false;
 
+/** What a running two finger gesture has committed to. */
+enum TouchTwoFingerMode {
+    T2F_Undecided = 0,
+    T2F_Pan,
+    T2F_Zoom,
+    T2F_Rotate,
+};
+
 /* Finger travel collected since the last frame, in screen pixels. */
 static float touch_pan_accum_x, touch_pan_accum_y;
+
+/* Totals since the two finger gesture began, used to commit to one of them. */
+static unsigned char touch_two_finger_mode = T2F_Undecided;
+static float touch_total_pan, touch_total_pinch, touch_total_twist;
 
 /* Reference values of the running two finger gesture. */
 static float touch_camera_prev_dist = 0.0f;
 static float touch_camera_prev_angle = 0.0f;
 static long touch_camera_prev_cx = 0, touch_camera_prev_cy = 0;
 
-/* Deferred click, so the game always observes at least one full frame with
-   the button held down - GUI buttons rely on that. */
-static int touch_pending_click_frames = 0;
+/* Deferred click, so the game always observes the press before it is released. */
+static TbBool touch_click_pending = false;
+static Uint32 touch_click_press_ticks = 0;
 static TbBool touch_button_down_left = false;
 static TbBool touch_button_down_right = false;
 
@@ -194,6 +225,8 @@ TbBool touch_controls_active(void)
 static void touch_reset_gesture_axes(void)
 {
     touch_pan_accum_x = touch_pan_accum_y = 0.0f;
+    touch_two_finger_mode = T2F_Undecided;
+    touch_total_pan = touch_total_pinch = touch_total_twist = 0.0f;
     touch_axis_pan_left = touch_axis_pan_right = 0.0f;
     touch_axis_pan_up = touch_axis_pan_down = 0.0f;
     touch_axis_zoom_in = touch_axis_zoom_out = 0.0f;
@@ -211,7 +244,7 @@ static void touch_release_buttons(void)
         mouseControl(MActn_RBUTTONUP, &delta);
         touch_button_down_right = false;
     }
-    touch_pending_click_frames = 0;
+    touch_click_pending = false;
 }
 
 static void touch_reset_state(void)
@@ -316,11 +349,20 @@ static void touch_press_right(void)
     }
 }
 
-/** Queues a complete click that is released again one frame later. */
+/**
+ * Presses the left button and leaves it down until the game has seen it.
+ *
+ * Counting frames here does not work: update_touch_inputs() runs inside
+ * poll_inputs(), and poll_inputs() is called several times between two
+ * update_mouse() calls in some loops, so a counted release could happen before
+ * the click was ever observed. That is why a tap did nothing while a drag,
+ * which holds the button across many frames, worked.
+ */
 static void touch_queue_click(void)
 {
     touch_press_left();
-    touch_pending_click_frames = 2;
+    touch_click_pending = true;
+    touch_click_press_ticks = SDL_GetTicks();
 }
 
 static void touch_begin_camera_gesture(void)
@@ -335,6 +377,8 @@ static void touch_begin_camera_gesture(void)
     touch_camera_prev_angle = atan2f(dy, dx);
     touch_camera_prev_cx = (a->x + b->x) / 2;
     touch_camera_prev_cy = (a->y + b->y) / 2;
+    touch_two_finger_mode = T2F_Undecided;
+    touch_total_pan = touch_total_pinch = touch_total_twist = 0.0f;
     touch_gesture = TGest_Camera;
 }
 
@@ -361,31 +405,65 @@ static void touch_update_camera_gesture(void)
     const long cx = (a->x + b->x) / 2;
     const long cy = (a->y + b->y) / 2;
 
-    // Pan: the world follows the fingers, so the camera travels the other way.
-    // Only accumulated here. A 120 Hz screen delivers many motion events per
-    // game frame, each a couple of pixels, so turning one event into an axis
-    // value would describe the sampling rate rather than how fast the finger
-    // is actually moving. update_touch_inputs() converts the sum once a frame.
-    touch_pan_accum_x += (float)(cx - touch_camera_prev_cx);
-    touch_pan_accum_y += (float)(cy - touch_camera_prev_cy);
-
-    // Pinch to zoom.
+    const float pan_dx = (float)(cx - touch_camera_prev_cx);
+    const float pan_dy = (float)(cy - touch_camera_prev_cy);
     const float dist_delta = dist - touch_camera_prev_dist;
-    if (dist_delta > TOUCH_PINCH_DEADZONE_PX)
-        touch_axis_zoom_in = touch_clamp01((dist_delta - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
-    else if (dist_delta < -TOUCH_PINCH_DEADZONE_PX)
-        touch_axis_zoom_out = touch_clamp01((-dist_delta - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
-
-    // Twist to rotate; normalise the wrap around at +/- pi.
     float angle_delta = angle - touch_camera_prev_angle;
     while (angle_delta > TOUCH_PI)
         angle_delta -= 2.0f * TOUCH_PI;
     while (angle_delta < -TOUCH_PI)
         angle_delta += 2.0f * TOUCH_PI;
-    if (angle_delta > TOUCH_TWIST_DEADZONE_RAD)
-        touch_axis_rotate_cw = touch_clamp01((angle_delta - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
-    else if (angle_delta < -TOUCH_TWIST_DEADZONE_RAD)
-        touch_axis_rotate_ccw = touch_clamp01((-angle_delta - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
+
+    // Decide once what this gesture is, then stick to it until the fingers lift.
+    if (touch_two_finger_mode == T2F_Undecided)
+    {
+        touch_total_pan += sqrtf(pan_dx * pan_dx + pan_dy * pan_dy);
+        touch_total_pinch += fabsf(dist_delta);
+        touch_total_twist += fabsf(angle_delta);
+
+        const float pan_share = touch_total_pan / TOUCH_COMMIT_PAN_PX;
+        const float pinch_share = touch_total_pinch / TOUCH_COMMIT_PINCH_PX;
+        const float twist_share = touch_total_twist / TOUCH_COMMIT_TWIST_RAD;
+        if ((pan_share >= 1.0f) || (pinch_share >= 1.0f) || (twist_share >= 1.0f))
+        {
+            if ((pan_share >= pinch_share) && (pan_share >= twist_share))
+                touch_two_finger_mode = T2F_Pan;
+            else if (pinch_share >= twist_share)
+                touch_two_finger_mode = T2F_Zoom;
+            else
+                touch_two_finger_mode = T2F_Rotate;
+        }
+    }
+
+    switch (touch_two_finger_mode)
+    {
+    case T2F_Pan:
+        // Only accumulated here. A 120 Hz screen delivers many motion events per
+        // game frame, each a couple of pixels, so turning one event into an axis
+        // value would describe the sampling rate rather than how fast the finger
+        // is actually moving. update_touch_inputs() converts the sum once a frame.
+        // The world follows the fingers, so the camera travels the other way.
+        touch_pan_accum_x += pan_dx;
+        touch_pan_accum_y += pan_dy;
+        break;
+
+    case T2F_Zoom:
+        if (dist_delta > TOUCH_PINCH_DEADZONE_PX)
+            touch_axis_zoom_in = touch_clamp01((dist_delta - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
+        else if (dist_delta < -TOUCH_PINCH_DEADZONE_PX)
+            touch_axis_zoom_out = touch_clamp01((-dist_delta - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
+        break;
+
+    case T2F_Rotate:
+        if (angle_delta > TOUCH_TWIST_DEADZONE_RAD)
+            touch_axis_rotate_cw = touch_clamp01((angle_delta - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
+        else if (angle_delta < -TOUCH_TWIST_DEADZONE_RAD)
+            touch_axis_rotate_ccw = touch_clamp01((-angle_delta - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
+        break;
+
+    default:
+        break;
+    }
 
     touch_camera_prev_dist = dist;
     touch_camera_prev_angle = angle;
@@ -459,7 +537,10 @@ void TEvent(const SDL_Event *ev)
         finger->y = (long)(ev->tfinger.y * (float)screen_h);
         const long travel_x = finger->x - finger->start_x;
         const long travel_y = finger->y - finger->start_y;
-        if ((labs(travel_x) >= TOUCH_DRAG_THRESHOLD_PX) || (labs(travel_y) >= TOUCH_DRAG_THRESHOLD_PX))
+        long threshold = screen_w / TOUCH_DRAG_THRESHOLD_DIVISOR;
+        if (threshold < TOUCH_DRAG_THRESHOLD_MIN_PX)
+            threshold = TOUCH_DRAG_THRESHOLD_MIN_PX;
+        if ((labs(travel_x) >= threshold) || (labs(travel_y) >= threshold))
             finger->moved = true;
 
         if (touch_gesture == TGest_Camera)
@@ -565,12 +646,18 @@ void update_touch_inputs(void)
         return;
     }
 
-    // Finish the deferred tap click one frame after it was issued.
-    if (touch_pending_click_frames > 0)
+    // update_mouse() clears lbDisplay.LeftButton once it has taken the press,
+    // so seeing it back at zero proves the game observed the click.
+    if (touch_click_pending)
     {
-        touch_pending_click_frames--;
-        if (touch_pending_click_frames == 0)
+        const TbBool observed = (lbDisplay.LeftButton == 0);
+        const TbBool overdue =
+            (SDL_GetTicks() - touch_click_press_ticks) > TOUCH_CLICK_MAX_HOLD_MS;
+        if (observed || overdue)
+        {
+            touch_click_pending = false;
             touch_release_buttons();
+        }
     }
 
     // A single finger resting in place turns into a right click (slap / drop).
