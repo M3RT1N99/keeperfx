@@ -96,7 +96,11 @@ set(SDL2MIXER_DEPS_SHARED OFF    CACHE BOOL   "" FORCE)
 set(SDL2MIXER_VORBIS      "STB"  CACHE STRING "" FORCE)
 set(SDL2MIXER_FLAC        OFF    CACHE BOOL   "" FORCE)
 set(SDL2MIXER_MOD         OFF    CACHE BOOL   "" FORCE)
-set(SDL2MIXER_MP3         OFF    CACHE BOOL   "" FORCE)
+# Campaign speech ships as MP3 - 40 files per language in the official release -
+# so this cannot be off. dr_mp3 is built into SDL2_mixer and pulls in nothing.
+set(SDL2MIXER_MP3         ON     CACHE BOOL   "" FORCE)
+set(SDL2MIXER_MP3_DRMP3   ON     CACHE BOOL   "" FORCE)
+set(SDL2MIXER_MP3_MPG123  OFF    CACHE BOOL   "" FORCE)
 set(SDL2MIXER_MIDI        OFF    CACHE BOOL   "" FORCE)
 set(SDL2MIXER_OPUS        OFF    CACHE BOOL   "" FORCE)
 set(SDL2MIXER_WAVPACK     OFF    CACHE BOOL   "" FORCE)
