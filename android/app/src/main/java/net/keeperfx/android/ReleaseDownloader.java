@@ -98,6 +98,107 @@ public final class ReleaseDownloader {
         cancelled = true;
     }
 
+    /**
+     * Downloads the background music archive and unpacks it into music/.
+     *
+     * Music is not part of the release on any platform; the desktop launcher
+     * fetches it from the same workshop item. Runs synchronously.
+     */
+    public void runMusic() {
+        File archive = null;
+        try {
+            listener.onStage("Looking up the music archive", -1, "");
+            final String url = queryMusicUrl();
+            if (url.isEmpty()) {
+                finish(false, "The workshop API returned no music download");
+                return;
+            }
+
+            archive = new File(context.getCacheDir(), "keeperfx-music.zip");
+            download(url, archive, -1, "music");
+            if (cancelled) {
+                finish(false, "Download cancelled");
+                return;
+            }
+
+            listener.onStage("Unpacking the music", -1, "");
+            final File musicDir = new File(GameData.gameDirectory(context), "music");
+            if (!musicDir.isDirectory() && !musicDir.mkdirs()) {
+                throw new IOException("Cannot create " + musicDir.getAbsolutePath());
+            }
+            final int files = unzipInto(archive, musicDir);
+            finish(true, "Installed " + files + " music tracks");
+        } catch (Exception e) {
+            Log.e(TAG, "Music download failed", e);
+            finish(false, "Failed: " + e.getMessage());
+        } finally {
+            if (archive != null && archive.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                archive.delete();
+            }
+        }
+    }
+
+    /**
+     * The music lives in workshop item 393, the same one the desktop launcher
+     * uses. The zip is preferred over the 7z: java.util.zip reads it directly.
+     */
+    private static String queryMusicUrl() throws IOException, org.json.JSONException {
+        final JSONObject item = requestJson(
+            "https://keeperfx.net/api/v1/workshop/item/393").getJSONObject("workshop_item");
+        final org.json.JSONArray files = item.optJSONArray("files");
+        String sevenZip = "";
+        if (files != null) {
+            for (int i = 0; i < files.length(); i++) {
+                final String url = files.getJSONObject(i).optString("url", "");
+                if (url.toLowerCase(Locale.US).endsWith(".zip")) {
+                    return url;
+                }
+                if (url.toLowerCase(Locale.US).endsWith(".7z")) {
+                    sevenZip = url;
+                }
+            }
+        }
+        return sevenZip;
+    }
+
+    private int unzipInto(File archive, File target) throws IOException {
+        final String canonicalRoot = target.getCanonicalPath() + File.separator;
+        int files = 0;
+        try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(
+                new BufferedInputStream(new java.io.FileInputStream(archive)))) {
+            java.util.zip.ZipEntry entry;
+            final byte[] buffer = new byte[128 * 1024];
+            while ((entry = zip.getNextEntry()) != null) {
+                if (cancelled) {
+                    return files;
+                }
+                // The archive carries a music/ prefix on some releases; flatten
+                // it so the tracks always land directly in the music folder.
+                String name = entry.getName().replace('\\', '/');
+                final int slash = name.lastIndexOf('/');
+                if (slash >= 0) {
+                    name = name.substring(slash + 1);
+                }
+                if (entry.isDirectory() || name.isEmpty()) {
+                    continue;
+                }
+                final File out = new File(target, name);
+                if (!out.getCanonicalPath().startsWith(canonicalRoot)) {
+                    continue;
+                }
+                try (OutputStream os = new FileOutputStream(out)) {
+                    int read;
+                    while ((read = zip.read(buffer)) > 0) {
+                        os.write(buffer, 0, read);
+                    }
+                }
+                files++;
+            }
+        }
+        return files;
+    }
+
     /** Runs synchronously; the caller provides the thread. */
     public void run() {
         File archive = null;
@@ -142,14 +243,18 @@ public final class ReleaseDownloader {
     }
 
     private static JSONObject requestLatestRelease() throws IOException, org.json.JSONException {
-        final HttpURLConnection connection = (HttpURLConnection) new URL(API_LATEST).openConnection();
+        return requestJson(API_LATEST).getJSONObject("release");
+    }
+
+    private static JSONObject requestJson(String url) throws IOException, org.json.JSONException {
+        final HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         try {
             connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
             connection.setReadTimeout(READ_TIMEOUT_MS);
             connection.setRequestProperty("Accept", "application/json");
             final int status = connection.getResponseCode();
             if (status != HttpURLConnection.HTTP_OK) {
-                throw new IOException("Release API returned HTTP " + status);
+                throw new IOException("API returned HTTP " + status + " for " + url);
             }
             final StringBuilder body = new StringBuilder();
             try (InputStream in = connection.getInputStream()) {
@@ -159,8 +264,7 @@ public final class ReleaseDownloader {
                     body.append(new String(buffer, 0, read, "UTF-8"));
                 }
             }
-            final JSONObject root = new JSONObject(body.toString());
-            return root.getJSONObject("release");
+            return new JSONObject(body.toString());
         } finally {
             connection.disconnect();
         }

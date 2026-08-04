@@ -27,6 +27,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
@@ -63,8 +64,8 @@ public class LauncherActivity extends Activity {
 
     private DataImporter runningImport;
     private ReleaseDownloader runningDownload;
+    private AppUpdater runningAppUpdate;
     private boolean busy = false;
-    private String availableVersion = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -196,47 +197,107 @@ public class LauncherActivity extends Activity {
         setBusy(busy);
     }
 
-    /** Compares the installed release against the API, quietly. */
+    /**
+     * Quietly counts what could be downloaded so the button can say so before
+     * the player taps it. Silent on failure; being offline must not get in the
+     * way of starting the game.
+     */
     private void checkForUpdateInBackground() {
-        if (!GameData.isKeeperfxInstalled(this) || prefs.getInstalledVersion().isEmpty()) {
-            return;
-        }
         new Thread(() -> {
-            try {
-                final ReleaseDownloader.ReleaseInfo info = ReleaseDownloader.queryLatestRelease();
-                mainHandler.post(() -> {
-                    availableVersion = info.version;
-                    if (!info.version.isEmpty()
-                        && !info.version.equals(prefs.getInstalledVersion())) {
-                        installButton.setText(
-                            getString(R.string.button_update_to, info.version));
-                    }
-                });
-            } catch (Exception e) {
-                // Offline or the API is down; the launcher stays usable.
-            }
+            final List<UpdateManager.Item> items = UpdateManager.check(this);
+            mainHandler.post(() -> {
+                if (!items.isEmpty() && !busy) {
+                    installButton.setText(getString(R.string.button_updates_waiting, items.size()));
+                }
+            });
         }, "kfx-update-check").start();
     }
 
     // ------------------------------------------------------- install / update
 
+    /**
+     * One entry point for everything that can be fetched: the KeeperFX release,
+     * the background music and a newer build of this app.
+     */
     private void confirmInstallOrUpdate() {
-        final boolean update = GameData.isKeeperfxInstalled(this);
-        final String versionText = availableVersion.isEmpty()
-            ? getString(R.string.version_latest) : availableVersion;
+        setBusy(true);
+        progressBar.setIndeterminate(true);
+        keeperfxStatus.setText(R.string.status_checking_updates);
+
+        new Thread(() -> {
+            final List<UpdateManager.Item> items = UpdateManager.check(this);
+            mainHandler.post(() -> {
+                setBusy(false);
+                refreshStatus();
+                if (items.isEmpty()) {
+                    new AlertDialog.Builder(this)
+                        .setTitle(R.string.updates_none_title)
+                        .setMessage(R.string.updates_none)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show();
+                    return;
+                }
+                showUpdateDialog(items);
+            });
+        }, "kfx-update-scan").start();
+    }
+
+    private void showUpdateDialog(List<UpdateManager.Item> items) {
+        final StringBuilder body = new StringBuilder();
+        boolean replacesData = false;
+        for (UpdateManager.Item item : items) {
+            body.append("• ").append(item.title).append('\n');
+            if (!item.detail.isEmpty()) {
+                body.append("    ").append(item.detail).append('\n');
+            }
+            if (item.kind == UpdateManager.Kind.GAME_DATA) {
+                replacesData = true;
+            }
+        }
+        if (replacesData) {
+            body.append('\n').append(getString(R.string.updates_replaces_data));
+        }
+        body.append('\n').append(getString(R.string.updates_use_wifi));
+
         new AlertDialog.Builder(this)
-            .setTitle(update ? R.string.install_update_title : R.string.install_title)
-            .setMessage(getString(R.string.install_explanation, versionText))
-            .setPositiveButton(R.string.install_start, (dialog, which) -> startInstall())
+            .setTitle(getString(R.string.updates_available_title, items.size()))
+            .setMessage(body.toString().trim())
+            .setPositiveButton(R.string.updates_download_all,
+                (dialog, which) -> runUpdates(items, 0))
             .setNegativeButton(android.R.string.cancel, null)
             .show();
     }
 
-    private void startInstall() {
+    /** Works through the list one item at a time; the app update comes last. */
+    private void runUpdates(List<UpdateManager.Item> items, int index) {
+        if (index >= items.size()) {
+            setBusy(false);
+            refreshStatus();
+            return;
+        }
+        final UpdateManager.Item item = items.get(index);
         setBusy(true);
         progressBar.setIndeterminate(true);
         detailView.setText("");
 
+        switch (item.kind) {
+            case GAME_DATA:
+                runDownloader(downloader -> downloader.run(), items, index);
+                break;
+            case MUSIC:
+                runDownloader(downloader -> downloader.runMusic(), items, index);
+                break;
+            case APP:
+                runAppUpdate(item, items, index);
+                break;
+        }
+    }
+
+    private interface DownloaderAction {
+        void run(ReleaseDownloader downloader);
+    }
+
+    private void runDownloader(DownloaderAction action, List<UpdateManager.Item> items, int index) {
         final ReleaseDownloader downloader = new ReleaseDownloader(this,
             new ReleaseDownloader.Listener() {
                 @Override
@@ -257,16 +318,67 @@ public class LauncherActivity extends Activity {
                 public void onFinished(boolean success, String message) {
                     mainHandler.post(() -> {
                         runningDownload = null;
-                        setBusy(false);
-                        refreshStatus();
                         if (!success) {
+                            setBusy(false);
+                            refreshStatus();
                             showError(R.string.install_failed, message);
+                            return;
                         }
+                        runUpdates(items, index + 1);
                     });
                 }
             });
         runningDownload = downloader;
-        new Thread(downloader::run, "kfx-install").start();
+        new Thread(() -> action.run(downloader), "kfx-download").start();
+    }
+
+    private void runAppUpdate(UpdateManager.Item item, List<UpdateManager.Item> items, int index) {
+        if (!AppUpdater.canInstallPackages(this)) {
+            setBusy(false);
+            new AlertDialog.Builder(this)
+                .setTitle(R.string.updates_permission_title)
+                .setMessage(R.string.updates_permission)
+                .setPositiveButton(R.string.updates_permission_open, (d, w) -> startActivity(
+                    new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + getPackageName()))))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+            return;
+        }
+
+        final AppUpdater updater = new AppUpdater(this, new AppUpdater.Listener() {
+            @Override
+            public void onProgress(int percent, String detail) {
+                mainHandler.post(() -> {
+                    keeperfxStatus.setText(R.string.status_downloading_app);
+                    detailView.setText(detail);
+                    if (percent >= 0) {
+                        progressBar.setIndeterminate(false);
+                        progressBar.setProgress(percent);
+                    } else {
+                        progressBar.setIndeterminate(true);
+                    }
+                });
+            }
+
+            @Override
+            public void onFinished(boolean success, String message) {
+                mainHandler.post(() -> {
+                    runningAppUpdate = null;
+                    if (!success) {
+                        setBusy(false);
+                        refreshStatus();
+                        showError(R.string.install_failed, message);
+                        return;
+                    }
+                    // The system installer is now in front; continuing the list
+                    // behind it would be confusing, and it is the last item.
+                    runUpdates(items, index + 1);
+                });
+            }
+        });
+        runningAppUpdate = updater;
+        new Thread(() -> updater.downloadAndInstall(item.appUpdate), "kfx-app-update").start();
     }
 
     // ---------------------------------------------------------------- import
@@ -418,6 +530,9 @@ public class LauncherActivity extends Activity {
         }
         if (runningDownload != null) {
             runningDownload.cancel();
+        }
+        if (runningAppUpdate != null) {
+            runningAppUpdate.cancel();
         }
         super.onDestroy();
     }

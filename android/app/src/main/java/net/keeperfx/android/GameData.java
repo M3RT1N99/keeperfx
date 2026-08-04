@@ -164,6 +164,24 @@ public final class GameData {
     }
 
     /**
+     * Background music is a separate download on the desktop too - it is not
+     * part of the release - so its absence never blocks starting the game.
+     */
+    public static boolean hasMusic(Context context) {
+        final File music = new File(gameDirectory(context), "music");
+        final String[] entries = music.list();
+        if (entries == null) {
+            return false;
+        }
+        for (String entry : entries) {
+            if (entry.toLowerCase(Locale.US).endsWith(".ogg")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Resolves a relative path, retrying case insensitively.
      *
      * The engine opens data files with the exact casing of the DOS originals,

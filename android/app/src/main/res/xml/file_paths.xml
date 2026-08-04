@@ -2,4 +2,6 @@
 <paths>
     <!-- Only the copy of the log that the share action writes is exposed. -->
     <cache-path name="shared-logs" path="shared-logs/" />
+    <!-- And the downloaded APK, which is handed to the system installer. -->
+    <cache-path name="updates" path="updates/" />
 </paths>

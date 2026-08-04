@@ -12,6 +12,8 @@ jobs:
   build-android:
     name: "Build Android arm64 APK"
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
 
     steps:
     - uses: actions/checkout@v4
@@ -84,7 +86,8 @@ jobs:
         ARTIFACT_NAME="keeperfx-android-arm64-${GIT_REVISION}"
         echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
         mkdir -p out
-        cp "$APK" "out/${ARTIFACT_NAME}.apk"
+        # Stable file name: the in-app updater downloads this exact URL.
+        cp "$APK" "out/keeperfx-android-arm64.apk"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -92,6 +95,49 @@ jobs:
         name: ${{ env.ARTIFACT_NAME }}
         path: out/*.apk
         if-no-files-found: error
+
+    # A rolling release gives a permanent, login-free download URL. Action
+    # artifacts expire after 90 days and cannot be fetched without a GitHub
+    # account, so the in-app updater could not use them.
+    - name: Publish the rolling development release
+      if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -eux
+        VERSION_NAME=$(grep -E '^VER_MAJOR=' version.mk | cut -d= -f2).$(grep -E '^VER_MINOR=' version.mk | cut -d= -f2).$(grep -E '^VER_RELEASE=' version.mk | cut -d= -f2).${BUILD_NUMBER}
+        cat > out/version.json <<JSON
+        {
+          "versionName": "${VERSION_NAME}",
+          "buildNumber": ${BUILD_NUMBER},
+          "commit": "${GIT_REVISION}",
+          "apk": "https://github.com/${GITHUB_REPOSITORY}/releases/download/android-latest/keeperfx-android-arm64.apk"
+        }
+        JSON
+        cat out/version.json
+
+        # Recreated rather than edited so the tag follows the current commit.
+        gh release delete android-latest --yes --cleanup-tag || true
+        gh release create android-latest \
+          out/keeperfx-android-arm64.apk out/version.json \
+          --target "${GITHUB_SHA}" \
+          --title "KeeperFX for Android ${VERSION_NAME}" \
+          --notes "Development build of the \`feature/android-support\` branch.
+
+        | | |
+        |---|---|
+        | Version | \`${VERSION_NAME}\` |
+        | Commit | \`${GIT_REVISION}\` |
+        | ABI | \`arm64-v8a\` |
+        | Requires | Android 9 (API 28) or newer |
+
+        Install straight over a previous build; game data and settings are kept.
+        Play Protect will warn about an unknown developer, which is expected for
+        a self signed APK.
+
+        Contains the engine only. Use **Install KeeperFX** in the launcher to
+        fetch the game data, then **Import original Dungeon Keeper** for the
+        files that must come from the original game."
 
   # The Android port must not change how the desktop ports build. This job is the
   # regression guard for the shared source files the port touches.
