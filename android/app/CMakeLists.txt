@@ -201,10 +201,14 @@ include(ExternalProject)
 get_filename_component(NDK_BIN "${CMAKE_C_COMPILER}" DIRECTORY)
 set(LUAJIT_WORK "${CMAKE_CURRENT_BINARY_DIR}/luajit")
 set(LUAJIT_LIB  "${LUAJIT_WORK}/src/libluajit.a")
-if(DEFINED ANDROID_LLVM_TRIPLE AND DEFINED ANDROID_PLATFORM_LEVEL)
-    set(LUAJIT_TRIPLE "${ANDROID_LLVM_TRIPLE}${ANDROID_PLATFORM_LEVEL}")
-else()
+# ANDROID_LLVM_TRIPLE already carries the API level (aarch64-none-linux-android21),
+# so it must not be appended a second time.
+if(CMAKE_C_COMPILER_TARGET)
     set(LUAJIT_TRIPLE "${CMAKE_C_COMPILER_TARGET}")
+elseif(DEFINED ANDROID_LLVM_TRIPLE)
+    set(LUAJIT_TRIPLE "${ANDROID_LLVM_TRIPLE}")
+else()
+    message(FATAL_ERROR "Cannot determine the LLVM target triple for LuaJIT")
 endif()
 set(LUAJIT_TARGET_FLAGS "--target=${LUAJIT_TRIPLE}")
 if(CMAKE_SYSROOT)
@@ -220,7 +224,10 @@ ExternalProject_Add(luajit_external
     DOWNLOAD_COMMAND ""
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND "${CMAKE_COMMAND}" -E copy_directory "${KFX_DEPS}/luajit" "${LUAJIT_WORK}"
-    BUILD_COMMAND "${KFX_MAKE_PROGRAM}" -C "${LUAJIT_WORK}"
+    # libluajit.a is a target of src/Makefile; LuaJIT's top level Makefile only
+    # forwards to it and would also link the luajit executable, which we do not
+    # need for the target architecture.
+    BUILD_COMMAND "${KFX_MAKE_PROGRAM}" -C "${LUAJIT_WORK}/src"
         "HOST_CC=cc"
         "CROSS=${NDK_BIN}/llvm-"
         "STATIC_CC=${NDK_BIN}/clang"
