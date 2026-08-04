@@ -75,15 +75,22 @@ public final class UpdateManager {
             final ReleaseDownloader.ReleaseInfo release = ReleaseDownloader.queryLatestRelease();
             final boolean installed = GameData.isKeeperfxInstalled(context);
             final String current = prefs.getInstalledVersion();
+            final String size = GameData.describeBytes(release.sizeInBytes);
             if (!installed) {
                 items.add(new Item(Kind.GAME_DATA,
                     "KeeperFX " + release.version,
-                    "Game data, " + GameData.describeBytes(release.sizeInBytes), null));
-            } else if (!current.isEmpty() && !current.equals(release.version)) {
+                    "Game data, " + size, null));
+            } else if (current.isEmpty()) {
+                // A hand imported folder carries no version, and there is no way
+                // to tell how complete it is - the one that prompted this came
+                // with no map pack levels at all. Always offer the real release.
                 items.add(new Item(Kind.GAME_DATA,
                     "KeeperFX " + release.version,
-                    "Update from " + current + ", " + GameData.describeBytes(release.sizeInBytes),
-                    null));
+                    "Replaces the imported folder with the official release, " + size, null));
+            } else if (!current.equals(release.version)) {
+                items.add(new Item(Kind.GAME_DATA,
+                    "KeeperFX " + release.version,
+                    "Update from " + current + ", " + size, null));
             }
         } catch (Exception e) {
             Log.w(TAG, "Could not check the KeeperFX release", e);
