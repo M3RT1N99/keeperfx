@@ -137,6 +137,41 @@ TbResult LbScreenUnlock(void)
     return Lb_SUCCESS;
 }
 
+/**
+ * Copies the draw surface onto a differently sized screen surface.
+ *
+ * SDL has no scaling blitter for a palettised source: SDL_CalculateBlit1()
+ * has no case for SDL_COPY_NEAREST, so SDL_BlitScaled() straight from the
+ * 8 bit draw surface fails with "Blit combination not supported" and nothing
+ * is ever drawn. The conversion therefore has to happen first, into a buffer
+ * of the draw surface's size but the screen's format, which is then scaled -
+ * and a same-format scaled blit is one SDL does support.
+ *
+ * @return An SDL blit result, negative on failure.
+ */
+static int LbScreenBlitScaled(void)
+{
+    static SDL_Surface *scale_buffer = NULL;
+    if ((scale_buffer != NULL)
+     && ((scale_buffer->w != lbDrawSurface->w)
+      || (scale_buffer->h != lbDrawSurface->h)
+      || (scale_buffer->format->format != lbScreenSurface->format->format))) {
+        SDL_FreeSurface(scale_buffer);
+        scale_buffer = NULL;
+    }
+    if (scale_buffer == NULL) {
+        scale_buffer = SDL_CreateRGBSurfaceWithFormat(0, lbDrawSurface->w,
+            lbDrawSurface->h, lbScreenSurface->format->BitsPerPixel,
+            lbScreenSurface->format->format);
+        if (scale_buffer == NULL)
+            return -1;
+    }
+    int blresult = SDL_BlitSurface(lbDrawSurface, NULL, scale_buffer, NULL);
+    if (blresult < 0)
+        return blresult;
+    return SDL_BlitScaled(scale_buffer, NULL, lbScreenSurface, NULL);
+}
+
 TbResult LbScreenSwap(void)
 {
     int blresult;
@@ -155,7 +190,11 @@ TbResult LbScreenSwap(void)
         // with the rest of the window untouched.
         if ((lbDrawSurface->w != lbScreenSurface->w)
          || (lbDrawSurface->h != lbScreenSurface->h)) {
-            blresult = SDL_BlitScaled(lbDrawSurface, NULL, lbScreenSurface, NULL);
+            blresult = LbScreenBlitScaled();
+            if (blresult < 0) {
+                // Better a picture that does not fill the window than none at all.
+                blresult = SDL_BlitSurface(lbDrawSurface, NULL, lbScreenSurface, NULL);
+            }
         } else {
             blresult = SDL_BlitSurface(lbDrawSurface, NULL, lbScreenSurface, NULL);
         }
