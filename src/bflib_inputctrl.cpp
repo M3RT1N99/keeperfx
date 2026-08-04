@@ -26,6 +26,7 @@
 #include "bflib_keybrd.h"
 #include "bflib_mouse.h"
 #include "bflib_joyst.h"
+#include "bflib_touch.h"
 #include "bflib_video.h"
 #include "bflib_planar.h"
 #include "bflib_sndlib.h"
@@ -61,6 +62,8 @@ std::map<int, TbKeyCode> keymap_sdl_to_bf;
 
 //defined here instead of bflib_joyst.h to avoid making header depend on SDL
 void JEvent(const SDL_Event *ev);
+//same for the touch layer, see bflib_input_touch.cpp
+void TEvent(const SDL_Event *ev);
 /******************************************************************************/
 
 /**
@@ -224,6 +227,7 @@ void init_inputcontrol(void)
     keymap_sdl_to_bf.insert(pair<int, TbKeyCode>(SDLK_UNDO, KC_UNASSIGNED));
 
     init_controller_input();
+    init_touch_input();
     LbStopTextInput();
 }
 
@@ -478,6 +482,13 @@ static void process_event(const SDL_Event *ev)
     case SDL_JOYBUTTONUP:
         last_used_input_device = ID_Controller;
         JEvent(ev);
+        break;
+
+    case SDL_FINGERDOWN:
+    case SDL_FINGERUP:
+    case SDL_FINGERMOTION:
+        last_used_input_device = ID_Touch;
+        TEvent(ev);
         break;
 
     case SDL_QUIT:

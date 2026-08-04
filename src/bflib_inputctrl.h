@@ -42,6 +42,7 @@ enum MouseGrabEvents {
 enum InputDevices {
     ID_Keyboard_Mouse = 1,
     ID_Controller = 2,
+    ID_Touch = 3,
 };
 /******************************************************************************/
 extern volatile int lbUserQuit;

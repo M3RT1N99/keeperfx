@@ -7,3 +7,9 @@
 *.c text
 *.cpp text
 *.h text
+
+# Shell scripts must keep LF so they stay runnable after a Windows checkout
+*.sh text eol=lf
+
+# Java keystores are binary and must never be line-ending converted
+*.keystore binary

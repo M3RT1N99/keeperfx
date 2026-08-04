@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="kfx_background">#FF12100E</color>
+    <color name="kfx_text">#FFE8E2D8</color>
+    <color name="kfx_text_dim">#FF9A9086</color>
+    <color name="kfx_accent">#FFD4A24C</color>
+    <color name="kfx_divider">#FF35302A</color>
+</resources>

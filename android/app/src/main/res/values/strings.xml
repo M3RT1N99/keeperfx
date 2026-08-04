@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KeeperFX</string>
+
+    <string name="status_ready">Game data ready (%1$s)</string>
+    <string name="status_incomplete">Game data incomplete</string>
+    <string name="status_missing_header">Missing:</string>
+    <string name="status_importing">Importing game data…</string>
+    <string name="status_import_progress">%1$d files copied — %2$s</string>
+
+    <string name="button_import">Import game folder</string>
+    <string name="button_remove">Delete game data</string>
+    <string name="button_play">Play</string>
+
+    <string name="import_title">Import game folder</string>
+    <string name="import_explanation">KeeperFX ships no game files. Pick a folder that contains a complete KeeperFX installation, including the files copied from an original Dungeon Keeper CD.\n\nThe folder is copied into this app\'s private storage, which can take a few minutes.</string>
+    <string name="import_choose">Choose folder</string>
+    <string name="import_failed">Import failed</string>
+
+    <string name="remove_title">Delete game data</string>
+    <string name="remove_explanation">This removes the imported installation including save games. The original folder you imported from is not touched.</string>
+    <string name="remove_confirm">Delete</string>
+
+    <string name="settings_controls">Controls</string>
+    <string name="input_auto">Automatic — follow the device last used</string>
+    <string name="input_touch">Touch — always use the touch scheme</string>
+    <string name="input_pointer">Mouse &amp; keyboard — ignore the touch screen</string>
+    <string name="input_gestures">Tap = left click · hold = right click · drag = paint area · two fingers = pan, pinch to zoom, twist to rotate · three finger tap = map · four finger tap = menu</string>
+
+    <string name="settings_startup">Startup</string>
+    <string name="option_no_intro">Skip the intro</string>
+    <string name="option_no_sound">Start without sound</string>
+    <string name="option_extra_args">Extra command line options (optional)</string>
+</resources>

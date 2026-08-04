@@ -27,6 +27,7 @@
 #include "bflib_keybrd.h"
 #include "bflib_mouse.h"
 #include "bflib_joyst.h"
+#include "bflib_touch.h"
 #include "bflib_planar.h"
 #include "bflib_math.h"
 #include "bflib_sprfnt.h"
@@ -309,6 +310,7 @@ TbBool poll_inputs(void)
 {
     TbBool user_not_quit = LbPollInputs();
     update_controller_inputs();
+    update_touch_inputs();
 
     return user_not_quit;
 }

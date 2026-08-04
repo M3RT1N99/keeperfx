@@ -31,9 +31,10 @@
 #include <time.h>
 #include <assert.h>
 
-#if defined(unix) && !defined(GO32)
+#if (defined(unix) || defined(__unix__) || defined(__APPLE__) || defined(__ANDROID__)) && !defined(GO32)
 #include <unistd.h>
 #include <signal.h>
+#include <strings.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #if !defined(stricmp)
@@ -69,7 +70,7 @@ extern "C" {
 
 // Basic Definitions
 
-#if defined(unix) && !defined (GO32)
+#if (defined(unix) || defined(__unix__) || defined(__APPLE__)) && !defined (GO32)
 #define SEPARATOR "/"
 #else
 #define SEPARATOR "\\"

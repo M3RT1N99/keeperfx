@@ -20,6 +20,7 @@
 #include "bflib_math.h"
 #include "bflib_keybrd.h"
 #include "bflib_inputctrl.h"
+#include "bflib_touch.h"
 #include "bflib_datetm.h"
 #include "bflib_sprfnt.h"
 #include "bflib_fileio.h"
@@ -1819,6 +1820,20 @@ static short process_command_line(unsigned short argc, char *argv[])
       {
           SYNCLOG("Mouse auto reset disabled");
           lbMouseGrab = false;
+      }
+      else if ( strcasecmp(parstr,"inputmode") == 0 )
+      {
+          narg++;
+          unsigned char touch_mode;
+          if (touch_parse_control_mode(pr2str, &touch_mode))
+          {
+              touch_set_control_mode(touch_mode);
+              SYNCLOG("Input mode set to %s", pr2str);
+          }
+          else
+          {
+              WARNLOG("Unknown input mode \"%s\", expected auto, touch or kbm", pr2str);
+          }
       }
       else if (strcasecmp(parstr,"packetload") == 0)
       {

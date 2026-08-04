@@ -23,6 +23,7 @@
 #include "bflib_basics.h"
 #include "bflib_planar.h"
 #include "bflib_joyst.h"
+#include "bflib_touch.h"
 #include "bflib_video.h"
 #include "bflib_keybrd.h"
 #include "bflib_mouse.h"
@@ -388,6 +389,10 @@ int is_game_key_pressed(long key_id, TbBool clear_pressed, TbBool ignore_mods)
         return result;
     }
 
+    result = touch_game_key_pressed(key_id, clear_pressed);
+    if (result)
+        return result;
+
     const TbControllerButtons ctrl_buttons_gamekey = settings.kbkeys[key_id].controller_buttons;
     if (ctrl_buttons_gamekey == 0 || controller_button_state == 0)
         return 0;
@@ -420,6 +425,10 @@ float get_game_key_axis_value(long key_id, TbBool ignore_mods)
     {
             return 1.0f;
     }
+
+    const float touch_axis = touch_game_key_axis_value(key_id);
+    if (touch_axis > 0.0f)
+        return touch_axis;
 
     return cbtn_axis_value(get_game_key_controller_buttons(key_id));
 }

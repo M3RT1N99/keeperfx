@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stylised dungeon heart: a diamond keystone over crossed pickaxe shafts. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#D4A24C"
+        android:pathData="M54,26 L76,54 L54,82 L32,54 Z" />
+    <path
+        android:fillColor="#8C1F1F"
+        android:pathData="M54,36 L67,54 L54,72 L41,54 Z" />
+    <path
+        android:fillColor="#2E2A24"
+        android:pathData="M28,84 L34,84 L34,90 L28,90 Z" />
+    <path
+        android:fillColor="#2E2A24"
+        android:pathData="M74,84 L80,84 L80,90 L74,90 Z" />
+    <path
+        android:fillColor="#2E2A24"
+        android:pathData="M51,84 L57,84 L57,90 L51,90 Z" />
+</vector>

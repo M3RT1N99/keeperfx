@@ -37,8 +37,14 @@
 #include <dbghelp.h>
 #include <psapi.h>
 #endif
+#if defined(__ANDROID__)
+// Bionic ships no <execinfo.h>; signal handling stays, backtraces are dropped.
+#define BF_NO_BACKTRACE 1
+#endif
 #if defined(BF_POSIX_CRASH)
+#if !defined(BF_NO_BACKTRACE)
 #include <execinfo.h>
+#endif
 #include <ucontext.h>
 #include <unistd.h>
 #include <dlfcn.h>
@@ -434,6 +440,13 @@ static void write_stderr_line(const char *line, size_t line_len)
     (void)written;
 }
 
+#if defined(BF_NO_BACKTRACE)
+static void _backtrace_posix(int depth)
+{
+    (void)depth;
+    LbErrorLog("Backtrace not available on this platform.\n");
+}
+#else
 static void _backtrace_posix(int depth)
 {
     void *frames[64];
@@ -494,6 +507,7 @@ static void _backtrace_posix(int depth)
         }
     }
 }
+#endif
 
 static void ctrl_handler_posix(int sig_id, siginfo_t *info, void *context)
 {

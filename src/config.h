@@ -118,9 +118,6 @@ enum TbConfigLoadFlags {
     CnfLd_PreListed     =  0x08, /**< Already parsed the names. */
 };
 
-#pragma pack(1)
-
-
 /******************************************************************************/
 
 enum confCommandResults

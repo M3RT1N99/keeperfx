@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.KeeperFX" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:colorBackground">@color/kfx_background</item>
+        <item name="android:textColorPrimary">@color/kfx_text</item>
+        <item name="android:colorAccent">@color/kfx_accent</item>
+    </style>
+
+    <style name="Theme.KeeperFX.Game" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

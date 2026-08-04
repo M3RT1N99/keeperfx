@@ -1,0 +1,130 @@
+plugins {
+    id "com.android.application"
+}
+
+// Version numbers come from version.mk so the APK always matches the engine.
+def versionProps = [:]
+file("${rootDir}/../version.mk").eachLine { line ->
+    def m = (line =~ /^\s*(VER_[A-Z]+)\s*=\s*(.*)$/)
+    if (m.matches()) {
+        versionProps[m.group(1)] = m.group(2).trim()
+    }
+}
+def verMajor = (versionProps.VER_MAJOR ?: "1") as int
+def verMinor = (versionProps.VER_MINOR ?: "0") as int
+def verRelease = (versionProps.VER_RELEASE ?: "0") as int
+def buildNumber = (project.findProperty("keeperfx.buildNumber") ?: "0") as int
+
+def sdlJavaDir = file("${rootDir}/.deps/SDL2/android-project/app/src/main/java")
+
+android {
+    namespace "net.keeperfx.android"
+    compileSdk 34
+    ndkVersion project.property("keeperfx.ndkVersion")
+
+    defaultConfig {
+        applicationId "net.keeperfx.android"
+        minSdk 21
+        targetSdk 34
+        versionCode verMajor * 1000000 + verMinor * 10000 + verRelease * 1000 + buildNumber
+        versionName "${verMajor}.${verMinor}.${verRelease}.${buildNumber}"
+
+        ndk {
+            abiFilters project.property("keeperfx.abiFilters").split(",").collect { it.trim() }
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_shared",
+                          "-DKFX_BUILD_NUMBER=${buildNumber}",
+                          "-DPACKAGE_SUFFIX=${project.findProperty('keeperfx.packageSuffix') ?: 'Android'}",
+                          "-DGIT_REVISION=${project.findProperty('keeperfx.gitRevision') ?: 'unknown'}"
+                // The engine is a large C codebase; -O2 keeps the build fast enough
+                // while still producing a playable frame rate.
+                cFlags "-O2"
+                cppFlags "-O2"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+            version project.property("keeperfx.cmakeVersion")
+        }
+    }
+
+    signingConfigs {
+        // Sideload key. It is intentionally committed: an APK has to be signed to
+        // be installable at all, and a stable key means CI builds can be updated
+        // in place instead of forcing an uninstall. It grants nothing beyond that.
+        ci {
+            storeFile file("keeperfx-ci.keystore")
+            storePassword "keeperfx"
+            keyAlias "keeperfx"
+            keyPassword "keeperfx"
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.ci
+        }
+        release {
+            signingConfig signingConfigs.ci
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main {
+            // SDLActivity and friends are used unmodified from the SDL release
+            // that fetch-deps.sh downloads, so no SDL code is vendored here.
+            java.srcDirs += sdlJavaDir
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging false
+        }
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+dependencies {
+    // Only needed for the Storage Access Framework helper used by the importer.
+    implementation "androidx.documentfile:documentfile:1.0.1"
+}
+
+// ---------------------------------------------------------------------------
+// Native dependency sources. CI runs this script explicitly before the build;
+// wiring it in here as well keeps a plain "gradlew assembleRelease" working.
+// ---------------------------------------------------------------------------
+def fetchNativeDeps = tasks.register("fetchNativeDeps", Exec) {
+    description = "Downloads the pinned native dependency sources"
+    workingDir rootDir
+    commandLine "bash", "scripts/fetch-deps.sh"
+    outputs.upToDateWhen { sdlJavaDir.exists() }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn fetchNativeDeps
+}
+
+afterEvaluate {
+    tasks.matching {
+        it.name.startsWith("configureCMake") || it.name.startsWith("buildCMake")
+    }.configureEach {
+        dependsOn fetchNativeDeps
+    }
+}
