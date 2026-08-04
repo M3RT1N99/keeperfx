@@ -25,6 +25,7 @@
 #include "pre_inc.h"
 #include "bflib_fmvids.h"
 #include "bflib_basics.h"
+#include "globals.h"
 #include "post_inc.h"
 
 extern "C" TbBool play_smk(const char * filename, int flags)

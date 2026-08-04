@@ -24,6 +24,7 @@
 #include "pre_inc.h"
 #include "net_portforward.h"
 #include "bflib_basics.h"
+#include "globals.h"
 #include "post_inc.h"
 
 int port_forward_add_mapping(uint16_t port)

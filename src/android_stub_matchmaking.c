@@ -24,6 +24,7 @@
 #include "pre_inc.h"
 #include "net_matchmaking.h"
 #include "bflib_basics.h"
+#include "globals.h"
 #include "post_inc.h"
 
 struct TbNetworkSessionNameEntry matchmaking_sessions[MATCHMAKING_SESSIONS_MAX];

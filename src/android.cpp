@@ -32,6 +32,7 @@
 #include "cdrom.h"
 #include <algorithm>
 #include <ctype.h>
+#include <string.h>
 #include <string>
 #include <memory>
 #include <utility>
@@ -216,15 +217,16 @@ static bool apply_data_directory(std::vector<char *> & args)
             continue;
         if (SDL_strcasecmp(args[i], "-datadir") != 0)
             continue;
+        const auto offset = static_cast<std::vector<char *>::difference_type>(i);
         if ((i + 1) >= args.size())
         {
             __android_log_print(ANDROID_LOG_ERROR, KFX_ANDROID_LOG_TAG,
                 "-datadir given without a path");
-            args.erase(args.begin() + i);
+            args.erase(args.begin() + offset);
             return false;
         }
         const std::string path = args[i + 1];
-        args.erase(args.begin() + i, args.begin() + i + 2);
+        args.erase(args.begin() + offset, args.begin() + offset + 2);
         if (chdir(path.c_str()) != 0)
         {
             __android_log_print(ANDROID_LOG_ERROR, KFX_ANDROID_LOG_TAG,
