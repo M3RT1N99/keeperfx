@@ -213,10 +213,6 @@ set(MBEDCRYPTO_LIBRARY  mbedcrypto                    CACHE STRING "" FORCE)
 # Answer it directly: DES is only used for NTLM, which is disabled below.
 set(HAVE_MBEDTLS_DES_CRYPT_ECB 0 CACHE INTERNAL "")
 
-# SDL and its satellites are shared libraries, so BUILD_SHARED_LIBS is on at
-# this point. curl belongs inside libkeeperfx.so instead of being one more file
-# to package, so it is turned off for this one subdirectory and restored after.
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(BUILD_CURL_EXE   OFF CACHE BOOL "" FORCE)
 set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
 set(CURL_DISABLE_NTLM ON CACHE BOOL "" FORCE)
@@ -241,9 +237,7 @@ add_subdirectory("${KFX_DEPS}/curl" "${CMAKE_CURRENT_BINARY_DIR}/curl" EXCLUDE_F
 #******************************************************************************
 # miniupnpc + libnatpmp
 #
-# Automatic port forwarding for hosting a game. Both are also static, so
-# BUILD_SHARED_LIBS stays off across them; libnatpmp in particular declares the
-# option itself and would otherwise inherit the shared setting SDL needs.
+# Automatic port forwarding when hosting a game.
 #******************************************************************************
 set(UPNPC_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(UPNPC_BUILD_STATIC ON  CACHE BOOL "" FORCE)
@@ -253,7 +247,16 @@ set(UPNPC_NO_INSTALL   ON  CACHE BOOL "" FORCE)
 add_subdirectory("${KFX_DEPS}/miniupnp/miniupnpc" "${CMAKE_CURRENT_BINARY_DIR}/miniupnpc" EXCLUDE_FROM_ALL)
 add_subdirectory("${KFX_DEPS}/libnatpmp" "${CMAKE_CURRENT_BINARY_DIR}/libnatpmp" EXCLUDE_FROM_ALL)
 
-set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+# Same situation as the SDL satellites: the engine includes
+# <miniupnpc/miniupnpc.h>, which is where the headers land when miniupnpc is
+# installed, but in the source tree they sit flat in include/.
+set(KFX_UPNP_COMPAT_INC "${CMAKE_CURRENT_BINARY_DIR}/miniupnpc-compat-include")
+file(MAKE_DIRECTORY "${KFX_UPNP_COMPAT_INC}/miniupnpc")
+file(GLOB KFX_UPNP_HEADERS "${KFX_DEPS}/miniupnp/miniupnpc/include/*.h")
+foreach(header ${KFX_UPNP_HEADERS})
+    get_filename_component(_name "${header}" NAME)
+    configure_file("${header}" "${KFX_UPNP_COMPAT_INC}/miniupnpc/${_name}" COPYONLY)
+endforeach()
 
 #******************************************************************************
 # enet6
