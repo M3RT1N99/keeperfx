@@ -186,6 +186,8 @@ jobs:
         sudo apt update
         sudo apt install -y \
           build-essential \
+          cmake \
+          ninja-build \
           pkg-config \
           curl \
           libavcodec-dev \
@@ -202,11 +204,16 @@ jobs:
           libsdl2-net-dev \
           libswresample-dev \
           libminiupnpc-dev \
+          libssl-dev \
+          libzstd-dev \
           zlib1g-dev
 
     - name: Build
       run: |
         set -eux
-        BUILD_NUMBER=$(git rev-list --count origin/master)
-        make BUILD_NUMBER=$BUILD_NUMBER VER_SUFFIX=AndroidBranchCheck -f linux.mk -j"$(nproc)"
-        ls -l bin/keeperfx
+        BUILD_NUMBER=$(git rev-list --count HEAD)
+        # Same recipe as upstream's own prototype workflow; linux.mk is gone.
+        cmake -S . -B out -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DBUILD_NUMBER=$BUILD_NUMBER -DPACKAGE_SUFFIX=AndroidBranchCheck
+        cmake --build out --target keeperfx -j"$(nproc)"
+        ls -l out/keeperfx

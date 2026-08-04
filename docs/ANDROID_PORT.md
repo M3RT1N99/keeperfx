@@ -249,5 +249,7 @@ src/
 └── bflib_input_touch.cpp           gesture recognition
 ```
 
-The Windows and Linux build files are untouched apart from one added source
-file (`bflib_input_touch.cpp`) in `Makefile` and `linux.mk`.
+The Windows build file gains one source file (`bflib_input_touch.cpp`) in
+`Makefile`; the CMake build collects `src/` by glob and picks it up on its own.
+`android.cpp` and the `android_stub_*` files are compiled out everywhere except
+Android, so they cost the desktop builds nothing.

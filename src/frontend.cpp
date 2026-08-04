@@ -2661,6 +2661,9 @@ FrontendMenuState frontend_setup_state(FrontendMenuState nstate)
               char* fname = prepare_file_path(FGrp_Save, continue_game_filename);
               LbFileDelete(fname);
           }
+          if (!is_campaign_loaded()) {
+              change_campaign(CampgnT_Default,"");
+          }
           turn_on_menu(GMnu_FEMAIN);
           last_mouse_x = GetMouseX();
           last_mouse_y = GetMouseY();
@@ -2698,6 +2701,7 @@ FrontendMenuState frontend_setup_state(FrontendMenuState nstate)
           turn_on_menu(GMnu_FENET_START);
           if (frontend_menu_state != FeSt_MP_MAPPACK_SELECT)
             frontnet_start_setup();
+          LbStartTextInput();
           set_flag(game.system_flags, GSF_NetworkActive);
           set_pointer_graphic_menu();
           break;
