@@ -110,6 +110,8 @@ android {
 dependencies {
     // Storage Access Framework helper used by the importer.
     implementation "androidx.documentfile:documentfile:1.0.1"
+    // FileProvider, so the log can be handed to another app.
+    implementation "androidx.core:core:1.13.1"
     // The official release is distributed as a 7z archive; commons-compress
     // reads it and xz supplies the LZMA/LZMA2 codecs it needs.
     implementation "org.apache.commons:commons-compress:1.27.1"

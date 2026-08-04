@@ -129,6 +129,8 @@ public class LauncherActivity extends Activity {
             R.string.import_original_title, R.string.import_original_explanation));
         playButton.setOnClickListener(v -> startGame());
         findViewById(R.id.removeData).setOnClickListener(v -> confirmRemoveData());
+        findViewById(R.id.showLog).setOnClickListener(
+            v -> startActivity(new Intent(this, LogActivity.class)));
     }
 
     @Override
@@ -155,6 +157,7 @@ public class LauncherActivity extends Activity {
         } else {
             keeperfxStatus.setText(R.string.status_keeperfx_missing);
         }
+        keeperfxStatus.setTextColor(getColor(hasKeeperfx ? R.color.kfx_ok : R.color.kfx_warn));
 
         if (hasOriginal) {
             originalDkStatus.setText(R.string.status_original_ready);
@@ -162,6 +165,7 @@ public class LauncherActivity extends Activity {
             final int missing = GameData.findMissingOriginalDkFiles(this).size();
             originalDkStatus.setText(getString(R.string.status_original_missing, missing));
         }
+        originalDkStatus.setTextColor(getColor(hasOriginal ? R.color.kfx_ok : R.color.kfx_warn));
 
         installButton.setText(hasKeeperfx
             ? getString(R.string.button_update_keeperfx)

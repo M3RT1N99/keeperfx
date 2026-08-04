@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors the QPushButton states of dk-orange.css from the desktop launcher. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:state_enabled="false">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="@color/kfx_disabled_top"
+                android:endColor="@color/kfx_disabled_bottom" />
+            <stroke android:width="1dp" android:color="@color/kfx_disabled_border" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="@color/kfx_orange_top_pressed"
+                android:endColor="@color/kfx_orange_bottom_pressed" />
+            <stroke android:width="1dp" android:color="@color/kfx_orange_border" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="@color/kfx_orange_top"
+                android:endColor="@color/kfx_orange_bottom" />
+            <stroke android:width="1dp" android:color="@color/kfx_orange_border" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+</selector>

@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">KeeperFX</string>
+    <string name="app_subtitle">Dungeon Keeper, remade — for Android</string>
+
+    <string name="log_title">Engine log</string>
+    <string name="log_header">keeperfx.log · %1$s · %2$s</string>
+    <string name="log_loading">Reading…</string>
+    <string name="log_none">No log yet — start the game once.</string>
+    <string name="log_empty_hint">The log is empty. It is written while the game runs and survives a crash, so try starting the game and coming back here.</string>
+    <string name="log_share">Share</string>
+    <string name="log_copy">Copy</string>
+    <string name="log_refresh">Reload</string>
+    <string name="log_copied">Log copied to the clipboard</string>
+    <string name="button_log">Engine log</string>
 
     <string name="version_unknown">imported folder</string>
     <string name="version_latest">the current release</string>

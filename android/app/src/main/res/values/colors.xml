@@ -1,8 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Colours taken from the desktop Qt launcher so both look like the same
+  application: res/play-button-theme/dk-orange.css in keeperfx-launcher-qt.
+-->
 <resources>
-    <color name="kfx_background">#FF12100E</color>
-    <color name="kfx_text">#FFE8E2D8</color>
-    <color name="kfx_text_dim">#FF9A9086</color>
-    <color name="kfx_accent">#FFD4A24C</color>
+    <color name="kfx_background">#FF0E0C0A</color>
+    <color name="kfx_scrim">#C4000000</color>
+    <color name="kfx_panel">#B21A1614</color>
+    <color name="kfx_panel_stroke">#33FFFFFF</color>
+
+    <color name="kfx_text">#FFEDE7DD</color>
+    <color name="kfx_text_dim">#FF9E948A</color>
+    <color name="kfx_accent">#FFFF9A3C</color>
+    <color name="kfx_ok">#FF7BC96F</color>
+    <color name="kfx_warn">#FFFF6A45</color>
     <color name="kfx_divider">#FF35302A</color>
+
+    <!-- Play button gradient -->
+    <color name="kfx_orange_top">#FFFF4217</color>
+    <color name="kfx_orange_bottom">#FF871A00</color>
+    <color name="kfx_orange_border">#FF681300</color>
+    <color name="kfx_orange_top_pressed">#FFE1281E</color>
+    <color name="kfx_orange_bottom_pressed">#FF821900</color>
+
+    <color name="kfx_disabled_top">#FF4B4B4B</color>
+    <color name="kfx_disabled_bottom">#FF3F3F3F</color>
+    <color name="kfx_disabled_border">#FF262626</color>
+    <color name="kfx_disabled_text">#FF6E6E6E</color>
+
+    <!-- Secondary buttons: same shape, muted -->
+    <color name="kfx_slate_top">#FF3A332E</color>
+    <color name="kfx_slate_bottom">#FF241F1B</color>
+    <color name="kfx_slate_border">#FF15110F</color>
+    <color name="kfx_slate_top_pressed">#FF4A423B</color>
+    <color name="kfx_slate_bottom_pressed">#FF2E2823</color>
 </resources>

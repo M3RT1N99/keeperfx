@@ -1,192 +1,286 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  Laid out after the desktop Qt launcher: the Dungeon Keeper land view behind a
+  dark scrim, status on a translucent panel, orange gradient action buttons.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
     android:background="@color/kfx_background">
 
-    <LinearLayout
+    <ImageView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="20dp">
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:src="@drawable/bg_landscape" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textColor="@color/kfx_accent"
-            android:textSize="28sp"
-            android:textStyle="bold" />
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/kfx_scrim" />
 
-        <TextView
-            android:id="@+id/keeperfxStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:textColor="@color/kfx_text"
-            android:textSize="16sp" />
-
-        <TextView
-            android:id="@+id/originalDkStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textColor="@color/kfx_text"
-            android:textSize="16sp" />
-
-        <TextView
-            android:id="@+id/detail"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:fontFamily="monospace"
-            android:textColor="@color/kfx_text_dim"
-            android:textSize="12sp" />
-
-        <ProgressBar
-            android:id="@+id/progress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:max="100"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/installKeeperfx"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:layout_marginTop="16dp"
-            android:text="@string/button_install_keeperfx"
-            android:textSize="16sp" />
-
-        <Button
-            android:id="@+id/importOriginalDk"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:layout_marginTop="10dp"
-            android:text="@string/button_import_original"
-            android:textSize="16sp" />
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <!-- Title bar -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
+                    android:contentDescription="@null"
+                    android:src="@mipmap/ic_launcher" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/app_name"
+                        android:textColor="@color/kfx_accent"
+                        android:textSize="26sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/app_subtitle"
+                        android:textColor="@color/kfx_text_dim"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Status panel -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/panel"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <TextView
+                    android:id="@+id/keeperfxStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/kfx_text"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/originalDkStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:textColor="@color/kfx_text"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/detail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/kfx_text_dim"
+                    android:textSize="11sp" />
+
+                <ProgressBar
+                    android:id="@+id/progress"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:max="100"
+                    android:visibility="gone" />
+            </LinearLayout>
 
             <Button
-                android:id="@+id/importKeeperfx"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_weight="1"
-                android:text="@string/button_import_keeperfx"
-                android:textSize="13sp" />
+                android:id="@+id/installKeeperfx"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/btn_orange"
+                android:text="@string/button_install_keeperfx"
+                android:textColor="@color/btn_text"
+                android:textSize="15sp" />
 
             <Button
-                android:id="@+id/removeData"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_marginStart="10dp"
-                android:layout_weight="1"
-                android:text="@string/button_remove"
-                android:textSize="13sp" />
+                android:id="@+id/importOriginalDk"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/btn_orange"
+                android:text="@string/button_import_original"
+                android:textColor="@color/btn_text"
+                android:textSize="15sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/importKeeperfx"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_slate"
+                    android:text="@string/button_import_keeperfx"
+                    android:textColor="@color/btn_text"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/showLog"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_slate"
+                    android:text="@string/button_log"
+                    android:textColor="@color/btn_text"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/removeData"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_slate"
+                    android:text="@string/button_remove"
+                    android:textColor="@color/btn_text"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Settings -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:text="@string/settings_controls"
+                android:textColor="@color/kfx_accent"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/panel"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <RadioGroup
+                    android:id="@+id/inputMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <RadioButton
+                        android:id="@+id/inputAuto"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:text="@string/input_auto"
+                        android:textColor="@color/kfx_text" />
+
+                    <RadioButton
+                        android:id="@+id/inputTouch"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:text="@string/input_touch"
+                        android:textColor="@color/kfx_text" />
+
+                    <RadioButton
+                        android:id="@+id/inputPointer"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:text="@string/input_pointer"
+                        android:textColor="@color/kfx_text" />
+                </RadioGroup>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/input_gestures"
+                    android:textColor="@color/kfx_text_dim"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="@string/settings_startup"
+                android:textColor="@color/kfx_accent"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/panel"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <CheckBox
+                    android:id="@+id/noIntro"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:text="@string/option_no_intro"
+                    android:textColor="@color/kfx_text" />
+
+                <CheckBox
+                    android:id="@+id/noSound"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:text="@string/option_no_sound"
+                    android:textColor="@color/kfx_text" />
+
+                <EditText
+                    android:id="@+id/extraArgs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:hint="@string/option_extra_args"
+                    android:importantForAutofill="no"
+                    android:inputType="text"
+                    android:textColor="@color/kfx_text"
+                    android:textColorHint="@color/kfx_text_dim"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/play"
+                android:layout_width="match_parent"
+                android:layout_height="76dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/btn_orange"
+                android:text="@string/button_play"
+                android:textColor="@color/btn_text"
+                android:textSize="22sp"
+                android:textStyle="bold" />
         </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="20dp"
-            android:background="@color/kfx_divider" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:text="@string/settings_controls"
-            android:textColor="@color/kfx_accent"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <RadioGroup
-            android:id="@+id/inputMode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:orientation="vertical">
-
-            <RadioButton
-                android:id="@+id/inputAuto"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="@string/input_auto"
-                android:textColor="@color/kfx_text" />
-
-            <RadioButton
-                android:id="@+id/inputTouch"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="@string/input_touch"
-                android:textColor="@color/kfx_text" />
-
-            <RadioButton
-                android:id="@+id/inputPointer"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="@string/input_pointer"
-                android:textColor="@color/kfx_text" />
-        </RadioGroup>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/input_gestures"
-            android:textColor="@color/kfx_text_dim"
-            android:textSize="13sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="@string/settings_startup"
-            android:textColor="@color/kfx_accent"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <CheckBox
-            android:id="@+id/noIntro"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="@string/option_no_intro"
-            android:textColor="@color/kfx_text" />
-
-        <CheckBox
-            android:id="@+id/noSound"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="@string/option_no_sound"
-            android:textColor="@color/kfx_text" />
-
-        <EditText
-            android:id="@+id/extraArgs"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="@string/option_extra_args"
-            android:importantForAutofill="no"
-            android:inputType="text"
-            android:textColor="@color/kfx_text"
-            android:textColorHint="@color/kfx_text_dim" />
-
-        <Button
-            android:id="@+id/play"
-            android:layout_width="match_parent"
-            android:layout_height="72dp"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="16dp"
-            android:text="@string/button_play"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-</ScrollView>
+    </ScrollView>
+</FrameLayout>
