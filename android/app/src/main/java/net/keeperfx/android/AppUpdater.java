@@ -159,7 +159,15 @@ public final class AppUpdater {
 
         final JSONObject release = new JSONObject(body.toString());
         final String tag = release.optString("tag_name", "");
-        final String version = tag.startsWith(TAG_PREFIX) ? tag.substring(TAG_PREFIX.length()) : tag;
+        // Only a versioned tag carries a version. The android-latest pointer,
+        // which exists so older builds can still find an update, is a
+        // prerelease and should never turn up here, but if it does its name
+        // must not be mistaken for a version number.
+        if (!tag.startsWith(TAG_PREFIX)) {
+            Log.w(TAG, "Ignoring release with unexpected tag " + tag);
+            return null;
+        }
+        final String version = tag.substring(TAG_PREFIX.length());
         if (version.isEmpty()) {
             return null;
         }

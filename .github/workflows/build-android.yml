@@ -169,6 +169,23 @@ jobs:
           --title "KeeperFX for Android ${VERSION_NAME}" \
           --notes-file out/notes.md
 
+        # Builds up to 1.4.0.5289 look for a fixed android-latest URL rather than
+        # asking the API, so that tag has to keep moving or those installs could
+        # never update themselves again. It is marked as a prerelease, which
+        # keeps /releases/latest returning the newest android-v* instead of this
+        # one - that is what newer builds follow.
+        gh release delete android-latest --yes --cleanup-tag || true
+        gh release create android-latest \
+          out/keeperfx-android-arm64.apk out/version.json \
+          --target "${GITHUB_SHA}" \
+          --prerelease \
+          --title "KeeperFX for Android ${VERSION_NAME} (compatibility pointer)" \
+          --notes "Always the same build as the newest \`android-v*\` release, kept
+        so that app versions up to 1.4.0.5289 can still find their update. It is
+        flagged as a prerelease so it never shadows the real one.
+
+        See [${TAG}](../../releases/tag/${TAG}) for the changelog."
+
   # The Android port must not change how the desktop ports build. This job is the
   # regression guard for the shared source files the port touches.
   build-linux-regression:
