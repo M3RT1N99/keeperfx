@@ -52,6 +52,10 @@ ASTRONOMY_TAG=v2.1.19
 MBEDTLS_VERSION=3.6.7
 CURL_VERSION=8.21.0
 CURL_TAG=curl-8_21_0
+# Automatic port forwarding. miniupnpc lives in a subdirectory of the miniupnp
+# repository, which also holds the daemon we have no use for.
+MINIUPNP_TAG=miniupnpc_2_3_3
+LIBNATPMP_COMMIT=134fc89e2781e154e40042641f4d8bcbe42579f1
 LUAJIT_COMMIT=1edc3e52b67eaf6ce5f809be8e17d6862594b8bc
 CENTIJSON_COMMIT=93395382de7ea59f7348759b78d5b2044370fcce
 
@@ -132,6 +136,8 @@ fetch_git enet6      https://github.com/SirLynix/enet6.git        "${ENET6_TAG}"
 fetch_git astronomy  https://github.com/cosinekitty/astronomy.git "${ASTRONOMY_TAG}"
 fetch_git luajit     https://github.com/LuaJIT/LuaJIT.git         "${LUAJIT_COMMIT}"
 fetch_git centijson  https://github.com/mity/centijson.git        "${CENTIJSON_COMMIT}"
+fetch_git miniupnp   https://github.com/miniupnp/miniupnp.git     "${MINIUPNP_TAG}"
+fetch_git libnatpmp  https://github.com/miniupnp/libnatpmp.git    "${LIBNATPMP_COMMIT}"
 
 # Several upstream projects ship their own Gradle wrapper for their samples and
 # demos. We never run those, but a stray gradle-wrapper.jar in the workspace

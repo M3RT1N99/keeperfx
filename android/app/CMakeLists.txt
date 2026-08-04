@@ -237,6 +237,22 @@ set(BUILD_TESTING    OFF CACHE BOOL "" FORCE)
 set(CURL_CA_PATH "/system/etc/security/cacerts" CACHE STRING "" FORCE)
 set(CURL_CA_BUNDLE "none" CACHE STRING "" FORCE)
 add_subdirectory("${KFX_DEPS}/curl" "${CMAKE_CURRENT_BINARY_DIR}/curl" EXCLUDE_FROM_ALL)
+
+#******************************************************************************
+# miniupnpc + libnatpmp
+#
+# Automatic port forwarding for hosting a game. Both are also static, so
+# BUILD_SHARED_LIBS stays off across them; libnatpmp in particular declares the
+# option itself and would otherwise inherit the shared setting SDL needs.
+#******************************************************************************
+set(UPNPC_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(UPNPC_BUILD_STATIC ON  CACHE BOOL "" FORCE)
+set(UPNPC_BUILD_TESTS  OFF CACHE BOOL "" FORCE)
+set(UPNPC_BUILD_SAMPLE OFF CACHE BOOL "" FORCE)
+set(UPNPC_NO_INSTALL   ON  CACHE BOOL "" FORCE)
+add_subdirectory("${KFX_DEPS}/miniupnp/miniupnpc" "${CMAKE_CURRENT_BINARY_DIR}/miniupnpc" EXCLUDE_FROM_ALL)
+add_subdirectory("${KFX_DEPS}/libnatpmp" "${CMAKE_CURRENT_BINARY_DIR}/libnatpmp" EXCLUDE_FROM_ALL)
+
 set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
 
 #******************************************************************************
@@ -333,15 +349,14 @@ target_include_directories(kfx_luajit INTERFACE "${LUAJIT_WORK}/src")
 file(GLOB KFX_SOURCES_C   "${KFX_ROOT}/src/*.c")
 file(GLOB KFX_SOURCES_CXX "${KFX_ROOT}/src/*.cpp" "${KFX_ROOT}/src/kfx/lense/*.cpp")
 
-# Platform files of the other ports, plus the two modules replaced by Android
-# specific stubs (FFmpeg and UPnP are not bundled).
+# Platform files of the other ports, plus the one module replaced by an Android
+# specific stub (FFmpeg is not bundled).
 set(KFX_EXCLUDED
     "${KFX_ROOT}/src/linux.cpp"
     "${KFX_ROOT}/src/windows.cpp"
     "${KFX_ROOT}/src/cdrom.cpp"
     "${KFX_ROOT}/src/steam_api.cpp"
-    "${KFX_ROOT}/src/bflib_fmvids.cpp"
-    "${KFX_ROOT}/src/net_portforward.cpp")
+    "${KFX_ROOT}/src/bflib_fmvids.cpp")
 list(REMOVE_ITEM KFX_SOURCES_C   ${KFX_EXCLUDED})
 list(REMOVE_ITEM KFX_SOURCES_CXX ${KFX_EXCLUDED})
 
@@ -389,6 +404,8 @@ target_link_libraries(keeperfx PRIVATE
     kfx_astronomy
     kfx_luajit
     CURL::libcurl
+    libminiupnpc-static
+    natpmp
     android
     log
     GLESv1_CM
