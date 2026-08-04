@@ -129,6 +129,9 @@ struct Thing *script_process_new_object(ThingModel tngmodel, MapSubtlCoord stl_x
             thing->valuable.gold_stored = arg;
             break;
         default:
+        {
+            // Braces required: in C a label must be followed by a statement, and
+            // a declaration is not one. GCC tolerates it, clang rejects it.
             struct ObjectConfigStats* objst = get_object_model_stats(tngmodel);
             if (objst->genre == OCtg_GoldHoard)
             {
@@ -138,6 +141,8 @@ struct Thing *script_process_new_object(ThingModel tngmodel, MapSubtlCoord stl_x
                 }
                 check_and_asimilate_thing_by_room(thing);
             }
+            break;
+        }
     }
     return thing;
 }
