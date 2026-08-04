@@ -137,6 +137,11 @@ jobs:
         [ -n "$CHANGES" ] || CHANGES="- No source changes"
 
         {
+          echo "**Unofficial community build.** Not produced by the KeeperFX team and"
+          echo "not supported by them, so report anything you find here rather than to"
+          echo "them. The game reports itself as \`Android-Unofficial\` for the same"
+          echo "reason: a screenshot or a log cannot be mistaken for an official release."
+          echo
           echo "Development build of the \`feature/android-support\` branch."
           echo
           echo "| | |"
@@ -166,7 +171,7 @@ jobs:
         gh release create "$TAG" \
           out/keeperfx-android-arm64.apk out/version.json \
           --target "${GITHUB_SHA}" \
-          --title "KeeperFX for Android ${VERSION_NAME}" \
+          --title "KeeperFX for Android ${VERSION_NAME} (unofficial)" \
           --notes-file out/notes.md
 
         # Builds up to 1.4.0.5289 look for a fixed android-latest URL rather than
@@ -179,8 +184,11 @@ jobs:
           out/keeperfx-android-arm64.apk out/version.json \
           --target "${GITHUB_SHA}" \
           --prerelease \
-          --title "KeeperFX for Android ${VERSION_NAME} (compatibility pointer)" \
-          --notes "Always the same build as the newest \`android-v*\` release, kept
+          --title "KeeperFX for Android ${VERSION_NAME} (unofficial, compatibility pointer)" \
+          --notes "**Unofficial community build**, not produced or supported by the
+        KeeperFX team.
+
+        Always the same build as the newest \`android-v*\` release, kept
         so that app versions up to 1.4.0.5289 can still find their update. It is
         flagged as a prerelease so it never shadows the real one.
 

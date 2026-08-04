@@ -52,8 +52,16 @@ if(NOT DEFINED KFX_BUILD_NUMBER OR KFX_BUILD_NUMBER STREQUAL "")
     set(KFX_BUILD_NUMBER "${VER_BUILD}")
 endif()
 set(VER_BUILD "${KFX_BUILD_NUMBER}")
+# version.mk carries the suffix that marks this fork's builds as unofficial;
+# Android adds its own name so a report says which build it came from. Gradle
+# can still override the whole thing with keeperfx.packageSuffix.
 if(NOT DEFINED PACKAGE_SUFFIX OR PACKAGE_SUFFIX STREQUAL "")
-    set(PACKAGE_SUFFIX "Android")
+    string(REGEX MATCH "PACKAGE_SUFFIX=([^\r\n]*)" _match "${KFX_VERSION_MK}")
+    if(CMAKE_MATCH_1 STREQUAL "")
+        set(PACKAGE_SUFFIX "Android")
+    else()
+        set(PACKAGE_SUFFIX "Android-${CMAKE_MATCH_1}")
+    endif()
 endif()
 if(NOT DEFINED GIT_REVISION OR GIT_REVISION STREQUAL "")
     set(GIT_REVISION "unknown")

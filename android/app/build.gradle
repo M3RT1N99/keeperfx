@@ -45,7 +45,10 @@ android {
             cmake {
                 arguments "-DANDROID_STL=c++_shared",
                           "-DKFX_BUILD_NUMBER=${buildNumber}",
-                          "-DPACKAGE_SUFFIX=${project.findProperty('keeperfx.packageSuffix') ?: 'Android'}",
+                          // Left empty on purpose: CMake then builds the suffix
+                          // from the one in version.mk, so "unofficial" is
+                          // stated in a single place.
+                          "-DPACKAGE_SUFFIX=${project.findProperty('keeperfx.packageSuffix') ?: ''}",
                           "-DGIT_REVISION=${project.findProperty('keeperfx.gitRevision') ?: 'unknown'}"
                 // The engine is a large C codebase; -O2 keeps the build fast enough
                 // while still producing a playable frame rate.
