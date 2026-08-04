@@ -107,6 +107,18 @@ set(SDL2NET_INSTALL OFF CACHE BOOL "" FORCE)
 set(SDL2NET_SAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory("${KFX_DEPS}/SDL2_net" "${CMAKE_CURRENT_BINARY_DIR}/SDL2_net" EXCLUDE_FROM_ALL)
 
+# The engine includes the satellite libraries as <SDL2/SDL_mixer.h> and friends,
+# matching how the desktop packages install them. Built from source they sit in
+# include/SDL_mixer.h instead, so stage them under the expected prefix.
+set(KFX_SDL2_COMPAT_INC "${CMAKE_CURRENT_BINARY_DIR}/sdl2-compat-include")
+file(MAKE_DIRECTORY "${KFX_SDL2_COMPAT_INC}/SDL2")
+configure_file("${KFX_DEPS}/SDL2_image/include/SDL_image.h"
+               "${KFX_SDL2_COMPAT_INC}/SDL2/SDL_image.h" COPYONLY)
+configure_file("${KFX_DEPS}/SDL2_mixer/include/SDL_mixer.h"
+               "${KFX_SDL2_COMPAT_INC}/SDL2/SDL_mixer.h" COPYONLY)
+configure_file("${KFX_DEPS}/SDL2_net/include/SDL_net.h"
+               "${KFX_SDL2_COMPAT_INC}/SDL2/SDL_net.h" COPYONLY)
+
 # Everything from here on is linked straight into libkeeperfx.so.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
@@ -275,6 +287,7 @@ add_library(keeperfx SHARED ${KFX_SOURCES_C} ${KFX_SOURCES_CXX})
 target_include_directories(keeperfx PRIVATE
     "${KFX_ROOT}/src"
     "${KFX_GENERATED_DIR}"
+    "${KFX_SDL2_COMPAT_INC}"
     ${KFX_ZLIB_INCLUDES})
 
 target_compile_definitions(keeperfx PRIVATE
