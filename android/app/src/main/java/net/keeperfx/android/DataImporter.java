@@ -3,12 +3,16 @@
 /******************************************************************************/
 /**
  * @file DataImporter.java
- *     Copies a KeeperFX installation from shared storage into the app.
+ *     Copies game data from shared storage into the app.
  * @par Purpose:
  *     The engine works on ordinary POSIX paths, which the Storage Access
- *     Framework cannot provide. The player picks their existing KeeperFX folder
- *     once and it is copied into the app's private directory, from where the
- *     native code can open it normally.
+ *     Framework cannot provide, so anything the player picks is copied into the
+ *     app's private directory first.
+ *
+ *     Two modes exist, matching the two halves of an installation: a full copy
+ *     of a KeeperFX folder, and a targeted search that pulls just the files an
+ *     original Dungeon Keeper has to supply out of whatever folder the player
+ *     points at.
  * @par Comment:
  *     Traversal uses DocumentsContract queries rather than DocumentFile: a
  *     KeeperFX installation has several thousand files and DocumentFile issues
@@ -37,11 +41,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public final class DataImporter {
 
     private static final String TAG = "KeeperFX";
+
+    /** Depth and node budget for the original-game search, so picking a whole
+     *  SD card cannot turn into an unbounded scan. */
+    private static final int DK_SEARCH_MAX_DEPTH = 6;
+    private static final int DK_SEARCH_MAX_DIRECTORIES = 4000;
 
     /** Reported back to the launcher; always called on a background thread. */
     public interface Listener {
@@ -64,11 +78,13 @@ public final class DataImporter {
         cancelled = true;
     }
 
+    // ------------------------------------------------------- KeeperFX release
+
     /**
      * Replaces the current installation with the contents of the picked tree.
      * Runs synchronously; the caller provides the thread.
      */
-    public void importTree(Uri treeUri) {
+    public void importKeeperfxTree(Uri treeUri) {
         final File destination = GameData.gameDirectory(context);
         try {
             deleteRecursively(destination);
@@ -98,6 +114,131 @@ public final class DataImporter {
             finish(false, "Import failed: " + e.getMessage());
         }
     }
+
+    // ---------------------------------------------------- original Dungeon Keeper
+
+    /**
+     * Searches the picked tree for the files an original Dungeon Keeper has to
+     * supply and copies them into the installation.
+     *
+     * The player may point at the game folder itself, at its DATA subfolder or
+     * at a mounted CD image, so the search walks down rather than expecting a
+     * fixed layout. Names are matched case insensitively because the originals
+     * are upper case on the CD and lower case in most re-releases.
+     */
+    public void importOriginalDkTree(Uri treeUri) {
+        final File destination = GameData.gameDirectory(context);
+        try {
+            if (!destination.isDirectory() && !destination.mkdirs()) {
+                finish(false, "Cannot create " + destination.getAbsolutePath());
+                return;
+            }
+
+            final Set<String> wanted = new HashSet<>();
+            for (String name : GameData.allOriginalDkFileNames()) {
+                wanted.add(name.toLowerCase(Locale.US));
+            }
+            final Set<String> found = new HashSet<>();
+
+            final String rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri);
+            final Uri rootUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId);
+            searchAndCopy(treeUri, rootUri, wanted, found);
+
+            if (cancelled) {
+                finish(false, "Import cancelled");
+                return;
+            }
+
+            final List<String> stillMissing = GameData.findMissingOriginalDkFiles(context);
+            if (stillMissing.isEmpty()) {
+                finish(true, "Copied " + filesCopied + " files from the original game");
+            } else {
+                final StringBuilder sb = new StringBuilder();
+                sb.append("Copied ").append(filesCopied).append(" files, but these are still missing:\n\n");
+                for (String name : stillMissing) {
+                    sb.append("  ").append(name).append('\n');
+                }
+                sb.append("\nPick the folder that holds the original game's DATA and SOUND folders.");
+                finish(false, sb.toString());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Original game import failed", e);
+            finish(false, "Import failed: " + e.getMessage());
+        }
+    }
+
+    private void searchAndCopy(Uri treeUri, Uri rootUri, Set<String> wanted, Set<String> found)
+            throws IOException {
+        final ContentResolver resolver = context.getContentResolver();
+        final Deque<SearchDir> queue = new ArrayDeque<>();
+        queue.add(new SearchDir(rootUri, 0));
+        int visited = 0;
+
+        while (!queue.isEmpty() && !cancelled && found.size() < wanted.size()) {
+            final SearchDir current = queue.poll();
+            if (++visited > DK_SEARCH_MAX_DIRECTORIES) {
+                Log.w(TAG, "Stopping the search after " + DK_SEARCH_MAX_DIRECTORIES + " folders");
+                break;
+            }
+
+            final String parentId = DocumentsContract.getDocumentId(current.uri);
+            final Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId);
+            final List<SearchDir> subdirectories = new ArrayList<>();
+
+            try (Cursor cursor = resolver.query(childrenUri, new String[] {
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+            }, null, null, null)) {
+                if (cursor == null) {
+                    continue;
+                }
+                while (cursor.moveToNext() && !cancelled) {
+                    final String documentId = cursor.getString(0);
+                    final String displayName = cursor.getString(1);
+                    final String mimeType = cursor.getString(2);
+                    if (displayName == null || displayName.contains("/")) {
+                        continue;
+                    }
+                    final Uri childUri =
+                        DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId);
+
+                    if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mimeType)) {
+                        if (current.depth < DK_SEARCH_MAX_DEPTH) {
+                            subdirectories.add(new SearchDir(childUri, current.depth + 1));
+                        }
+                        continue;
+                    }
+
+                    final String key = displayName.toLowerCase(Locale.US);
+                    if (!wanted.contains(key) || found.contains(key)) {
+                        continue;
+                    }
+                    final File targetDir = new File(GameData.gameDirectory(context),
+                        GameData.targetSubdirectoryFor(displayName));
+                    if (!targetDir.isDirectory() && !targetDir.mkdirs()) {
+                        throw new IOException("Cannot create " + targetDir.getAbsolutePath());
+                    }
+                    copyFile(childUri, new File(targetDir, key));
+                    found.add(key);
+                    listener.onProgress(filesCopied, displayName);
+                }
+            }
+            queue.addAll(subdirectories);
+        }
+    }
+
+    private static final class SearchDir {
+        final Uri uri;
+        final int depth;
+
+        SearchDir(Uri uri, int depth) {
+            this.uri = uri;
+            this.depth = depth;
+        }
+    }
+
+    // ------------------------------------------------------------------ shared
 
     private static final class PendingDir {
         final Uri documentUri;
@@ -133,7 +274,7 @@ public final class DataImporter {
                 if (isDir) {
                     directoryCount++;
                     onlyDirectoryId = id;
-                    if ("data".equalsIgnoreCase(name) || "fxdata".equalsIgnoreCase(name)) {
+                    if ("fxdata".equalsIgnoreCase(name) || "creatrs".equalsIgnoreCase(name)) {
                         sawExpectedEntry = true;
                     }
                 } else if (name != null && name.equalsIgnoreCase("keeperfx.cfg")) {

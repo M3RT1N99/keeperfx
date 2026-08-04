@@ -38,6 +38,7 @@ public final class Prefs {
     private static final String KEY_NO_INTRO = "no_intro";
     private static final String KEY_NO_SOUND = "no_sound";
     private static final String KEY_EXTRA_ARGS = "extra_args";
+    private static final String KEY_INSTALLED_VERSION = "installed_version";
 
     private final SharedPreferences prefs;
 
@@ -67,6 +68,19 @@ public final class Prefs {
 
     public void setNoSound(boolean value) {
         prefs.edit().putBoolean(KEY_NO_SOUND, value).apply();
+    }
+
+    /**
+     * Version of the KeeperFX release currently unpacked, or an empty string.
+     * Only set by the downloader; a manually imported folder carries no version
+     * we could trust, so it stays empty and update checks stay silent for it.
+     */
+    public String getInstalledVersion() {
+        return prefs.getString(KEY_INSTALLED_VERSION, "");
+    }
+
+    public void setInstalledVersion(String version) {
+        prefs.edit().putString(KEY_INSTALLED_VERSION, version == null ? "" : version).apply();
     }
 
     public String getExtraArguments() {

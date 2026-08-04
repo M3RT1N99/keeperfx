@@ -32,9 +32,47 @@ Treat the current state as "compiles, links and installs", not "plays".
 | `LauncherActivity` | Data import, verification and settings |
 | `GameActivity` | `SDLActivity` subclass that starts the engine |
 
-**No game data.** The APK ships nothing that came from Dungeon Keeper or from a
-KeeperFX release. The player imports their own installation folder, which keeps
-the package legally distributable and avoids shipping a half populated data set.
+**No game data.** The APK contains the engine and nothing else — no KeeperFX
+release files and nothing from Dungeon Keeper.
+
+---
+
+## Getting to a playable installation
+
+A playable installation is two independent halves, exactly as on the desktop,
+and the launcher follows the same flow as the Qt launcher:
+
+| Half | Where it comes from | Size |
+|---|---|---|
+| KeeperFX release | Downloaded from `keeperfx.net/api/v1/release/stable/latest`, or imported from a folder | ~360 MB |
+| Original Dungeon Keeper files | Picked out of the player's own Dungeon Keeper folder | 14 files |
+
+**Install KeeperFX** asks the same API the desktop launcher uses, downloads the
+7z release and unpacks it. Windows binaries in the archive are skipped. The
+installed version is recorded, and every time the launcher opens it re-queries
+the API; when a newer release exists the button turns into *Update to X*.
+
+**Import original Dungeon Keeper** takes any folder — the game directory, its
+`DATA` subfolder, a mounted CD image — and searches it for the files below,
+case insensitively, then copies only those. Nothing else is taken.
+
+```
+data/    bluepal.dat  bluepall.dat  dogpal.pal   hitpall.dat  lightng.pal
+         redpal.col   redpall.dat   slab0-0.dat  slab0-1.dat  vampal.pal
+         whitepal.col
+sound/   atmos1.sbk   atmos2.sbk    bullfrog.sbk
+```
+
+This is the list the official Qt launcher copies. `docs/files_required_from_original_dk.txt`
+additionally names `main.pal` and `mapfadeg.dat`; they are copied when found but
+no longer required — the engine generates the fade table itself.
+
+**Import KeeperFX folder** stays available for anyone who already has an
+installation on the device and would rather not download 360 MB.
+
+Reinstalling or updating KeeperFX replaces the whole tree, so the original game
+files have to be imported again afterwards. The launcher shows both halves
+separately and says which one is missing.
 
 ---
 
@@ -168,13 +206,15 @@ bionic only gained in API 28.
 
 1. Build or download the APK and install it (allow installation from unknown
    sources).
-2. Put a complete KeeperFX installation somewhere on the device — internal
-   storage or an SD card. It needs the KeeperFX release files **and** the files
-   copied from an original Dungeon Keeper CD, listed in
-   `docs/files_required_from_original_dk.txt`.
-3. Open KeeperFX, tap **Import game folder** and pick that folder. It is copied
-   into the app's private storage, which takes a few minutes.
-4. The launcher lists anything still missing. Once the check passes, tap **Play**.
+2. Open KeeperFX and tap **Install KeeperFX**. It downloads and unpacks the
+   current release; use Wi-Fi, it is around 360 MB.
+3. Put your Dungeon Keeper folder somewhere on the device — internal storage, an
+   SD card, or a mounted CD image — and tap **Import original Dungeon Keeper**.
+   The launcher finds and copies the 14 files it needs.
+4. Both status lines turn green. Tap **Play**.
+
+Anyone who already has a KeeperFX installation on the device can skip step 2 and
+use **Import KeeperFX folder** instead.
 
 The imported copy lives in `/data/data/net.keeperfx.android/files/keeperfx`,
 which is also the engine's working directory, so saves, screenshots and
@@ -192,10 +232,11 @@ android/
 │   └── src/main/
 │       ├── AndroidManifest.xml
 │       ├── java/net/keeperfx/android/
-│       │   ├── LauncherActivity.java   UI, import, settings
+│       │   ├── LauncherActivity.java   UI, install, import, settings
 │       │   ├── GameActivity.java       SDLActivity subclass
-│       │   ├── DataImporter.java       Storage Access Framework copy
-│       │   ├── GameData.java           paths and installation check
+│       │   ├── ReleaseDownloader.java  release API, download, 7z unpack
+│       │   ├── DataImporter.java       folder copy and original-game search
+│       │   ├── GameData.java           paths and the two-half check
 │       │   └── Prefs.java              settings to command line
 │       └── res/
 ├── scripts/fetch-deps.sh           pinned dependency sources

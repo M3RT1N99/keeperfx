@@ -20,10 +20,18 @@
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/status"
+            android:id="@+id/keeperfxStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="14dp"
+            android:textColor="@color/kfx_text"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/originalDkStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:textColor="@color/kfx_text"
             android:textSize="16sp" />
 
@@ -31,7 +39,7 @@
             android:id="@+id/detail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:fontFamily="monospace"
             android:textColor="@color/kfx_text_dim"
             android:textSize="12sp" />
@@ -42,29 +50,47 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:indeterminate="true"
+            android:max="100"
             android:visibility="gone" />
+
+        <Button
+            android:id="@+id/installKeeperfx"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="16dp"
+            android:text="@string/button_install_keeperfx"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/importOriginalDk"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="10dp"
+            android:text="@string/button_import_original"
+            android:textSize="16sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="10dp"
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/importData"
+                android:id="@+id/importKeeperfx"
                 android:layout_width="0dp"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:layout_weight="1"
-                android:text="@string/button_import" />
+                android:text="@string/button_import_keeperfx"
+                android:textSize="13sp" />
 
             <Button
                 android:id="@+id/removeData"
                 android:layout_width="0dp"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:layout_marginStart="10dp"
                 android:layout_weight="1"
-                android:text="@string/button_remove" />
+                android:text="@string/button_remove"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <View

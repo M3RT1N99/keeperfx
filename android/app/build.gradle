@@ -83,6 +83,9 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+        // commons-compress reaches for java.nio and java.time corners that are
+        // not uniformly present across the supported API levels.
+        coreLibraryDesugaringEnabled true
     }
 
     sourceSets {
@@ -105,8 +108,14 @@ android {
 }
 
 dependencies {
-    // Only needed for the Storage Access Framework helper used by the importer.
+    // Storage Access Framework helper used by the importer.
     implementation "androidx.documentfile:documentfile:1.0.1"
+    // The official release is distributed as a 7z archive; commons-compress
+    // reads it and xz supplies the LZMA/LZMA2 codecs it needs.
+    implementation "org.apache.commons:commons-compress:1.27.1"
+    implementation "org.tukaani:xz:1.10"
+
+    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.3"
 }
 
 // ---------------------------------------------------------------------------

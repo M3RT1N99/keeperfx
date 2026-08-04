@@ -2,23 +2,44 @@
 <resources>
     <string name="app_name">KeeperFX</string>
 
-    <string name="status_ready">Game data ready (%1$s)</string>
-    <string name="status_incomplete">Game data incomplete</string>
-    <string name="status_missing_header">Missing:</string>
-    <string name="status_importing">Importing game data…</string>
+    <string name="version_unknown">imported folder</string>
+    <string name="version_latest">the current release</string>
+
+    <string name="status_keeperfx_ready">KeeperFX %1$s installed (%2$s)</string>
+    <string name="status_keeperfx_missing">KeeperFX is not installed</string>
+    <string name="status_original_ready">Original Dungeon Keeper files present</string>
+    <string name="status_original_missing">%1$d files from the original Dungeon Keeper are missing</string>
+    <string name="status_importing">Copying KeeperFX…</string>
+    <string name="status_searching_original">Searching for the original game files…</string>
     <string name="status_import_progress">%1$d files copied — %2$s</string>
 
-    <string name="button_import">Import game folder</string>
-    <string name="button_remove">Delete game data</string>
+    <string name="hint_install_keeperfx">Tap "Install KeeperFX" to download the current release, or import a folder you already have.</string>
+    <string name="hint_import_original">Still missing from an original Dungeon Keeper:</string>
+
+    <string name="button_install_keeperfx">Install KeeperFX</string>
+    <string name="button_update_keeperfx">Check for KeeperFX updates</string>
+    <string name="button_update_to">Update to KeeperFX %1$s</string>
+    <string name="button_import_original">Import original Dungeon Keeper</string>
+    <string name="button_import_keeperfx">Import KeeperFX folder</string>
+    <string name="button_remove">Delete everything</string>
     <string name="button_play">Play</string>
 
-    <string name="import_title">Import game folder</string>
-    <string name="import_explanation">KeeperFX ships no game files. Pick a folder that contains a complete KeeperFX installation, including the files copied from an original Dungeon Keeper CD.\n\nThe folder is copied into this app\'s private storage, which can take a few minutes.</string>
-    <string name="import_choose">Choose folder</string>
-    <string name="import_failed">Import failed</string>
+    <string name="install_title">Install KeeperFX</string>
+    <string name="install_update_title">Update KeeperFX</string>
+    <string name="install_explanation">Downloads %1$s from keeperfx.net and unpacks it. The archive is around 360 MB, so use Wi-Fi.\n\nThis replaces the current installation, including the files copied from the original game — import those again afterwards. Save games are lost.</string>
+    <string name="install_start">Download</string>
+    <string name="install_failed">Installation failed</string>
 
-    <string name="remove_title">Delete game data</string>
-    <string name="remove_explanation">This removes the imported installation including save games. The original folder you imported from is not touched.</string>
+    <string name="import_keeperfx_title">Import KeeperFX folder</string>
+    <string name="import_keeperfx_explanation">Use this instead of downloading if you already have a KeeperFX installation on this device. Pick its folder; it is copied into the app\'s private storage.</string>
+
+    <string name="import_original_title">Import original Dungeon Keeper</string>
+    <string name="import_original_explanation">KeeperFX cannot ship a few files that must come from an original Dungeon Keeper. Pick your Dungeon Keeper folder — the one containing DATA and SOUND — and they are picked out and copied automatically.\n\nA mounted or extracted CD image works too. Nothing else from that folder is copied.</string>
+    <string name="import_choose">Choose folder</string>
+    <string name="import_failed">Import incomplete</string>
+
+    <string name="remove_title">Delete everything</string>
+    <string name="remove_explanation">Removes the installation including save games. The folders you imported from are not touched.</string>
     <string name="remove_confirm">Delete</string>
 
     <string name="settings_controls">Controls</string>
