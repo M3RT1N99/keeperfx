@@ -40,6 +40,18 @@ SPNG_TAG=v0.7.4
 OPENAL_TAG=1.24.3
 ENET6_TAG=v6.1.3
 ASTRONOMY_TAG=v2.1.19
+# TLS for the matchmaking client. mbedTLS rather than OpenSSL: it is a plain
+# CMake project that cross compiles without a bespoke configure system, and
+# curl's mbedTLS backend reads a directory of certificates, which is the shape
+# Android's trust store already has.
+#
+# Both are taken from the release tarballs, not from git. mbedTLS generates
+# several sources (error.c, version_features.c, the PSA driver wrappers) from
+# Jinja templates; the tarball ships them ready made, a git checkout would need
+# Python with jinja2 on the runner and the framework submodule on top.
+MBEDTLS_VERSION=3.6.7
+CURL_VERSION=8.21.0
+CURL_TAG=curl-8_21_0
 LUAJIT_COMMIT=1edc3e52b67eaf6ce5f809be8e17d6862594b8bc
 CENTIJSON_COMMIT=93395382de7ea59f7348759b78d5b2044370fcce
 
@@ -56,10 +68,12 @@ fetch_tarball() {
     log "downloading ${name} from ${url}"
     rm -rf "${target}" "${target}.tmp"
     mkdir -p "${target}.tmp"
-    curl -fL --retry 3 --retry-delay 5 -o "${DEPS_DIR}/${name}.tar.gz" "${url}"
-    tar -xzf "${DEPS_DIR}/${name}.tar.gz" -C "${target}.tmp"
+    curl -fL --retry 3 --retry-delay 5 -o "${DEPS_DIR}/${name}.archive" "${url}"
+    # No -z: the archives are a mix of gzip and bzip2 and GNU tar picks the
+    # decompressor itself.
+    tar -xf "${DEPS_DIR}/${name}.archive" -C "${target}.tmp"
     mv "${target}.tmp/${inner}" "${target}"
-    rm -rf "${target}.tmp" "${DEPS_DIR}/${name}.tar.gz"
+    rm -rf "${target}.tmp" "${DEPS_DIR}/${name}.archive"
     touch "${target}/.stamp"
 }
 
@@ -102,6 +116,14 @@ fetch_tarball SDL2_mixer \
 fetch_tarball SDL2_net \
     "https://github.com/libsdl-org/SDL_net/releases/download/release-${SDL2_NET_VERSION}/SDL2_net-${SDL2_NET_VERSION}.tar.gz" \
     "SDL2_net-${SDL2_NET_VERSION}"
+
+fetch_tarball mbedtls \
+    "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${MBEDTLS_VERSION}/mbedtls-${MBEDTLS_VERSION}.tar.bz2" \
+    "mbedtls-${MBEDTLS_VERSION}"
+
+fetch_tarball curl \
+    "https://github.com/curl/curl/releases/download/${CURL_TAG}/curl-${CURL_VERSION}.tar.gz" \
+    "curl-${CURL_VERSION}"
 
 fetch_git zlib       https://github.com/madler/zlib.git           "${ZLIB_TAG}"
 fetch_git libspng    https://github.com/randy408/libspng.git      "${SPNG_TAG}"

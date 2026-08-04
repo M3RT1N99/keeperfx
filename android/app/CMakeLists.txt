@@ -180,6 +180,55 @@ set(LIBTYPE "SHARED" CACHE STRING "" FORCE)
 add_subdirectory("${KFX_DEPS}/openal" "${CMAKE_CURRENT_BINARY_DIR}/openal" EXCLUDE_FROM_ALL)
 
 #******************************************************************************
+# mbedTLS + libcurl
+#
+# The matchmaking client speaks wss:// to keeperfx.net, so it needs curl with
+# WebSocket support and a TLS backend. mbedTLS rather than OpenSSL: it is an
+# ordinary CMake project that cross compiles without a bespoke configure step,
+# and curl's mbedTLS backend loads a directory of certificates through
+# mbedtls_x509_crt_parse_path(), which is exactly the shape of Android's trust
+# store - so no certificate bundle has to be shipped.
+#******************************************************************************
+set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
+set(ENABLE_TESTING  OFF CACHE BOOL "" FORCE)
+set(MBEDTLS_AS_SUBPROJECT ON CACHE BOOL "" FORCE)
+set(USE_SHARED_MBEDTLS_LIBRARY OFF CACHE BOOL "" FORCE)
+set(USE_STATIC_MBEDTLS_LIBRARY ON  CACHE BOOL "" FORCE)
+# On by default upstream; the NDK clang is not the compiler mbedTLS tunes its
+# warning set for, and a single new warning would fail the whole APK build.
+set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
+set(GEN_FILES OFF CACHE BOOL "" FORCE)
+add_subdirectory("${KFX_DEPS}/mbedtls" "${CMAKE_CURRENT_BINARY_DIR}/mbedtls" EXCLUDE_FROM_ALL)
+
+# curl looks for mbedTLS with find_package. Pointing the four variables it
+# checks at the targets built above skips the search entirely; CMake resolves
+# the names as targets when it links.
+set(MBEDTLS_INCLUDE_DIR "${KFX_DEPS}/mbedtls/include" CACHE PATH   "" FORCE)
+set(MBEDTLS_LIBRARY     mbedtls                       CACHE STRING "" FORCE)
+set(MBEDX509_LIBRARY    mbedx509                      CACHE STRING "" FORCE)
+set(MBEDCRYPTO_LIBRARY  mbedcrypto                    CACHE STRING "" FORCE)
+
+set(BUILD_CURL_EXE   OFF CACHE BOOL "" FORCE)
+set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
+set(CURL_USE_MBEDTLS ON  CACHE BOOL "" FORCE)
+set(CURL_USE_OPENSSL OFF CACHE BOOL "" FORCE)
+set(CURL_USE_LIBPSL  OFF CACHE BOOL "" FORCE)
+set(CURL_USE_LIBSSH2 OFF CACHE BOOL "" FORCE)
+set(CURL_ZLIB        OFF CACHE STRING "" FORCE)
+set(CURL_BROTLI      OFF CACHE BOOL "" FORCE)
+set(CURL_ZSTD        OFF CACHE BOOL "" FORCE)
+set(USE_LIBIDN2      OFF CACHE BOOL "" FORCE)
+set(CURL_DISABLE_LDAP  ON CACHE BOOL "" FORCE)
+set(CURL_DISABLE_LDAPS ON CACHE BOOL "" FORCE)
+set(ENABLE_CURL_MANUAL OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING    OFF CACHE BOOL "" FORCE)
+# Android's trust store. The engine never sets CURLOPT_CAINFO, so this compiled
+# in default is what verifies the matchmaking server.
+set(CURL_CA_PATH "/system/etc/security/cacerts" CACHE STRING "" FORCE)
+set(CURL_CA_BUNDLE "none" CACHE STRING "" FORCE)
+add_subdirectory("${KFX_DEPS}/curl" "${CMAKE_CURRENT_BINARY_DIR}/curl" EXCLUDE_FROM_ALL)
+
+#******************************************************************************
 # enet6
 #******************************************************************************
 # enet6 has no library type option of its own; it follows BUILD_SHARED_LIBS,
@@ -329,6 +378,7 @@ target_link_libraries(keeperfx PRIVATE
     kfx_centitoml
     kfx_astronomy
     kfx_luajit
+    CURL::libcurl
     android
     log
     GLESv1_CM
