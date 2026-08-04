@@ -295,6 +295,14 @@ target_compile_definitions(keeperfx PRIVATE
     SPNG_STATIC=1)
 
 target_compile_options(keeperfx PRIVATE
+    # Plain char is unsigned on ARM but signed on x86, and the engine uses -1 as
+    # a sentinel in char valued returns and fields all over: pathfinding
+    # (ariadne_wallhug.c), door orientation (thing_traps.c), menu fade
+    # (gui_frontmenu.c) and about forty more. Unsigned char turns "x != -1" into
+    # a constant true and "case -1:" into "case 255:", so those checks silently
+    # stop working. Forcing signed char gives the same semantics the desktop
+    # builds have always had, without touching any of those sites.
+    -fsigned-char
     -Wall -Wextra
     -Wno-unused-parameter
     -Wno-unknown-pragmas
