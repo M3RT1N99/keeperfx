@@ -22,7 +22,16 @@ def portBaseline = (project.findProperty("keeperfx.portBaseline") ?: "0") as int
 def portMinor = Math.max(0, buildNumber - portBaseline)
 def portVersion = "${portMajor}.${portMinor}"
 // The KeeperFX build this engine is, not the number of commits in this fork.
+// The KeeperFX build this engine is: the merge base with dkfans/keeperfx, not
+// the number of commits in this fork. It becomes VER_BUILD, which is what the
+// multiplayer handshake compares - net_versions_match() requires all four
+// numbers to be equal, so reporting our own commit count made this build
+// incompatible with every KeeperFX in existence, official or not. Falls back
+// to the fork count only for a local build, which has no upstream remote.
 def engineBuild = (project.findProperty("keeperfx.engineBuild") ?: "0") as int
+if (engineBuild <= 0) {
+    engineBuild = buildNumber
+}
 def engineVersion = "${verMajor}.${verMinor}.${verRelease}.${engineBuild}"
 
 def sdlJavaDir = file("${rootDir}/.deps/SDL2/android-project/app/src/main/java")
@@ -59,7 +68,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_STL=c++_shared",
-                          "-DKFX_BUILD_NUMBER=${buildNumber}",
+                          "-DKFX_BUILD_NUMBER=${engineBuild}",
                           "-DKFX_PORT_VERSION=${portVersion}",
                           "-DKFX_ENGINE_BUILD=${engineBuild}",
                           // Left empty on purpose: CMake then builds the suffix
