@@ -61,6 +61,7 @@ android {
                 arguments "-DANDROID_STL=c++_shared",
                           "-DKFX_BUILD_NUMBER=${buildNumber}",
                           "-DKFX_PORT_VERSION=${portVersion}",
+                          "-DKFX_ENGINE_BUILD=${engineBuild}",
                           // Left empty on purpose: CMake then builds the suffix
                           // from the one in version.mk, so "unofficial" is
                           // stated in a single place.
