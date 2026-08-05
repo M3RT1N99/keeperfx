@@ -35,6 +35,7 @@ public final class UpdateManager {
 
     public enum Kind {
         GAME_DATA,
+        GAME_ALPHA,
         MUSIC,
         APP,
     }
@@ -94,6 +95,29 @@ public final class UpdateManager {
             }
         } catch (Exception e) {
             Log.w(TAG, "Could not check the KeeperFX release", e);
+        }
+
+        // --- Alpha patch ------------------------------------------------------
+        // The engine in this APK is built from master while the data comes from
+        // the last stable release, so anything the engine gained since then is
+        // missing - a device log showed exactly that for fxdata/font12.fxfont,
+        // font16.fxfont and sounds.cfg, all three of which the alpha patch
+        // carries. It is only meaningful once the release it patches is there.
+        if (GameData.isKeeperfxInstalled(context)) {
+            try {
+                final ReleaseDownloader.ReleaseInfo alpha = ReleaseDownloader.queryLatestAlpha();
+                final String current = prefs.getInstalledAlphaVersion();
+                if (!alpha.version.isEmpty() && !alpha.version.equals(current)) {
+                    items.add(new Item(Kind.GAME_ALPHA,
+                        "KeeperFX alpha " + alpha.version,
+                        (current.isEmpty()
+                            ? "Files the current engine needs and 1.4.0 does not have, "
+                            : "Update from " + current + ", ")
+                            + GameData.describeBytes(alpha.sizeInBytes), null));
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Could not check the KeeperFX alpha", e);
+            }
         }
 
         // --- Background music -------------------------------------------------

@@ -44,6 +44,17 @@ public final class ReleaseDownloader {
 
     private static final String TAG = "KeeperFX";
     private static final String API_LATEST = "https://keeperfx.net/api/v1/release/stable/latest";
+    /**
+     * The newest alpha patch, a ~33 MB archive that is laid over the stable
+     * release rather than replacing it.
+     *
+     * This port matters more than it does on the desktop: the engine here is
+     * built from master, while the data comes from the last stable release, and
+     * anything the engine gained since then is simply absent. That is what made
+     * a device log complain about missing fxdata/font12.fxfont, font16.fxfont
+     * and sounds.cfg - all three are in the alpha patch and none are in 1.4.0.
+     */
+    private static final String API_ALPHA = "https://keeperfx.net/api/v1/release/alpha/latest";
 
     private static final int CONNECT_TIMEOUT_MS = 20000;
     private static final int READ_TIMEOUT_MS = 60000;
@@ -206,6 +217,52 @@ public final class ReleaseDownloader {
         return files;
     }
 
+    /**
+     * Downloads the newest alpha patch and lays it over the installation.
+     *
+     * Deliberately the same unpacking path as a full release: the archive has
+     * the same layout, only fewer files, and extract() already merges rather
+     * than replaces. The recorded version is left alone, because what is
+     * installed is still the stable release with a patch on top.
+     */
+    public void runAlpha() {
+        File archive = null;
+        try {
+            listener.onStage("Checking for the current alpha", -1, "");
+            final ReleaseInfo alpha = queryLatestAlpha();
+            if (alpha.downloadUrl.isEmpty()) {
+                finish(false, "The alpha API returned no download URL");
+                return;
+            }
+            final String version = alpha.version.isEmpty() ? "unknown" : alpha.version;
+            Log.i(TAG, "Latest KeeperFX alpha: " + version + " at " + alpha.downloadUrl);
+
+            archive = new File(downloadDirectory(), "keeperfx-alpha.7z");
+            download(alpha.downloadUrl, archive, alpha.sizeInBytes, version);
+            if (isCancelled()) {
+                finish(false, "Download cancelled");
+                return;
+            }
+
+            extract(archive);
+            if (isCancelled()) {
+                finish(false, "Cancelled while unpacking");
+                return;
+            }
+
+            new Prefs(context).setInstalledAlphaVersion(version);
+            finish(true, "KeeperFX alpha " + version + " applied");
+        } catch (Exception e) {
+            Log.e(TAG, "Alpha download failed", e);
+            finish(false, "Failed: " + e.getMessage());
+        } finally {
+            if (archive != null && archive.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                archive.delete();
+            }
+        }
+    }
+
     /** Runs synchronously; the caller provides the thread. */
     public void run() {
         File archive = null;
@@ -236,7 +293,11 @@ public final class ReleaseDownloader {
                 return;
             }
 
-            new Prefs(context).setInstalledVersion(version);
+            // A full release overwrites whatever the alpha patch had put there,
+            // so it is no longer applied and has to be offered again.
+            final Prefs prefs = new Prefs(context);
+            prefs.setInstalledVersion(version);
+            prefs.setInstalledAlphaVersion("");
             finish(true, "KeeperFX " + version + " installed");
         } catch (Exception e) {
             Log.e(TAG, "Release download failed", e);
@@ -251,6 +312,15 @@ public final class ReleaseDownloader {
 
     private static JSONObject requestLatestRelease() throws IOException, org.json.JSONException {
         return requestJson(API_LATEST).getJSONObject("release");
+    }
+
+    /** Asks the API which alpha patch is current. Blocking. */
+    public static ReleaseInfo queryLatestAlpha() throws IOException, org.json.JSONException {
+        final JSONObject build = requestJson(API_ALPHA).getJSONObject("alpha_build");
+        return new ReleaseInfo(
+            build.optString("version", ""),
+            build.optString("download_url", ""),
+            build.optLong("size_in_bytes", -1));
     }
 
     private static JSONObject requestJson(String url) throws IOException, org.json.JSONException {

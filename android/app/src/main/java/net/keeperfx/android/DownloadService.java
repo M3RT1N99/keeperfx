@@ -213,6 +213,7 @@ public class DownloadService extends Service {
 
         switch (kind) {
             case GAME_DATA:
+            case GAME_ALPHA:
             case MUSIC: {
                 final ReleaseDownloader downloader =
                     new ReleaseDownloader(this, new ReleaseDownloader.Listener() {
@@ -233,6 +234,8 @@ public class DownloadService extends Service {
                 // The downloader is synchronous; run it here and wait on nothing.
                 if (kind == UpdateManager.Kind.GAME_DATA) {
                     downloader.run();
+                } else if (kind == UpdateManager.Kind.GAME_ALPHA) {
+                    downloader.runAlpha();
                 } else {
                     downloader.runMusic();
                 }

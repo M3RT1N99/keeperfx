@@ -40,6 +40,7 @@ public final class Prefs {
     private static final String KEY_NO_SOUND = "no_sound";
     private static final String KEY_EXTRA_ARGS = "extra_args";
     private static final String KEY_INSTALLED_VERSION = "installed_version";
+    private static final String KEY_INSTALLED_ALPHA = "installed_alpha";
 
     private final SharedPreferences prefs;
 
@@ -91,6 +92,20 @@ public final class Prefs {
 
     public void setInstalledVersion(String version) {
         prefs.edit().putString(KEY_INSTALLED_VERSION, version == null ? "" : version).apply();
+    }
+
+    /**
+     * Version of the alpha patch laid over the release, or an empty string.
+     *
+     * Kept apart from the release version: an alpha is a patch on top of the
+     * stable release, not a replacement for it, so both are installed at once.
+     */
+    public String getInstalledAlphaVersion() {
+        return prefs.getString(KEY_INSTALLED_ALPHA, "");
+    }
+
+    public void setInstalledAlphaVersion(String version) {
+        prefs.edit().putString(KEY_INSTALLED_ALPHA, version == null ? "" : version).apply();
     }
 
     public String getExtraArguments() {
