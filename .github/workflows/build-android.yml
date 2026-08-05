@@ -193,6 +193,11 @@ jobs:
           echo "for the files that must come from the original game."
         } > out/notes.md
 
+        # Every call names the repository explicitly: the build step above adds
+        # an "upstream" remote to work out which KeeperFX build the engine is,
+        # and gh then resolves the default repository to dkfans/keeperfx and
+        # tries to publish this fork's APK there.
+        #
         # The releases API answers 403 under secondary rate limiting, which is
         # easy to hit when several builds land close together or the releases
         # are being edited at the same time. One build was lost to it, so give
@@ -210,8 +215,8 @@ jobs:
         }
 
         # A re-run of the same commit would clash with its own tag.
-        gh release delete "$TAG" --yes --cleanup-tag || true
-        publish gh release create "$TAG" \
+        gh release delete -R "$GITHUB_REPOSITORY" "$TAG" --yes --cleanup-tag || true
+        publish gh release create -R "$GITHUB_REPOSITORY" "$TAG" \
           out/keeperfx-android-arm64.apk out/version.json \
           --target "${GITHUB_SHA}" \
           --title "KeeperFX for Android ${VERSION_NAME} (unofficial)" \
@@ -222,8 +227,8 @@ jobs:
         # never update themselves again. It is marked as a prerelease, which
         # keeps /releases/latest returning the newest android-v* instead of this
         # one - that is what newer builds follow.
-        gh release delete android-latest --yes --cleanup-tag || true
-        publish gh release create android-latest \
+        gh release delete -R "$GITHUB_REPOSITORY" android-latest --yes --cleanup-tag || true
+        publish gh release create -R "$GITHUB_REPOSITORY" android-latest \
           out/keeperfx-android-arm64.apk out/version.json \
           --target "${GITHUB_SHA}" \
           --prerelease \
