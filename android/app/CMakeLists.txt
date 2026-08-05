@@ -66,10 +66,7 @@ endif()
 if(NOT DEFINED GIT_REVISION OR GIT_REVISION STREQUAL "")
     set(GIT_REVISION "unknown")
 endif()
-# KeeperFX's own version, an underscore, then this port's build number, so the
-# log header says which half is which. The desktop builds keep the plain dotted
-# form; this composition is the Android port's alone.
-set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}_${VER_BUILD} ${PACKAGE_SUFFIX}")
+set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${VER_BUILD} ${PACKAGE_SUFFIX}")
 
 set(KFX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${KFX_GENERATED_DIR}")
@@ -105,12 +102,19 @@ set(SDL2MIXER_VENDORED    OFF    CACHE BOOL   "" FORCE)
 set(SDL2MIXER_DEPS_SHARED OFF    CACHE BOOL   "" FORCE)
 # stb_vorbis is built into SDL2_mixer, so Ogg music needs no external libraries.
 set(SDL2MIXER_VORBIS      "STB"  CACHE STRING "" FORCE)
-set(SDL2MIXER_FLAC        OFF    CACHE BOOL   "" FORCE)
+# The engine accepts .wav, .mp3, .flac and .ogg for sounds and speech
+# (config_sounds.c), so switching FLAC off made a whole declared format
+# silently inaudible. drflac is built into SDL2_mixer and pulls in nothing.
+set(SDL2MIXER_FLAC        ON     CACHE BOOL   "" FORCE)
+set(SDL2MIXER_FLAC_DRFLAC ON     CACHE BOOL   "" FORCE)
+set(SDL2MIXER_FLAC_LIBFLAC OFF   CACHE BOOL   "" FORCE)
 set(SDL2MIXER_MOD         OFF    CACHE BOOL   "" FORCE)
 # Campaign speech ships as MP3 - 40 files per language in the official release -
-# so this cannot be off. dr_mp3 is built into SDL2_mixer and pulls in nothing.
+# so this cannot be off. minimp3 is built into SDL2_mixer and pulls in nothing.
+# (SDL2MIXER_MP3_DRMP3 was set here before and does not exist in 2.8.2, so it
+# did nothing; the backend option is called MINIMP3.)
 set(SDL2MIXER_MP3         ON     CACHE BOOL   "" FORCE)
-set(SDL2MIXER_MP3_DRMP3   ON     CACHE BOOL   "" FORCE)
+set(SDL2MIXER_MP3_MINIMP3 ON     CACHE BOOL   "" FORCE)
 set(SDL2MIXER_MP3_MPG123  OFF    CACHE BOOL   "" FORCE)
 set(SDL2MIXER_MIDI        OFF    CACHE BOOL   "" FORCE)
 set(SDL2MIXER_OPUS        OFF    CACHE BOOL   "" FORCE)

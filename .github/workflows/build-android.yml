@@ -114,14 +114,8 @@ jobs:
         VER_MAJOR=$(grep -E '^VER_MAJOR=' version.mk | cut -d= -f2)
         VER_MINOR=$(grep -E '^VER_MINOR=' version.mk | cut -d= -f2)
         VER_RELEASE=$(grep -E '^VER_RELEASE=' version.mk | cut -d= -f2)
-        # KeeperFX's own version, an underscore, then this port's build number,
-        # so it is obvious at a glance which half comes from where.
-        VERSION_NAME="${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}_${BUILD_NUMBER}"
-        # The tag deliberately keeps the old dotted form. Installed builds up to
-        # 1.4.0.5316 take the version from the tag and read the build number as
-        # the part after the last dot; an underscore there would make them fail
-        # to parse it and they would never find an update again.
-        TAG="android-v${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${BUILD_NUMBER}"
+        VERSION_NAME="${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${BUILD_NUMBER}"
+        TAG="android-v${VERSION_NAME}"
 
         cat > out/version.json <<JSON
         {
