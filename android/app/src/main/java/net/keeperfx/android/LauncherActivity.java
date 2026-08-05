@@ -146,8 +146,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         });
         useAlphaBox.setOnCheckedChangeListener((v, checked) -> {
             prefs.setAlphaEnabled(checked);
-            // The list of downloads is built from this, so it has to be asked again.
-            checkForUpdateInBackground();
+            if (!checked && !prefs.getInstalledAlphaVersion().isEmpty()) {
+                removeAlphaPatch();
+            } else {
+                // The list of downloads is built from this, so ask again.
+                checkForUpdateInBackground();
+            }
         });
         backButtonBox.setOnCheckedChangeListener((v, checked) -> prefs.setBackButtonShown(checked));
         noIntroBox.setOnCheckedChangeListener((v, checked) -> prefs.setNoIntro(checked));
@@ -456,6 +460,35 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                     .show();
             });
         }, "kfx-app-update-check").start();
+    }
+
+    /**
+     * Takes the alpha patch back off without downloading anything.
+     *
+     * The files it replaced were saved when it went on, so this is a local
+     * copy of a few megabytes rather than the 374 MB release again.
+     */
+    private void removeAlphaPatch() {
+        setBusy(true);
+        new Thread(() -> {
+            final ReleaseDownloader downloader =
+                new ReleaseDownloader(this, new ReleaseDownloader.Listener() {
+                    @Override
+                    public void onStage(String stage, int percent, String detail) {
+                        mainHandler.post(() -> detailView.setText(stage));
+                    }
+
+                    @Override
+                    public void onFinished(boolean success, String message) {
+                        mainHandler.post(() -> {
+                            setBusy(false);
+                            detailView.setText(message);
+                            refreshStatus();
+                        });
+                    }
+                });
+            downloader.revertAlpha();
+        }, "kfx-alpha-revert").start();
     }
 
     // ---------------------------------------------------------------- import

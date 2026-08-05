@@ -32,16 +32,20 @@ import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Locale;
 
 public final class ReleaseDownloader {
 
+    private static final String LINE_END = "\n";
     private static final String TAG = "KeeperFX";
     private static final String API_LATEST = "https://keeperfx.net/api/v1/release/stable/latest";
     /**
@@ -244,6 +248,12 @@ public final class ReleaseDownloader {
                 return;
             }
 
+            // Everything the patch is about to replace is copied aside first, so
+            // that going back to the plain release later costs nothing. Without
+            // it the only way back would be the 374 MB release all over again,
+            // which is a lot to pay for changing one's mind.
+            listener.onStage("Saving the files being replaced", -1, "");
+            backupBeforePatch(archive);
             extract(archive);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
@@ -261,6 +271,153 @@ public final class ReleaseDownloader {
                 archive.delete();
             }
         }
+    }
+
+    /** Where the release's own copies of the patched files are kept. */
+    private File alphaBackupDirectory() {
+        return new File(context.getFilesDir(), "alpha-backup");
+    }
+
+    /** Paths the patch added, which a revert deletes rather than restores. */
+    private File alphaAddedList() {
+        return new File(alphaBackupDirectory(), "added.txt");
+    }
+
+    /**
+     * Copies aside every installed file the archive would overwrite, and notes
+     * the ones it only adds.
+     *
+     * Only the entry names are read, so nothing is unpacked twice. An existing
+     * backup is left alone: it already holds the plain release's copies, and
+     * taking it again after a patch had been applied would capture patched
+     * files and make the way back a fiction.
+     */
+    private void backupBeforePatch(File archive) throws IOException {
+        final File destination = GameData.gameDirectory(context);
+        final File backup = alphaBackupDirectory();
+        if (backup.isDirectory()) {
+            return;
+        }
+        if (!backup.mkdirs()) {
+            throw new IOException("Cannot create " + backup.getAbsolutePath());
+        }
+        final StringBuilder added = new StringBuilder();
+        int saved = 0;
+        try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
+            SevenZArchiveEntry entry;
+            final byte[] buffer = new byte[64 * 1024];
+            while ((entry = sevenZ.getNextEntry()) != null) {
+                final String name = entry.getName();
+                if (name == null || name.isEmpty() || entry.isDirectory() || isSkipped(name)) {
+                    continue;
+                }
+                final File installed = new File(destination, name);
+                if (!installed.isFile()) {
+                    added.append(name).append(LINE_END);
+                    continue;
+                }
+                final File target = new File(backup, name);
+                final File parent = target.getParentFile();
+                if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+                    continue;
+                }
+                try (InputStream in = new FileInputStream(installed);
+                     OutputStream out = new FileOutputStream(target)) {
+                    int read;
+                    while ((read = in.read(buffer)) > 0) {
+                        out.write(buffer, 0, read);
+                    }
+                }
+                saved++;
+            }
+        }
+        try (OutputStream out = new FileOutputStream(alphaAddedList())) {
+            out.write(added.toString().getBytes("UTF-8"));
+        }
+        Log.i(TAG, "Saved " + saved + " files before applying the alpha patch");
+    }
+
+    /**
+     * Puts the installation back to the plain release without downloading it.
+     *
+     * Restores what the patch replaced and deletes what it added. Runs
+     * synchronously and is quick: the backup is a few megabytes of
+     * configuration and data files, not the 374 MB release.
+     */
+    public void revertAlpha() {
+        try {
+            final Prefs prefs = new Prefs(context);
+            final File backup = alphaBackupDirectory();
+            if (!backup.isDirectory()) {
+                prefs.setInstalledAlphaVersion("");
+                finish(true, "No alpha patch to remove");
+                return;
+            }
+            final File destination = GameData.gameDirectory(context);
+            listener.onStage("Restoring the release", -1, "");
+
+            final File addedList = alphaAddedList();
+            if (addedList.isFile()) {
+                for (String line : Files.readAllLines(addedList.toPath(),
+                        Charset.forName("UTF-8"))) {
+                    final String name = line.trim();
+                    if (!name.isEmpty()) {
+                        //noinspection ResultOfMethodCallIgnored
+                        new File(destination, name).delete();
+                    }
+                }
+            }
+            final int restored = restoreTree(backup, destination);
+            deleteTree(backup);
+            prefs.setInstalledAlphaVersion("");
+            finish(true, "Alpha patch removed, " + restored + " files restored");
+        } catch (Exception e) {
+            Log.e(TAG, "Could not remove the alpha patch", e);
+            finish(false, "Failed: " + e.getMessage());
+        }
+    }
+
+    private int restoreTree(File from, File to) throws IOException {
+        final File[] entries = from.listFiles();
+        if (entries == null) {
+            return 0;
+        }
+        int restored = 0;
+        final byte[] buffer = new byte[64 * 1024];
+        for (File entry : entries) {
+            final File target = new File(to, entry.getName());
+            if (entry.isDirectory()) {
+                //noinspection ResultOfMethodCallIgnored
+                target.mkdirs();
+                restored += restoreTree(entry, target);
+            } else if (!entry.getName().equals("added.txt")) {
+                try (InputStream in = new FileInputStream(entry);
+                     OutputStream out = new FileOutputStream(target)) {
+                    int read;
+                    while ((read = in.read(buffer)) > 0) {
+                        out.write(buffer, 0, read);
+                    }
+                }
+                restored++;
+            }
+        }
+        return restored;
+    }
+
+    private static void deleteTree(File root) {
+        final File[] entries = root.listFiles();
+        if (entries != null) {
+            for (File entry : entries) {
+                if (entry.isDirectory()) {
+                    deleteTree(entry);
+                } else {
+                    //noinspection ResultOfMethodCallIgnored
+                    entry.delete();
+                }
+            }
+        }
+        //noinspection ResultOfMethodCallIgnored
+        root.delete();
     }
 
     /** Runs synchronously; the caller provides the thread. */
@@ -297,7 +454,10 @@ public final class ReleaseDownloader {
             // so it is no longer applied and has to be offered again.
             final Prefs prefs = new Prefs(context);
             prefs.setInstalledVersion(version);
+            // A full release replaces the patched files with its own, so the
+            // saved copies describe nothing that is still installed.
             prefs.setInstalledAlphaVersion("");
+            deleteTree(alphaBackupDirectory());
             finish(true, "KeeperFX " + version + " installed");
         } catch (Exception e) {
             Log.e(TAG, "Release download failed", e);
