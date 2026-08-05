@@ -726,6 +726,38 @@ static short get_screen_control_inputs(void)
   return false;
 }
 
+/**
+ * Whether the player asked to leave a level that has already been decided.
+ *
+ * The key bound to this is Space, and a touch screen has no way of producing
+ * one - which left a won or lost level with no way out at all. Once the level
+ * is decided there is nothing else to do in the play area, so a tap there
+ * counts as well; the statistics screen that follows already takes a click the
+ * same way in front_continue_pressed().
+ *
+ * Three things are deliberately not treated as that tap: anything over the
+ * panel, which get_gui_inputs() has consumed by the time this runs and which
+ * game_is_busy_doing_gui() still reports; the minimap, which is inside the
+ * panel without being a button; and the parchment map, where a click means
+ * "zoom there" and losing a level should not stop the player looking around.
+ */
+static TbBool finish_level_requested(void)
+{
+    if (is_game_key_pressed(Gkey_FinishLevel, true, false))
+        return true;
+    if (!touch_controls_active() || !left_button_clicked)
+        return false;
+    if (game_is_busy_doing_gui())
+        return false;
+    struct PlayerInfo* player = get_my_player();
+    if (player->view_type != PVT_DungeonTop)
+        return false;
+    if (mouse_is_over_panel_map(player->minimap_pos_x, player->minimap_pos_y))
+        return false;
+    left_button_clicked = 0;
+    return true;
+}
+
 static short get_global_inputs(void)
 {
   if (game_is_busy_doing_gui_string_input())
@@ -837,7 +869,7 @@ static short get_global_inputs(void)
       return true;
   if (get_screen_capture_inputs())
       return true;
-  if (player->victory_state != VicS_Undecided && is_game_key_pressed(Gkey_FinishLevel, true, false))
+  if (player->victory_state != VicS_Undecided && finish_level_requested())
       {
         if ((player->victory_state == VicS_LostLevel) && network_is_active() && (player->id_number == get_host_player_id()) && network_human_contenders_remain())
         {
@@ -890,7 +922,7 @@ static TbBool get_level_lost_inputs(void)
         return true;
     if (get_screen_capture_inputs())
         return true;
-    if (is_game_key_pressed(Gkey_FinishLevel, true, false))
+    if (finish_level_requested())
     {
         set_players_packet_action(player, PckA_FinishGame, player->victory_state, 0, 0, 0);
     }
