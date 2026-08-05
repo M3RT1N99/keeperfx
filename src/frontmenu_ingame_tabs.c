@@ -1958,6 +1958,29 @@ void gui_area_instance_button(struct GuiButton *gbtn)
 }
 
 /** Callback function of maintaining creature skill button. */
+/**
+ * Selects the ability a possessed creature will use, from its panel button.
+ *
+ * The abilities were only reachable by their number keys, or by cycling with a
+ * controller's shoulder buttons. The panel drew them as buttons but had no
+ * click handler on them, which left possession unplayable on a touch screen -
+ * and made the icons look interactive on a mouse without being so.
+ */
+void gui_choose_instance(struct GuiButton *gbtn)
+{
+    struct PlayerInfo* player = get_my_player();
+    struct Thing* ctrltng = thing_get(player->controlled_thing_idx);
+    TRACE_THING(ctrltng);
+    if (!thing_is_creature(ctrltng)) {
+        return;
+    }
+    int inst_id = creature_instance_get_available_id_for_pos(ctrltng, (int)gbtn->content.lval);
+    if (!creature_instance_is_available(ctrltng, inst_id)) {
+        return;
+    }
+    set_players_packet_action(player, PckA_CtrlCrtrSetInstnc, inst_id, 0, 0, 0);
+}
+
 void maintain_instance(struct GuiButton *gbtn)
 {
     struct PlayerInfo* player = get_my_player();
