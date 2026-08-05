@@ -68,11 +68,14 @@ if(NOT DEFINED GIT_REVISION OR GIT_REVISION STREQUAL "")
 endif()
 # The KeeperFX version this engine is, then the port's own version if Gradle
 # passed one, so the log header says both.
-if(DEFINED KFX_PORT_VERSION AND NOT KFX_PORT_VERSION STREQUAL "")
-    set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}_${KFX_PORT_VERSION} ${PACKAGE_SUFFIX}")
-else()
-    set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${VER_BUILD} ${PACKAGE_SUFFIX}")
+# The engine reports the KeeperFX build it actually is, which is the merge base
+# with upstream rather than this fork's commit count. That is the same counter
+# an alpha patch is numbered with, so a log says straight away whether engine
+# and data belong together.
+if(NOT DEFINED KFX_ENGINE_BUILD OR KFX_ENGINE_BUILD STREQUAL "")
+    set(KFX_ENGINE_BUILD "${VER_BUILD}")
 endif()
+set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${KFX_ENGINE_BUILD} ${PACKAGE_SUFFIX}")
 
 set(KFX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${KFX_GENERATED_DIR}")

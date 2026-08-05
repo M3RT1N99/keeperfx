@@ -21,6 +21,9 @@ def portMajor = (project.findProperty("keeperfx.portMajor") ?: "1") as int
 def portBaseline = (project.findProperty("keeperfx.portBaseline") ?: "0") as int
 def portMinor = Math.max(0, buildNumber - portBaseline)
 def portVersion = "${portMajor}.${portMinor}"
+// The KeeperFX build this engine is, not the number of commits in this fork.
+def engineBuild = (project.findProperty("keeperfx.engineBuild") ?: "0") as int
+def engineVersion = "${verMajor}.${verMinor}.${verRelease}.${engineBuild}"
 
 def sdlJavaDir = file("${rootDir}/.deps/SDL2/android-project/app/src/main/java")
 
@@ -41,10 +44,12 @@ android {
         minSdk 28
         targetSdk 34
         versionCode verMajor * 1000000 + verMinor * 10000 + verRelease * 1000 + buildNumber
-        // The KeeperFX version this runs on, then the port's own version:
-        // "1.4.0_1.0". versionCode keeps counting commits because Android needs
-        // it to rise on every build and never shows it to anyone.
-        versionName "${verMajor}.${verMinor}.${verRelease}_${portVersion}"
+        // Just the port's own version. Which KeeperFX this engine is has its
+        // own line in the launcher and its own place in the log header, so
+        // cramming it in here only made the number look like an official build
+        // without being comparable to one. versionCode still counts commits:
+        // Android needs it to rise on every build and never shows it to anyone.
+        versionName portVersion
 
         ndk {
             abiFilters.addAll(

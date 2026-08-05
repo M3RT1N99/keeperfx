@@ -61,6 +61,15 @@ jobs:
         # installed build would be impossible to tell apart.
         BUILD_NUMBER=$(git rev-list --count HEAD)
         GIT_REVISION=$(git describe --always)
+        # Which KeeperFX build this engine actually is. Counting our own
+        # commits would blend upstream's counter with ours into a number that
+        # looks like an official build without being comparable to one; the
+        # merge base is the honest answer, and it is the same counter that an
+        # alpha patch is numbered with.
+        git remote add upstream https://github.com/dkfans/keeperfx.git 2>/dev/null || true
+        git fetch --no-tags --quiet upstream master || true
+        ENGINE_BUILD=$(git rev-list --count "$(git merge-base HEAD upstream/master)" 2>/dev/null || echo 0)
+        echo "ENGINE_BUILD=$ENGINE_BUILD" >> $GITHUB_ENV
         echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
         echo "GIT_REVISION=$GIT_REVISION" >> $GITHUB_ENV
         # Passing a suffix here overrides the one the CMake side would compose,
@@ -71,6 +80,7 @@ jobs:
         echo "PACKAGE_SUFFIX=$PACKAGE_SUFFIX" >> $GITHUB_ENV
         gradle --no-daemon assembleRelease \
           -Pkeeperfx.buildNumber="$BUILD_NUMBER" \
+          -Pkeeperfx.engineBuild="$ENGINE_BUILD" \
           -Pkeeperfx.gitRevision="$GIT_REVISION" \
           -Pkeeperfx.packageSuffix="$PACKAGE_SUFFIX"
 
@@ -120,7 +130,10 @@ jobs:
         PORT_BASELINE=$(grep -E '^keeperfx.portBaseline=' android/gradle.properties | cut -d= -f2)
         PORT_MINOR=$((BUILD_NUMBER - PORT_BASELINE))
         [ "$PORT_MINOR" -ge 0 ] || PORT_MINOR=0
-        VERSION_NAME="${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}_${PORT_MAJOR}.${PORT_MINOR}"
+        # The app version is the port's own. Which KeeperFX the engine is
+        # gets its own row in the notes below.
+        VERSION_NAME="${PORT_MAJOR}.${PORT_MINOR}"
+        ENGINE_VERSION="${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${ENGINE_BUILD}"
         TAG="android-v${VERSION_NAME}"
 
         cat > out/version.json <<JSON
@@ -159,7 +172,8 @@ jobs:
           echo
           echo "| | |"
           echo "|---|---|"
-          echo "| Version | \`${VERSION_NAME}\` |"
+          echo "| App version | \`${VERSION_NAME}\` |"
+          echo "| Engine | KeeperFX \`${ENGINE_VERSION}\` |"
           echo "| Commit | \`${GIT_REVISION}\` |"
           echo "| ABI | \`arm64-v8a\` |"
           echo "| Requires | Android 9 (API 28) or newer |"

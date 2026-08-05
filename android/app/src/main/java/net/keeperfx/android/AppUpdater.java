@@ -211,24 +211,20 @@ public final class AppUpdater {
     }
 
     /**
-     * Orders two versions of this port against each other.
+     * Orders two app versions against each other.
      *
-     * A version reads "1.4.0_1.7": the KeeperFX version it runs on, then the
-     * port's own major.minor. Only the port half orders our builds - the
-     * KeeperFX half moves for entirely separate reasons - so that is what is
-     * turned into a number here, with room for a major bump to still come out
-     * above every minor below it.
+     * A version is the port's own "major.minor" and nothing else - which
+     * KeeperFX the engine is has its own place and moves for entirely separate
+     * reasons. The major is weighted so that a bump still comes out above every
+     * minor below it. Anything that does not parse sorts lowest, which is what
+     * the versions from before this scheme did.
      */
     private static int buildNumberOf(String versionName) {
         try {
-            final int split = versionName.lastIndexOf('_');
-            if (split < 0) {
-                return 0; // Not one of ours, or a version from before the reset
-            }
-            final String port = versionName.substring(split + 1);
+            final String port = versionName.trim();
             final int dot = port.indexOf('.');
             if (dot < 0) {
-                return Integer.parseInt(port.trim()) * 100000;
+                return Integer.parseInt(port) * 100000;
             }
             final int major = Integer.parseInt(port.substring(0, dot).trim());
             final int minor = Integer.parseInt(port.substring(dot + 1).trim());
