@@ -41,6 +41,7 @@ public final class Prefs {
     private static final String KEY_EXTRA_ARGS = "extra_args";
     private static final String KEY_INSTALLED_VERSION = "installed_version";
     private static final String KEY_INSTALLED_ALPHA = "installed_alpha";
+    private static final String KEY_LANGUAGE = "game_language";
 
     private final SharedPreferences prefs;
 
@@ -106,6 +107,20 @@ public final class Prefs {
 
     public void setInstalledAlphaVersion(String version) {
         prefs.edit().putString(KEY_INSTALLED_ALPHA, version == null ? "" : version).apply();
+    }
+
+    /**
+     * Language the game runs in, as one of the engine's own codes.
+     *
+     * Defaults to whatever the device is set to rather than to English, so a
+     * player who never opens the setting still gets their own language.
+     */
+    public String getLanguage() {
+        return prefs.getString(KEY_LANGUAGE, GameLanguage.forDevice());
+    }
+
+    public void setLanguage(String code) {
+        prefs.edit().putString(KEY_LANGUAGE, code).apply();
     }
 
     public String getExtraArguments() {

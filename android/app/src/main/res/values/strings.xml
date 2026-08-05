@@ -100,6 +100,9 @@ The system back button and the back gesture also leave a menu.</string>
     <string name="option_back_button">Show a back arrow while playing</string>
     <string name="game_back">Back</string>
 
+    <string name="settings_language">Language</string>
+    <string name="settings_language_hint">Sets the language the game runs in. Starts on the one the device uses; speech and text only appear in it when the installation carries that language.</string>
+
     <string name="settings_startup">Startup</string>
     <string name="option_no_intro">Skip the intro</string>
     <string name="option_no_sound">Start without sound</string>

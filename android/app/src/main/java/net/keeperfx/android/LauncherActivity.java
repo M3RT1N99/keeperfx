@@ -34,7 +34,10 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+import android.widget.Spinner;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.RadioGroup;
@@ -63,6 +66,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private Button playButton;
     private Button updateAppButton;
     private RadioGroup inputModeGroup;
+    private Spinner languageSpinner;
     private CheckBox backButtonBox;
     private CheckBox noIntroBox;
     private CheckBox noSoundBox;
@@ -90,6 +94,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         updateAppButton.setText(getString(R.string.button_update_app,
             AppUpdater.installedVersionName(this)));
         inputModeGroup = findViewById(R.id.inputMode);
+        languageSpinner = findViewById(R.id.language);
         backButtonBox = findViewById(R.id.backButton);
         noIntroBox = findViewById(R.id.noIntro);
         noSoundBox = findViewById(R.id.noSound);
@@ -106,6 +111,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 inputModeGroup.check(R.id.inputAuto);
                 break;
         }
+        final java.util.List<GameLanguage.Entry> languages = GameLanguage.all();
+        final ArrayAdapter<GameLanguage.Entry> languageAdapter = new ArrayAdapter<>(
+            this, android.R.layout.simple_spinner_item, languages);
+        languageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        languageSpinner.setAdapter(languageAdapter);
+        languageSpinner.setSelection(GameLanguage.indexOf(prefs.getLanguage()));
         backButtonBox.setChecked(prefs.isBackButtonShown());
         noIntroBox.setChecked(prefs.isNoIntro());
         noSoundBox.setChecked(prefs.isNoSound());
@@ -119,6 +130,16 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             } else {
                 prefs.setInputMode(Prefs.INPUT_AUTO);
             }
+        });
+        languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                final String code = GameLanguage.codeAt(position);
+                prefs.setLanguage(code);
+                GameLanguage.applyToConfig(LauncherActivity.this, code);
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
         });
         backButtonBox.setOnCheckedChangeListener((v, checked) -> prefs.setBackButtonShown(checked));
         noIntroBox.setOnCheckedChangeListener((v, checked) -> prefs.setNoIntro(checked));
@@ -554,6 +575,10 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             String failure = null;
             try {
                 BundledConfig.install(this);
+                // After the bundled copy, which is what creates keeperfx.cfg the
+                // first time round and would otherwise hand the engine its
+                // built in English.
+                GameLanguage.applyToConfig(this, prefs.getLanguage());
             } catch (Exception e) {
                 failure = e.getMessage();
             }

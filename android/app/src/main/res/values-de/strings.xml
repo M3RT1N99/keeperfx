@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  German launcher texts. Anything not translated here falls back to values/,
+  so this file can grow one string at a time without ever leaving a gap.
+-->
+<resources>
+    <string name="app_subtitle">Dungeon Keeper, neu gebaut — für Android</string>
+
+    <string name="log_title">Engine-Protokoll</string>
+    <string name="log_loading">Wird gelesen…</string>
+    <string name="log_none">Noch kein Protokoll — starte das Spiel einmal.</string>
+    <string name="log_empty_hint">Das Protokoll ist leer. Es wird während des Spiels geschrieben und übersteht auch einen Absturz. Starte also das Spiel und schau dann wieder hier nach.</string>
+    <string name="log_share">Teilen</string>
+    <string name="log_copy">Kopieren</string>
+    <string name="log_refresh">Neu laden</string>
+    <string name="log_copied">Protokoll in die Zwischenablage kopiert</string>
+    <string name="button_log">Protokoll</string>
+
+    <string name="version_unknown">importierter Ordner</string>
+    <string name="version_latest">die aktuelle Version</string>
+
+    <string name="status_keeperfx_ready">KeeperFX %1$s installiert (%2$s)</string>
+    <string name="status_keeperfx_missing">KeeperFX ist nicht installiert</string>
+    <string name="status_original_ready">Dateien des originalen Dungeon Keeper vorhanden</string>
+    <string name="status_original_missing">%1$d Dateien des originalen Dungeon Keeper fehlen</string>
+    <string name="status_importing">KeeperFX wird kopiert…</string>
+    <string name="status_searching_original">Originaldateien werden gesucht…</string>
+    <string name="status_import_progress">%1$d Dateien kopiert — %2$s</string>
+
+    <string name="hint_install_keeperfx">Tippe auf „KeeperFX installieren“, um die aktuelle Version zu laden, oder importiere einen Ordner, den du schon hast.</string>
+    <string name="hint_import_original">Fehlt noch aus einem originalen Dungeon Keeper:</string>
+
+    <string name="button_install_keeperfx">KeeperFX installieren</string>
+    <string name="button_update_keeperfx">Nach Downloads suchen</string>
+    <string name="button_updates_waiting">%1$d Download(s) verfügbar</string>
+    <string name="button_import_original">Original Dungeon Keeper importieren</string>
+    <string name="button_import_keeperfx">Ordner</string>
+    <string name="button_remove">Zurücksetzen</string>
+    <string name="button_play">Spielen</string>
+
+    <string name="status_checking_updates">Suche nach Downloads…</string>
+    <string name="status_downloading_app">App wird geladen…</string>
+
+    <string name="updates_none_title">Alles aktuell</string>
+    <string name="updates_available_title">%1$d Download(s) verfügbar</string>
+    <string name="updates_download_all">Alle laden</string>
+    <string name="updates_replaces_data">Die Spieldaten werden dabei ersetzt. Spielstände, importierte Originaldateien, Musik und eigene Karten bleiben erhalten.</string>
+    <string name="updates_use_wifi">Am besten im WLAN. Der Download läuft weiter, wenn du die App verlässt.</string>
+    <string name="updates_running">Es läuft bereits ein Download.</string>
+
+    <string name="button_update_app">App-Version %1$s</string>
+    <string name="app_update_title">App-Update</string>
+    <string name="app_update_none">%1$s ist die neueste Version.</string>
+    <string name="app_update_changes">Änderungen:</string>
+    <string name="app_update_check">Suchen</string>
+    <string name="app_update_offline">Die Update-Prüfung ist fehlgeschlagen. Besteht eine Internetverbindung?</string>
+    <string name="app_update_install">Installieren</string>
+
+    <string name="install_title">KeeperFX installieren</string>
+    <string name="install_update_title">KeeperFX aktualisieren</string>
+    <string name="install_start">Herunterladen</string>
+    <string name="install_failed">Installation fehlgeschlagen: %1$s</string>
+
+    <string name="import_keeperfx_title">KeeperFX-Ordner importieren</string>
+    <string name="import_original_title">Original Dungeon Keeper importieren</string>
+    <string name="import_choose">Ordner wählen</string>
+    <string name="import_failed">Import fehlgeschlagen: %1$s</string>
+    <string name="config_failed">Konfiguration konnte nicht geschrieben werden: %1$s</string>
+
+    <string name="remove_title">Installation löschen</string>
+    <string name="remove_explanation">Löscht die Installation einschließlich der Spielstände. Die Ordner, aus denen du importiert hast, bleiben unberührt.</string>
+    <string name="remove_confirm">Löschen</string>
+
+    <string name="settings_controls">Steuerung</string>
+    <string name="input_auto">Automatisch — dem zuletzt benutzten Gerät folgen</string>
+    <string name="input_touch">Touch — immer die Touch-Steuerung</string>
+    <string name="input_pointer">Maus &amp; Tastatur — Touchscreen ignorieren</string>
+    <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Drehen · Zwei-Finger-Tipp = zurück · Drei-Finger-Tipp = Karte · Vier-Finger-Tipp = Menü
+
+Die Zurück-Taste und die Zurück-Geste verlassen ein Menü ebenfalls.</string>
+    <string name="option_back_button">Zurück-Pfeil im Spiel anzeigen</string>
+    <string name="game_back">Zurück</string>
+
+    <string name="settings_language">Sprache</string>
+    <string name="settings_language_hint">Legt fest, in welcher Sprache das Spiel läuft. Beginnt mit der des Geräts. Sprachausgabe und Texte erscheinen nur dann darin, wenn die Installation diese Sprache mitbringt.</string>
+
+    <string name="settings_startup">Start</string>
+    <string name="option_no_intro">Intro überspringen</string>
+    <string name="option_no_sound">Ohne Ton starten</string>
+    <string name="option_extra_args">Zusätzliche Kommandozeilenoptionen (optional)</string>
+</resources>
