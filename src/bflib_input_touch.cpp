@@ -70,8 +70,12 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
 /** Hold time in milliseconds before a motionless press becomes a right click. */
 #define TOUCH_LONGPRESS_MS 420
 
-/** Longest press still counted as a tap. */
-#define TOUCH_TAP_MAX_MS 400
+/**
+ * Longest press still counted as a tap. Equal to the long press time on
+ * purpose: any gap between the two is a window in which a press is neither,
+ * and a finger lifted in it does nothing whatsoever.
+ */
+#define TOUCH_TAP_MAX_MS TOUCH_LONGPRESS_MS
 
 /**
  * Finger travel per game frame, in pixels, that corresponds to a fully
@@ -170,6 +174,10 @@ enum TouchTwoFingerMode {
 
 /* Finger travel collected since the last frame, in screen pixels. */
 static float touch_pan_accum_x, touch_pan_accum_y;
+/* The same for the pinch and the twist, for the same reason: SDL reports one
+   motion event per finger per display frame, so a single event on a 120 Hz
+   panel carries a fraction of the movement a deadzone is meant to filter. */
+static float touch_pinch_accum, touch_twist_accum;
 
 /* State since the two finger gesture began, used to commit to one of them. */
 static unsigned char touch_two_finger_mode = T2F_Undecided;
@@ -245,6 +253,7 @@ TbBool touch_controls_active(void)
 static void touch_reset_gesture_axes(void)
 {
     touch_pan_accum_x = touch_pan_accum_y = 0.0f;
+    touch_pinch_accum = touch_twist_accum = 0.0f;
     touch_two_finger_mode = T2F_Undecided;
     touch_total_twist = 0.0f;
     touch_axis_pan_left = touch_axis_pan_right = 0.0f;
@@ -404,6 +413,7 @@ static void touch_begin_camera_gesture(void)
     touch_start_cy = touch_camera_prev_cy;
     touch_two_finger_mode = T2F_Undecided;
     touch_total_twist = 0.0f;
+    touch_pinch_accum = touch_twist_accum = 0.0f;
     touch_gesture = TGest_Camera;
 }
 
@@ -480,17 +490,16 @@ static void touch_update_camera_gesture(void)
         break;
 
     case T2F_Zoom:
-        if (dist_delta > TOUCH_PINCH_DEADZONE_PX)
-            touch_axis_zoom_in = touch_clamp01((dist_delta - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
-        else if (dist_delta < -TOUCH_PINCH_DEADZONE_PX)
-            touch_axis_zoom_out = touch_clamp01((-dist_delta - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
+        // Collected, not acted on. Testing one event's delta against a deadzone
+        // measured in whole pixels asks a 120 Hz screen for movement it never
+        // reports in a single event, so a deliberate pinch cleared the commit
+        // threshold - which is measured against the gesture's start - and then
+        // produced nothing at all.
+        touch_pinch_accum += dist_delta;
         break;
 
     case T2F_Rotate:
-        if (angle_delta > TOUCH_TWIST_DEADZONE_RAD)
-            touch_axis_rotate_cw = touch_clamp01((angle_delta - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
-        else if (angle_delta < -TOUCH_TWIST_DEADZONE_RAD)
-            touch_axis_rotate_ccw = touch_clamp01((-angle_delta - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
+        touch_twist_accum += angle_delta;
         break;
 
     default:
@@ -663,6 +672,7 @@ void TEvent(const SDL_Event *ev)
 /******************************************************************************/
 
 static void touch_apply_pan_accumulator(void);
+static void touch_apply_camera_accumulators(void);
 
 static void touch_decay_axis(float *axis)
 {
@@ -728,15 +738,10 @@ void update_touch_inputs(void)
         touch_back_key_frames = 2;
     }
 
+    // All four camera axes are summed over the frame now, so none of them needs
+    // decaying: a frame in which the fingers did not move already yields zero.
     touch_apply_pan_accumulator();
-
-    // Zoom and rotation are pulses set by individual motion events, so they
-    // fade rather than being recomputed. Panning is not decayed: a frame with
-    // no finger travel already yields zero.
-    touch_decay_axis(&touch_axis_zoom_in);
-    touch_decay_axis(&touch_axis_zoom_out);
-    touch_decay_axis(&touch_axis_rotate_cw);
-    touch_decay_axis(&touch_axis_rotate_ccw);
+    touch_apply_camera_accumulators();
 }
 
 /**
@@ -747,6 +752,35 @@ void update_touch_inputs(void)
  * pan to a hundredth of its intended speed. Taking the square root here undoes
  * that, so the camera follows the finger at the speed it actually moved.
  */
+/**
+ * Turns the pinch and twist collected since the last frame into axis values.
+ *
+ * The deadzone is subtracted from the total rather than gating on it, so a slow
+ * steady pinch still moves at a rate that follows the fingers instead of
+ * switching on and off at frame boundaries. Both axes are read as booleans by
+ * the engine - they end up as discrete zoom and rotate packets - so what this
+ * really decides is whether the gesture does anything at all.
+ */
+static void touch_apply_camera_accumulators(void)
+{
+    touch_axis_zoom_in = touch_axis_zoom_out = 0.0f;
+    touch_axis_rotate_cw = touch_axis_rotate_ccw = 0.0f;
+
+    if (touch_gesture == TGest_Camera)
+    {
+        if (touch_pinch_accum > TOUCH_PINCH_DEADZONE_PX)
+            touch_axis_zoom_in = touch_clamp01((touch_pinch_accum - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
+        else if (touch_pinch_accum < -TOUCH_PINCH_DEADZONE_PX)
+            touch_axis_zoom_out = touch_clamp01((-touch_pinch_accum - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
+
+        if (touch_twist_accum > TOUCH_TWIST_DEADZONE_RAD)
+            touch_axis_rotate_cw = touch_clamp01((touch_twist_accum - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
+        else if (touch_twist_accum < -TOUCH_TWIST_DEADZONE_RAD)
+            touch_axis_rotate_ccw = touch_clamp01((-touch_twist_accum - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
+    }
+    touch_pinch_accum = touch_twist_accum = 0.0f;
+}
+
 static void touch_apply_pan_accumulator(void)
 {
     touch_axis_pan_left = touch_axis_pan_right = 0.0f;
