@@ -100,6 +100,10 @@ The system back button and the back gesture also leave a menu.</string>
     <string name="option_back_button">Show a back arrow while playing</string>
     <string name="game_back">Back</string>
 
+    <string name="settings_data">Game data</string>
+    <string name="option_use_alpha">Also install the newest alpha patch</string>
+    <string name="option_use_alpha_hint">The engine in this app is built from the current source, and the stable release does not carry everything it expects - fonts and sound definitions among them. The alpha patch adds those, about 33 MB on top of the release. Turn this off to stay strictly on 1.4.0; going back needs the release downloaded again.</string>
+
     <string name="settings_language">Language</string>
     <string name="settings_language_hint">Sets the language the game runs in. Starts on the one the device uses; speech and text only appear in it when the installation carries that language.</string>
 

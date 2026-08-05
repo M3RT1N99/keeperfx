@@ -66,6 +66,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private Button playButton;
     private Button updateAppButton;
     private RadioGroup inputModeGroup;
+    private CheckBox useAlphaBox;
     private Spinner languageSpinner;
     private CheckBox backButtonBox;
     private CheckBox noIntroBox;
@@ -94,6 +95,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         updateAppButton.setText(getString(R.string.button_update_app,
             AppUpdater.installedVersionName(this)));
         inputModeGroup = findViewById(R.id.inputMode);
+        useAlphaBox = findViewById(R.id.useAlpha);
         languageSpinner = findViewById(R.id.language);
         backButtonBox = findViewById(R.id.backButton);
         noIntroBox = findViewById(R.id.noIntro);
@@ -117,6 +119,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         languageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         languageSpinner.setAdapter(languageAdapter);
         languageSpinner.setSelection(GameLanguage.indexOf(prefs.getLanguage()));
+        useAlphaBox.setChecked(prefs.isAlphaEnabled());
         backButtonBox.setChecked(prefs.isBackButtonShown());
         noIntroBox.setChecked(prefs.isNoIntro());
         noSoundBox.setChecked(prefs.isNoSound());
@@ -140,6 +143,11 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             }
 
             @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+        useAlphaBox.setOnCheckedChangeListener((v, checked) -> {
+            prefs.setAlphaEnabled(checked);
+            // The list of downloads is built from this, so it has to be asked again.
+            checkForUpdateInBackground();
         });
         backButtonBox.setOnCheckedChangeListener((v, checked) -> prefs.setBackButtonShown(checked));
         noIntroBox.setOnCheckedChangeListener((v, checked) -> prefs.setNoIntro(checked));

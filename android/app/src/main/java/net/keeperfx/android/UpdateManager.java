@@ -103,7 +103,7 @@ public final class UpdateManager {
         // missing - a device log showed exactly that for fxdata/font12.fxfont,
         // font16.fxfont and sounds.cfg, all three of which the alpha patch
         // carries. It is only meaningful once the release it patches is there.
-        if (GameData.isKeeperfxInstalled(context)) {
+        if (GameData.isKeeperfxInstalled(context) && prefs.isAlphaEnabled()) {
             try {
                 final ReleaseDownloader.ReleaseInfo alpha = ReleaseDownloader.queryLatestAlpha();
                 final String current = prefs.getInstalledAlphaVersion();

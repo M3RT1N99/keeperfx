@@ -42,6 +42,7 @@ public final class Prefs {
     private static final String KEY_INSTALLED_VERSION = "installed_version";
     private static final String KEY_INSTALLED_ALPHA = "installed_alpha";
     private static final String KEY_LANGUAGE = "game_language";
+    private static final String KEY_USE_ALPHA = "use_alpha";
 
     private final SharedPreferences prefs;
 
@@ -121,6 +122,22 @@ public final class Prefs {
 
     public void setLanguage(String code) {
         prefs.edit().putString(KEY_LANGUAGE, code).apply();
+    }
+
+    /**
+     * Whether to lay the newest alpha patch over the stable release.
+     *
+     * On by default, and deliberately so: the engine in this APK is built from
+     * master, and the stable release does not carry the data files it has
+     * gained since - fxdata/font12.fxfont among them. Turning it off is the
+     * choice to run a strictly official data set instead.
+     */
+    public boolean isAlphaEnabled() {
+        return prefs.getBoolean(KEY_USE_ALPHA, true);
+    }
+
+    public void setAlphaEnabled(boolean value) {
+        prefs.edit().putBoolean(KEY_USE_ALPHA, value).apply();
     }
 
     public String getExtraArguments() {
