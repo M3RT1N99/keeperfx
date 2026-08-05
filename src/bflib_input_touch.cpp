@@ -75,9 +75,15 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
 
 /**
  * Finger travel per game frame, in pixels, that corresponds to a fully
- * deflected pan axis. A brisk swipe covers roughly this much between frames.
+ * deflected pan axis.
+ *
+ * The camera is velocity driven and its speed is capped by the engine, so the
+ * map can never quite chase the finger; what this decides is how much of that
+ * speed an ordinary drag gets. At 18 a normal drag sat at about half throttle
+ * and the map crawled, which is the wrong trade - overshooting slightly is far
+ * less annoying than a map that will not keep up.
  */
-#define TOUCH_PAN_FULL_SPEED_PX 18.0f
+#define TOUCH_PAN_FULL_SPEED_PX 7.0f
 
 /** Pinch distance change in pixels that corresponds to a fully deflected zoom axis. */
 #define TOUCH_PINCH_FULL_SPEED_PX 16.0f
@@ -90,15 +96,19 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
 #define TOUCH_TWIST_DEADZONE_RAD 0.012f
 
 /**
- * Travel a two finger gesture has to accumulate before it commits to being a
- * pan, a pinch or a twist. Two fingers on a screen always produce a little of
- * all three at once, and acting on all of them together is what makes the
- * camera feel like it is fighting back. Rotation needs the largest margin
- * because an accidental twist while dragging is the easiest one to trigger.
+ * How far a two finger gesture has to get from where it started before it
+ * commits to being a pan, a pinch or a twist. Two fingers on a screen always
+ * produce a little of all three at once, and acting on all of them together is
+ * what makes the camera feel like it is fighting back.
+ *
+ * Panning is deliberately the easiest to reach and zooming the hardest. It is
+ * the movement people make constantly, two fingers dragged across a screen
+ * never stay exactly the same distance apart, and being zoomed when you meant
+ * to move is far more disruptive than the other way round.
  */
-#define TOUCH_COMMIT_PAN_PX 26.0f
-#define TOUCH_COMMIT_PINCH_PX 26.0f
-#define TOUCH_COMMIT_TWIST_RAD 0.22f
+#define TOUCH_COMMIT_PAN_PX 20.0f
+#define TOUCH_COMMIT_PINCH_PX 34.0f
+#define TOUCH_COMMIT_TWIST_RAD 0.30f
 
 /** How quickly gesture axes fall back to zero once the fingers stop moving. */
 #define TOUCH_AXIS_DECAY 0.55f
@@ -161,9 +171,12 @@ enum TouchTwoFingerMode {
 /* Finger travel collected since the last frame, in screen pixels. */
 static float touch_pan_accum_x, touch_pan_accum_y;
 
-/* Totals since the two finger gesture began, used to commit to one of them. */
+/* State since the two finger gesture began, used to commit to one of them. */
 static unsigned char touch_two_finger_mode = T2F_Undecided;
-static float touch_total_pan, touch_total_pinch, touch_total_twist;
+static float touch_start_dist;
+static long touch_start_cx, touch_start_cy;
+/** Signed sum of the per event twists, so that jitter cancels instead of adding up. */
+static float touch_total_twist;
 
 /* Reference values of the running two finger gesture. */
 static float touch_camera_prev_dist = 0.0f;
@@ -233,7 +246,7 @@ static void touch_reset_gesture_axes(void)
 {
     touch_pan_accum_x = touch_pan_accum_y = 0.0f;
     touch_two_finger_mode = T2F_Undecided;
-    touch_total_pan = touch_total_pinch = touch_total_twist = 0.0f;
+    touch_total_twist = 0.0f;
     touch_axis_pan_left = touch_axis_pan_right = 0.0f;
     touch_axis_pan_up = touch_axis_pan_down = 0.0f;
     touch_axis_zoom_in = touch_axis_zoom_out = 0.0f;
@@ -386,8 +399,11 @@ static void touch_begin_camera_gesture(void)
     touch_camera_prev_angle = atan2f(dy, dx);
     touch_camera_prev_cx = (a->x + b->x) / 2;
     touch_camera_prev_cy = (a->y + b->y) / 2;
+    touch_start_dist = touch_camera_prev_dist;
+    touch_start_cx = touch_camera_prev_cx;
+    touch_start_cy = touch_camera_prev_cy;
     touch_two_finger_mode = T2F_Undecided;
-    touch_total_pan = touch_total_pinch = touch_total_twist = 0.0f;
+    touch_total_twist = 0.0f;
     touch_gesture = TGest_Camera;
 }
 
@@ -426,13 +442,20 @@ static void touch_update_camera_gesture(void)
     // Decide once what this gesture is, then stick to it until the fingers lift.
     if (touch_two_finger_mode == T2F_Undecided)
     {
-        touch_total_pan += sqrtf(pan_dx * pan_dx + pan_dy * pan_dy);
-        touch_total_pinch += fabsf(dist_delta);
-        touch_total_twist += fabsf(angle_delta);
+        // Measured against where the fingers started, not by adding up the size
+        // of every step. A digitiser reports a pixel or two of noise per event
+        // and a 120 Hz screen produces dozens of events per frame, so summing
+        // absolute steps made a perfectly parallel drag accumulate tens of
+        // pixels of "pinch" out of nothing and commit to a zoom. Net values
+        // cancel that noise instead of collecting it.
+        const float net_pan_x = (float)(cx - touch_start_cx);
+        const float net_pan_y = (float)(cy - touch_start_cy);
+        touch_total_twist += angle_delta;
 
-        const float pan_share = touch_total_pan / TOUCH_COMMIT_PAN_PX;
-        const float pinch_share = touch_total_pinch / TOUCH_COMMIT_PINCH_PX;
-        const float twist_share = touch_total_twist / TOUCH_COMMIT_TWIST_RAD;
+        const float pan_share =
+            sqrtf(net_pan_x * net_pan_x + net_pan_y * net_pan_y) / TOUCH_COMMIT_PAN_PX;
+        const float pinch_share = fabsf(dist - touch_start_dist) / TOUCH_COMMIT_PINCH_PX;
+        const float twist_share = fabsf(touch_total_twist) / TOUCH_COMMIT_TWIST_RAD;
         if ((pan_share >= 1.0f) || (pinch_share >= 1.0f) || (twist_share >= 1.0f))
         {
             if ((pan_share >= pinch_share) && (pan_share >= twist_share))
