@@ -15,6 +15,13 @@ def verMinor = (versionProps.VER_MINOR ?: "0") as int
 def verRelease = (versionProps.VER_RELEASE ?: "0") as int
 def buildNumber = (project.findProperty("keeperfx.buildNumber") ?: "0") as int
 
+// Version of the port itself: major from gradle.properties, minor counting up
+// from the baseline recorded there. See the comment next to those properties.
+def portMajor = (project.findProperty("keeperfx.portMajor") ?: "1") as int
+def portBaseline = (project.findProperty("keeperfx.portBaseline") ?: "0") as int
+def portMinor = Math.max(0, buildNumber - portBaseline)
+def portVersion = "${portMajor}.${portMinor}"
+
 def sdlJavaDir = file("${rootDir}/.deps/SDL2/android-project/app/src/main/java")
 
 // The engine and the files in config/ have to match. They ship together on the
@@ -34,10 +41,10 @@ android {
         minSdk 28
         targetSdk 34
         versionCode verMajor * 1000000 + verMinor * 10000 + verRelease * 1000 + buildNumber
-        // Four dotted numbers, the same shape KeeperFX itself uses for its
-        // alpha builds ("keeperfx-1_4_0_5271-Alpha"). What marks a build as
-        // ours is the suffix, not the version.
-        versionName "${verMajor}.${verMinor}.${verRelease}.${buildNumber}"
+        // The KeeperFX version this runs on, then the port's own version:
+        // "1.4.0_1.0". versionCode keeps counting commits because Android needs
+        // it to rise on every build and never shows it to anyone.
+        versionName "${verMajor}.${verMinor}.${verRelease}_${portVersion}"
 
         ndk {
             abiFilters.addAll(
@@ -48,6 +55,7 @@ android {
             cmake {
                 arguments "-DANDROID_STL=c++_shared",
                           "-DKFX_BUILD_NUMBER=${buildNumber}",
+                          "-DKFX_PORT_VERSION=${portVersion}",
                           // Left empty on purpose: CMake then builds the suffix
                           // from the one in version.mk, so "unofficial" is
                           // stated in a single place.

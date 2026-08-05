@@ -66,7 +66,13 @@ endif()
 if(NOT DEFINED GIT_REVISION OR GIT_REVISION STREQUAL "")
     set(GIT_REVISION "unknown")
 endif()
-set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${VER_BUILD} ${PACKAGE_SUFFIX}")
+# The KeeperFX version this engine is, then the port's own version if Gradle
+# passed one, so the log header says both.
+if(DEFINED KFX_PORT_VERSION AND NOT KFX_PORT_VERSION STREQUAL "")
+    set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}_${KFX_PORT_VERSION} ${PACKAGE_SUFFIX}")
+else()
+    set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${VER_BUILD} ${PACKAGE_SUFFIX}")
+endif()
 
 set(KFX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${KFX_GENERATED_DIR}")

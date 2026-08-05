@@ -114,7 +114,13 @@ jobs:
         VER_MAJOR=$(grep -E '^VER_MAJOR=' version.mk | cut -d= -f2)
         VER_MINOR=$(grep -E '^VER_MINOR=' version.mk | cut -d= -f2)
         VER_RELEASE=$(grep -E '^VER_RELEASE=' version.mk | cut -d= -f2)
-        VERSION_NAME="${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${BUILD_NUMBER}"
+        # The KeeperFX version this runs on, then the port's own version, both
+        # composed exactly as android/app/build.gradle composes them.
+        PORT_MAJOR=$(grep -E '^keeperfx.portMajor=' android/gradle.properties | cut -d= -f2)
+        PORT_BASELINE=$(grep -E '^keeperfx.portBaseline=' android/gradle.properties | cut -d= -f2)
+        PORT_MINOR=$((BUILD_NUMBER - PORT_BASELINE))
+        [ "$PORT_MINOR" -ge 0 ] || PORT_MINOR=0
+        VERSION_NAME="${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}_${PORT_MAJOR}.${PORT_MINOR}"
         TAG="android-v${VERSION_NAME}"
 
         cat > out/version.json <<JSON

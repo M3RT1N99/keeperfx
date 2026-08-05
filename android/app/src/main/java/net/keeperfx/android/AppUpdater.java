@@ -165,7 +165,7 @@ public final class AppUpdater {
             Log.w(TAG, "Ignoring release with unexpected tag " + tag);
             return null;
         }
-        final String version = displayVersion(tag.substring(TAG_PREFIX.length()));
+        final String version = tag.substring(TAG_PREFIX.length());
         if (version.isEmpty()) {
             return null;
         }
@@ -211,36 +211,28 @@ public final class AppUpdater {
     }
 
     /**
-     * Rewrites a version taken from a tag into the form the app shows.
+     * Orders two versions of this port against each other.
      *
-     * The tags stay fully dotted because builds up to 1.4.0.5316 read the build
-     * number as the part after the last dot and would stop finding updates
-     * otherwise. What is shown is "1.4.0_5320": KeeperFX's own version, an
-     * underscore, then this port's build number.
-     */
-    private static String displayVersion(String tagVersion) {
-        final int dot = tagVersion.lastIndexOf('.');
-        if ((dot < 0) || (tagVersion.indexOf('_') >= 0)) {
-            return tagVersion;
-        }
-        return tagVersion.substring(0, dot) + '_' + tagVersion.substring(dot + 1);
-    }
-
-    /**
-     * The trailing number of a version name, whichever way it is separated.
-     *
-     * Versions read "1.4.0_5320" now, KeeperFX's own version and then this
-     * port's build number, but builds up to 1.4.0.5316 wrote a plain dot and
-     * their tags are still on the releases page, so both have to parse.
+     * A version reads "1.4.0_1.7": the KeeperFX version it runs on, then the
+     * port's own major.minor. Only the port half orders our builds - the
+     * KeeperFX half moves for entirely separate reasons - so that is what is
+     * turned into a number here, with room for a major bump to still come out
+     * above every minor below it.
      */
     private static int buildNumberOf(String versionName) {
         try {
-            int start = versionName.length();
-            while ((start > 0) && Character.isDigit(versionName.charAt(start - 1))) {
-                start--;
+            final int split = versionName.lastIndexOf('_');
+            if (split < 0) {
+                return 0; // Not one of ours, or a version from before the reset
             }
-            return (start < versionName.length())
-                ? Integer.parseInt(versionName.substring(start)) : 0;
+            final String port = versionName.substring(split + 1);
+            final int dot = port.indexOf('.');
+            if (dot < 0) {
+                return Integer.parseInt(port.trim()) * 100000;
+            }
+            final int major = Integer.parseInt(port.substring(0, dot).trim());
+            final int minor = Integer.parseInt(port.substring(dot + 1).trim());
+            return major * 100000 + minor;
         } catch (NumberFormatException e) {
             return 0;
         }
