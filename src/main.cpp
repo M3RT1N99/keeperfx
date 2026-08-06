@@ -1835,6 +1835,33 @@ static short process_command_line(unsigned short argc, char *argv[])
               WARNLOG("Unknown input mode \"%s\", expected auto, touch or kbm", pr2str);
           }
       }
+      else if ( strcasecmp(parstr,"touchtune") == 0 )
+      {
+          // "-touchtune panspeed=5,longpress=350". Every gesture constant was
+          // chosen without a device to try it on, so this exists to let them be
+          // settled on real hardware in one sitting instead of one rebuild per
+          // guess. The launcher passes its extra arguments field through
+          // verbatim, so no launcher change is needed to reach it.
+          narg++;
+          char tune[256];
+          snprintf(tune, sizeof(tune), "%s", pr2str);
+          char *save_entry = NULL;
+          for (char *entry = strtok_r(tune, ",", &save_entry); entry != NULL;
+               entry = strtok_r(NULL, ",", &save_entry))
+          {
+              char *equals = strchr(entry, '=');
+              if (equals == NULL)
+              {
+                  WARNLOG("Touch tuning \"%s\" is not name=value", entry);
+                  continue;
+              }
+              *equals = '\0';
+              if (!touch_tune(entry, (float)atof(equals + 1)))
+              {
+                  WARNLOG("Unknown touch tuning \"%s\"", entry);
+              }
+          }
+      }
       else if (strcasecmp(parstr,"packetload") == 0)
       {
          if (start_params.packet_save_enable)

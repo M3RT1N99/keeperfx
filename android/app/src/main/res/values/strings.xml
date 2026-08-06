@@ -94,7 +94,7 @@ The update installs over this one; game data and settings are kept.</string>
     <string name="input_auto">Automatic — follow the device last used</string>
     <string name="input_touch">Touch — always use the touch scheme</string>
     <string name="input_pointer">Mouse &amp; keyboard — ignore the touch screen</string>
-    <string name="input_gestures">Tap = left click · hold = right click · drag = paint area · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = back · three finger tap = map · four finger tap = menu
+    <string name="input_gestures">Tap = left click · hold = right click · drag = paint area · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back · four finger tap = map
 
 The system back button and the back gesture also leave a menu.</string>
     <string name="option_back_button">Show a back arrow while playing</string>

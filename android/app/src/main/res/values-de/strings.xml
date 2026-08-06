@@ -75,7 +75,7 @@
     <string name="input_auto">Automatisch — dem zuletzt benutzten Gerät folgen</string>
     <string name="input_touch">Touch — immer die Touch-Steuerung</string>
     <string name="input_pointer">Maus &amp; Tastatur — Touchscreen ignorieren</string>
-    <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Drehen · Zwei-Finger-Tipp = zurück · Drei-Finger-Tipp = Karte · Vier-Finger-Tipp = Menü
+    <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Drehen · Zwei-Finger-Tipp = Rechtsklick · Drei-Finger-Tipp = zurück · Vier-Finger-Tipp = Karte
 
 Die Zurück-Taste und die Zurück-Geste verlassen ein Menü ebenfalls.</string>
     <string name="option_back_button">Zurück-Pfeil im Spiel anzeigen</string>

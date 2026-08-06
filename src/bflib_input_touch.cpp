@@ -62,20 +62,20 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
  * pixels on one panel and 40 on another, and a thumb never lands still.
  */
 #define TOUCH_DRAG_THRESHOLD_DIVISOR 50
-#define TOUCH_DRAG_THRESHOLD_MIN_PX 12
+static float touch_drag_threshold_min_px = 12.0f;
 
 /** Safety net in case update_mouse() is not running; keeps a tap from sticking. */
 #define TOUCH_CLICK_MAX_HOLD_MS 250
 
 /** Hold time in milliseconds before a motionless press becomes a right click. */
-#define TOUCH_LONGPRESS_MS 420
+static float touch_longpress_ms = 420.0f;
 
 /**
  * Longest press still counted as a tap. Equal to the long press time on
  * purpose: any gap between the two is a window in which a press is neither,
  * and a finger lifted in it does nothing whatsoever.
  */
-#define TOUCH_TAP_MAX_MS TOUCH_LONGPRESS_MS
+#define TOUCH_TAP_MAX_MS touch_longpress_ms
 
 /**
  * Finger travel per game frame, in pixels, that corresponds to a fully
@@ -87,7 +87,7 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
  * and the map crawled, which is the wrong trade - overshooting slightly is far
  * less annoying than a map that will not keep up.
  */
-#define TOUCH_PAN_FULL_SPEED_PX 7.0f
+static float touch_pan_full_speed_px = 7.0f;
 
 /** Pinch distance change in pixels that corresponds to a fully deflected zoom axis. */
 #define TOUCH_PINCH_FULL_SPEED_PX 16.0f
@@ -110,9 +110,9 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
  * never stay exactly the same distance apart, and being zoomed when you meant
  * to move is far more disruptive than the other way round.
  */
-#define TOUCH_COMMIT_PAN_PX 20.0f
-#define TOUCH_COMMIT_PINCH_PX 34.0f
-#define TOUCH_COMMIT_TWIST_RAD 0.30f
+static float touch_commit_pan_px = 20.0f;
+static float touch_commit_pinch_px = 34.0f;
+static float touch_commit_twist_rad = 0.30f;
 
 /** M_PI is not guaranteed by the C standard on every toolchain we build with. */
 #define TOUCH_PI 3.14159265358979323846f
@@ -151,6 +151,8 @@ static float touch_axis_rotate_cw, touch_axis_rotate_ccw;
 /* One shot gestures, consumed by touch_game_key_pressed(). */
 static TbBool touch_tapped_map_toggle = false;
 static TbBool touch_tapped_pause_menu = false;
+/** Two finger tap: a right click where the first finger landed. */
+static TbBool touch_tapped_right_click = false;
 
 /* Two finger tap: leaves whatever is open. Emitted as Escape rather than as a
    game key because that is the one the menus themselves listen for, and it is
@@ -188,6 +190,8 @@ static long touch_camera_prev_cx = 0, touch_camera_prev_cy = 0;
 /* Deferred click, so the game always observes the press before it is released. */
 static TbBool touch_click_pending = false;
 static Uint32 touch_click_press_ticks = 0;
+static TbBool touch_right_click_pending = false;
+static Uint32 touch_right_click_ticks = 0;
 static TbBool touch_button_down_left = false;
 static TbBool touch_button_down_right = false;
 
@@ -195,6 +199,44 @@ static TbBool touch_button_down_right = false;
 static int touch_max_fingers_this_contact = 0;
 
 /******************************************************************************/
+
+/**
+ * Adjusts one of the gesture constants at run time.
+ *
+ * Every one of these was picked by reasoning about a device nobody building
+ * this port can test on, and getting a single number wrong costs a CI build, a
+ * release, an install and a play session to find out. Exposing them means the
+ * whole set can be settled in one sitting on the actual hardware, and the
+ * values that win can then be baked back into the defaults above.
+ *
+ * @return true when the name was recognised.
+ */
+TbBool touch_tune(const char *name, float value)
+{
+    static const struct { const char *name; float *target; float min; float max; } tunables[] = {
+        { "panspeed",    &touch_pan_full_speed_px,      1.0f,  60.0f },
+        { "longpress",   &touch_longpress_ms,         120.0f, 2000.0f },
+        { "dragslop",    &touch_drag_threshold_min_px,  2.0f,  80.0f },
+        { "commitpan",   &touch_commit_pan_px,          4.0f, 200.0f },
+        { "commitpinch", &touch_commit_pinch_px,        4.0f, 200.0f },
+        { "committwist", &touch_commit_twist_rad,      0.02f,   2.0f },
+    };
+    for (size_t i = 0; i < sizeof(tunables) / sizeof(tunables[0]); i++)
+    {
+        if (strcasecmp(name, tunables[i].name) != 0)
+            continue;
+        if ((value < tunables[i].min) || (value > tunables[i].max))
+        {
+            WARNLOG("Touch tuning \"%s\" out of range %g..%g, ignored",
+                name, (double)tunables[i].min, (double)tunables[i].max);
+            return true;
+        }
+        *tunables[i].target = value;
+        SYNCLOG("Touch tuning %s = %g", name, (double)value);
+        return true;
+    }
+    return false;
+}
 
 void touch_set_control_mode(unsigned char mode)
 {
@@ -268,6 +310,7 @@ static void touch_release_buttons(void)
         touch_button_down_right = false;
     }
     touch_click_pending = false;
+    touch_right_click_pending = false;
 }
 
 static void touch_reset_state(void)
@@ -390,6 +433,20 @@ static void touch_queue_click(void)
     touch_click_press_ticks = SDL_GetTicks();
 }
 
+/**
+ * Presses the right button and leaves it down until the game has seen it.
+ *
+ * Same shape as touch_queue_click(): mouseControl() sets lbDisplay.RightButton
+ * straight away and update_mouse() clears it once it has taken the press, so
+ * that returning to zero is the proof the click was observed.
+ */
+static void touch_queue_right_click(void)
+{
+    touch_press_right();
+    touch_right_click_pending = true;
+    touch_right_click_ticks = SDL_GetTicks();
+}
+
 static void touch_begin_camera_gesture(void)
 {
     struct TouchFinger *a = NULL;
@@ -457,9 +514,9 @@ static void touch_update_camera_gesture(void)
         touch_total_twist += angle_delta;
 
         const float pan_share =
-            sqrtf(net_pan_x * net_pan_x + net_pan_y * net_pan_y) / TOUCH_COMMIT_PAN_PX;
-        const float pinch_share = fabsf(dist - touch_start_dist) / TOUCH_COMMIT_PINCH_PX;
-        const float twist_share = fabsf(touch_total_twist) / TOUCH_COMMIT_TWIST_RAD;
+            sqrtf(net_pan_x * net_pan_x + net_pan_y * net_pan_y) / touch_commit_pan_px;
+        const float pinch_share = fabsf(dist - touch_start_dist) / touch_commit_pinch_px;
+        const float twist_share = fabsf(touch_total_twist) / touch_commit_twist_rad;
         if ((pan_share >= 1.0f) || (pinch_share >= 1.0f) || (twist_share >= 1.0f))
         {
             if ((pan_share >= pinch_share) && (pan_share >= twist_share))
@@ -573,8 +630,8 @@ void TEvent(const SDL_Event *ev)
         const long travel_x = finger->x - finger->start_x;
         const long travel_y = finger->y - finger->start_y;
         long threshold = screen_w / TOUCH_DRAG_THRESHOLD_DIVISOR;
-        if (threshold < TOUCH_DRAG_THRESHOLD_MIN_PX)
-            threshold = TOUCH_DRAG_THRESHOLD_MIN_PX;
+        if (threshold < (long)touch_drag_threshold_min_px)
+            threshold = (long)touch_drag_threshold_min_px;
         if ((labs(travel_x) >= threshold) || (labs(travel_y) >= threshold))
             finger->moved = true;
 
@@ -629,12 +686,18 @@ void TEvent(const SDL_Event *ev)
                 // Multi finger taps that never turned into a drag act as shortcuts.
                 if (!was_moved && (held_ms <= TOUCH_TAP_MAX_MS))
                 {
+                    // Two fingers is the shortest gesture there is, and right
+                    // click is the verb Dungeon Keeper uses most after left:
+                    // slap, drop what the hand is holding, undesignate, cancel
+                    // an armed room. Leaving it behind a 420 ms hold made all of
+                    // those cost most of a second. Escape moves up a finger; it
+                    // still has the system back button and the on screen arrow.
                     if (touch_max_fingers_this_contact == 2)
-                        touch_tapped_back = true;
+                        touch_tapped_right_click = true;
                     else if (touch_max_fingers_this_contact == 3)
-                        touch_tapped_map_toggle = true;
+                        touch_tapped_back = true;
                     else if (touch_max_fingers_this_contact >= 4)
-                        touch_tapped_pause_menu = true;
+                        touch_tapped_map_toggle = true;
                 }
                 touch_reset_gesture_axes();
                 break;
@@ -690,6 +753,17 @@ void update_touch_inputs(void)
             touch_release_buttons();
         }
     }
+    if (touch_right_click_pending)
+    {
+        const TbBool observed = (lbDisplay.RightButton == 0);
+        const TbBool overdue =
+            (SDL_GetTicks() - touch_right_click_ticks) > TOUCH_CLICK_MAX_HOLD_MS;
+        if (observed || overdue)
+        {
+            touch_right_click_pending = false;
+            touch_release_buttons();
+        }
+    }
 
     // A single finger resting in place turns into a right click (slap / drop).
     if ((touch_gesture == TGest_Point) && (touch_finger_count == 1))
@@ -699,7 +773,7 @@ void update_touch_inputs(void)
             struct TouchFinger *finger = &touch_fingers[i];
             if (!finger->active || finger->moved)
                 continue;
-            if ((SDL_GetTicks() - finger->down_ticks) >= TOUCH_LONGPRESS_MS)
+            if ((SDL_GetTicks() - finger->down_ticks) >= touch_longpress_ms)
             {
                 touch_move_pointer(finger->x, finger->y);
                 touch_press_right();
@@ -716,6 +790,11 @@ void update_touch_inputs(void)
         touch_back_key_frames--;
         if (touch_back_key_frames == 0)
             lbKeyOn[KC_ESCAPE] = 0;
+    }
+    if (touch_tapped_right_click)
+    {
+        touch_tapped_right_click = false;
+        touch_queue_right_click();
     }
     if (touch_tapped_back)
     {
@@ -775,8 +854,8 @@ static void touch_apply_pan_accumulator(void)
 
     if (touch_gesture == TGest_Camera)
     {
-        const float dx = touch_pan_accum_x / TOUCH_PAN_FULL_SPEED_PX;
-        const float dy = touch_pan_accum_y / TOUCH_PAN_FULL_SPEED_PX;
+        const float dx = touch_pan_accum_x / touch_pan_full_speed_px;
+        const float dy = touch_pan_accum_y / touch_pan_full_speed_px;
         if (dx > 0.0f)
             touch_axis_pan_left = sqrtf(touch_clamp01(dx));
         else if (dx < 0.0f)

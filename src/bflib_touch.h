@@ -53,6 +53,14 @@ void touch_set_control_mode(unsigned char mode);
  */
 TbBool touch_parse_control_mode(const char *text, unsigned char *mode);
 
+/**
+ * Adjusts one gesture constant at run time, by name.
+ *
+ * Names: panspeed, longpress, dragslop, commitpan, commitpinch, committwist.
+ * @return true when the name was recognised.
+ */
+TbBool touch_tune(const char *name, float value);
+
 /** Prepares the touch layer. Called once from init_inputcontrol(). */
 void init_touch_input(void);
 
