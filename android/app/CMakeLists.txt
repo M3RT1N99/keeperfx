@@ -51,7 +51,17 @@ endforeach()
 if(NOT DEFINED KFX_BUILD_NUMBER OR KFX_BUILD_NUMBER STREQUAL "")
     set(KFX_BUILD_NUMBER "${VER_BUILD}")
 endif()
-set(VER_BUILD "${KFX_BUILD_NUMBER}")
+# VER_BUILD is deliberately left at version.mk's value, which is 0.
+#
+# It is what goes on the wire: net_current_version carries it and
+# net_versions_match() requires all four numbers to be equal. Every official
+# build puts 0 there, because ver_defs.h.in substitutes ${VER_BUILD} and the
+# root CMakeLists only ever derives BUILD_NUMBER *from* it, never the reverse -
+# so -DBUILD_NUMBER= does not reach the binary. Overriding it here is what made
+# this port announce a version no official client could match.
+#
+# The build the engine actually is stays visible in the version string below
+# and in the package suffix, which is where that information belongs.
 # version.mk carries the suffix that marks this fork's builds as unofficial;
 # Android adds its own name so a report says which build it came from. Gradle
 # can still override the whole thing with keeperfx.packageSuffix.
