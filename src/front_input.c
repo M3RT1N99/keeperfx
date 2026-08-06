@@ -747,13 +747,26 @@ static TbBool finish_level_requested(void)
         return true;
     if (!touch_controls_active() || !left_button_clicked)
         return false;
-    if (game_is_busy_doing_gui())
-        return false;
     struct PlayerInfo* player = get_my_player();
     if (player->view_type != PVT_DungeonTop)
         return false;
     if (mouse_is_over_panel_map(player->minimap_pos_x, player->minimap_pos_y))
         return false;
+    // The panel is tested by its own rectangle rather than by asking
+    // game_is_busy_doing_gui(). That flag is set by get_gui_inputs(), which
+    // does not run at all on the lost level path - get_inputs() returns
+    // straight after get_level_lost_inputs() - so it would answer with
+    // whatever the last ordinary frame left behind, and a tap on the panel
+    // could end the level.
+    const int mnu_num = menu_id_to_number(GMnu_MAIN);
+    if (mnu_num >= 0)
+    {
+        const struct GuiMenu *gmnu = get_active_menu(mnu_num);
+        if (gmnu->is_turned_on
+         && (GetMouseX() >= gmnu->pos_x) && (GetMouseX() < gmnu->pos_x + gmnu->width)
+         && (GetMouseY() >= gmnu->pos_y) && (GetMouseY() < gmnu->pos_y + gmnu->height))
+            return false;
+    }
     left_button_clicked = 0;
     return true;
 }

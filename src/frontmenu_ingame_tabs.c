@@ -1969,6 +1969,13 @@ void gui_area_instance_button(struct GuiButton *gbtn)
 void gui_choose_instance(struct GuiButton *gbtn)
 {
     struct PlayerInfo* player = get_my_player();
+    // Only while actually possessing. The same panel shows a creature's
+    // abilities when one is merely being queried, and a tap there should not be
+    // consumed - let alone send an instance packet for a creature the player is
+    // not controlling.
+    if (player->view_type != PVT_CreatureContrl) {
+        return;
+    }
     struct Thing* ctrltng = thing_get(player->controlled_thing_idx);
     TRACE_THING(ctrltng);
     if (!thing_is_creature(ctrltng)) {

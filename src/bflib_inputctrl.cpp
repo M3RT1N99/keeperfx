@@ -494,7 +494,12 @@ static void process_event(const SDL_Event *ev)
     case SDL_FINGERDOWN:
     case SDL_FINGERUP:
     case SDL_FINGERMOTION:
-        last_used_input_device = ID_Touch;
+        // Only claim the input device when the touch scheme is actually in use.
+        // A desktop machine with a touchscreen still delivers these, and saying
+        // "touch" there would change what the game reports for a stray brush
+        // against the panel while the player is on keyboard and mouse.
+        if (touch_control_mode != TCMode_PointerKeys)
+            last_used_input_device = ID_Touch;
         TEvent(ev);
         break;
 

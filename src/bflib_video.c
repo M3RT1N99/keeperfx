@@ -149,9 +149,13 @@ TbResult LbScreenUnlock(void)
  *
  * @return An SDL blit result, negative on failure.
  */
+/** Held across frames so the conversion surface is made once, not every frame. */
+static SDL_Surface *lbScaleBuffer = NULL;
+
 static int LbScreenBlitScaled(void)
 {
-    static SDL_Surface *scale_buffer = NULL;
+    SDL_Surface **const scale_buffer_slot = &lbScaleBuffer;
+#define scale_buffer (*scale_buffer_slot)
     if ((scale_buffer != NULL)
      && ((scale_buffer->w != lbDrawSurface->w)
       || (scale_buffer->h != lbDrawSurface->h)
@@ -170,6 +174,7 @@ static int LbScreenBlitScaled(void)
     if (blresult < 0)
         return blresult;
     return SDL_BlitScaled(scale_buffer, NULL, lbScreenSurface, NULL);
+#undef scale_buffer
 }
 
 TbResult LbScreenSwap(void)
@@ -831,6 +836,12 @@ TbResult LbScreenReset(TbBool exiting_application)
     LbMouseChangeSprite(NULL);
     if (lbHasSecondSurface) {
         SDL_FreeSurface(lbDrawSurface);
+    }
+    // The scaling path keeps a converted copy of the draw surface between
+    // frames; it is sized from both surfaces, so it cannot outlive them.
+    if (lbScaleBuffer != NULL) {
+        SDL_FreeSurface(lbScaleBuffer);
+        lbScaleBuffer = NULL;
     }
     //do not free screen surface, it is freed automatically on SDL_Quit or next call to set video mode
     lbHasSecondSurface = false;
