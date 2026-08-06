@@ -114,12 +114,6 @@ unsigned char touch_control_mode = TCMode_PointerKeys;
 #define TOUCH_COMMIT_PINCH_PX 34.0f
 #define TOUCH_COMMIT_TWIST_RAD 0.30f
 
-/** How quickly gesture axes fall back to zero once the fingers stop moving. */
-#define TOUCH_AXIS_DECAY 0.55f
-
-/** Gesture axes below this are treated as released. */
-#define TOUCH_AXIS_EPSILON 0.02f
-
 /** M_PI is not guaranteed by the C standard on every toolchain we build with. */
 #define TOUCH_PI 3.14159265358979323846f
 
@@ -673,13 +667,6 @@ void TEvent(const SDL_Event *ev)
 
 static void touch_apply_pan_accumulator(void);
 static void touch_apply_camera_accumulators(void);
-
-static void touch_decay_axis(float *axis)
-{
-    *axis *= TOUCH_AXIS_DECAY;
-    if (*axis < TOUCH_AXIS_EPSILON)
-        *axis = 0.0f;
-}
 
 void update_touch_inputs(void)
 {
