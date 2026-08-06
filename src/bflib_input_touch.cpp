@@ -148,9 +148,6 @@ static float touch_axis_pan_up, touch_axis_pan_down;
 static float touch_axis_zoom_in, touch_axis_zoom_out;
 static float touch_axis_rotate_cw, touch_axis_rotate_ccw;
 
-/* One shot gestures, consumed by touch_game_key_pressed(). */
-static TbBool touch_tapped_map_toggle = false;
-static TbBool touch_tapped_pause_menu = false;
 /** Two finger tap: a right click where the first finger landed. */
 static TbBool touch_tapped_right_click = false;
 
@@ -321,8 +318,6 @@ static void touch_reset_state(void)
     touch_gesture = TGest_None;
     touch_max_fingers_this_contact = 0;
     touch_reset_gesture_axes();
-    touch_tapped_map_toggle = false;
-    touch_tapped_pause_menu = false;
     touch_tapped_back = false;
     touch_back_key_frames = 0;
 }
@@ -694,10 +689,8 @@ void TEvent(const SDL_Event *ev)
                     // still has the system back button and the on screen arrow.
                     if (touch_max_fingers_this_contact == 2)
                         touch_tapped_right_click = true;
-                    else if (touch_max_fingers_this_contact == 3)
+                    else if (touch_max_fingers_this_contact >= 3)
                         touch_tapped_back = true;
-                    else if (touch_max_fingers_this_contact >= 4)
-                        touch_tapped_map_toggle = true;
                 }
                 touch_reset_gesture_axes();
                 break;
@@ -892,23 +885,6 @@ int touch_game_key_pressed(long key_id, TbBool clear_pressed)
 {
     if (!touch_controls_active())
         return 0;
-
-    if (key_id == Gkey_SwitchToMap)
-    {
-        if (!touch_tapped_map_toggle)
-            return 0;
-        if (clear_pressed)
-            touch_tapped_map_toggle = false;
-        return 1;
-    }
-    if (key_id == Gkey_PauseMenu)
-    {
-        if (!touch_tapped_pause_menu)
-            return 0;
-        if (clear_pressed)
-            touch_tapped_pause_menu = false;
-        return 1;
-    }
 
     return (touch_game_key_axis_value(key_id) > 0.0f) ? 1 : 0;
 }
