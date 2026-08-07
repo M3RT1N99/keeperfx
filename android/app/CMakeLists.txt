@@ -285,6 +285,8 @@ add_subdirectory("${KFX_DEPS}/curl" "${CMAKE_CURRENT_BINARY_DIR}/curl" EXCLUDE_F
 # FFmpeg has its own configure script rather than CMake, so it is driven as an
 # ExternalProject, the same way LuaJIT is.
 #******************************************************************************
+include(ExternalProject)
+
 set(KFX_FFMPEG_SRC "${KFX_DEPS}/ffmpeg")
 set(KFX_FFMPEG_BUILD "${CMAKE_CURRENT_BINARY_DIR}/ffmpeg")
 set(KFX_FFMPEG_PREFIX "${KFX_FFMPEG_BUILD}/install")
