@@ -308,6 +308,17 @@ static void process_event(const SDL_Event *ev)
     switch (ev->type)
     {
     case SDL_KEYDOWN:
+#ifdef __ANDROID__
+        // The on screen right click toggle sends this. Android has no key
+        // meaning "the next tap is a right click", so the overlay button
+        // borrows one the game never uses, the same way the back arrow borrows
+        // Escape. Handled here rather than mapped to a game key because it
+        // flips a mode instead of pressing anything.
+        if (ev->key.keysym.sym == SDLK_NUMLOCKCLEAR) {
+            touch_set_sticky_right_click(!touch_sticky_right_click());
+            return;
+        }
+#endif
         x = keyboard_keys_mapping(&ev->key);
         if (x != KC_UNASSIGNED)
         {
@@ -317,6 +328,11 @@ static void process_event(const SDL_Event *ev)
         break;
 
     case SDL_KEYUP:
+#ifdef __ANDROID__
+        if (ev->key.keysym.sym == SDLK_NUMLOCKCLEAR) {
+            return;
+        }
+#endif
         x = keyboard_keys_mapping(&ev->key);
         if (x != KC_UNASSIGNED)
         {

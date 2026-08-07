@@ -42,7 +42,18 @@ public class GameActivity extends SDLActivity {
 
     private static final String TAG = "KeeperFX";
 
+    /**
+     * Android has no key meaning "the next tap is a right click", so the toggle
+     * borrows one the game never uses. bflib_inputctrl.cpp watches for it and
+     * flips the mode instead of treating it as a key press.
+     */
+    private static final int KEYCODE_STICKY_RIGHT_CLICK = KeyEvent.KEYCODE_NUM_LOCK;
+
+    /** Present but not competing with the game for attention. */
+    private static final float IDLE_ALPHA = 0.55f;
+
     private String[] arguments = new String[0];
+    private boolean rightClickActive = false;
     private WifiManager.MulticastLock multicastLock;
 
     @Override
@@ -63,6 +74,7 @@ public class GameActivity extends SDLActivity {
         goImmersive();
         if (new Prefs(this).isBackButtonShown()) {
             addBackButton();
+            addRightClickToggle();
         }
     }
 
@@ -85,7 +97,7 @@ public class GameActivity extends SDLActivity {
         button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         button.setContentDescription(getString(R.string.game_back));
         // Present but not competing with the game for attention.
-        button.setAlpha(0.55f);
+        button.setAlpha(IDLE_ALPHA);
         button.setOnClickListener(view -> sendEscape(view));
         final FrameLayout.LayoutParams params =
             new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.END);
@@ -93,6 +105,42 @@ public class GameActivity extends SDLActivity {
         params.rightMargin = margin;
         // addContentView() stacks onto the window's own frame, so SDL's view
         // hierarchy is left exactly as SDLActivity built it.
+        addContentView(button, params);
+    }
+
+    /**
+     * Puts a right click toggle under the back arrow.
+     *
+     * Right click is the verb Dungeon Keeper uses most after left click, and on
+     * a touch screen it is reachable by a two finger tap or by holding - both
+     * of which work, and neither of which anyone finds without being told. A
+     * button that stays pressed makes it visible: while it is on, an ordinary
+     * tap slaps, drops and undesignates, and a drag undesignates an area.
+     *
+     * The state lives in the engine, not here, so the button only asks it to
+     * flip and colours itself from what it asked for.
+     */
+    private void addRightClickToggle() {
+        final float density = getResources().getDisplayMetrics().density;
+        final int size = Math.round(48 * density);
+        final int margin = Math.round(10 * density);
+        final ImageButton button = new ImageButton(this);
+        button.setImageResource(R.drawable.ic_right_click);
+        button.setBackgroundResource(R.drawable.overlay_round);
+        button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        button.setContentDescription(getString(R.string.game_right_click));
+        button.setAlpha(IDLE_ALPHA);
+        button.setOnClickListener(view -> {
+            rightClickActive = !rightClickActive;
+            view.setAlpha(rightClickActive ? 1.0f : IDLE_ALPHA);
+            view.setSelected(rightClickActive);
+            sendKey(view, KEYCODE_STICKY_RIGHT_CLICK);
+        });
+        final FrameLayout.LayoutParams params =
+            new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.END);
+        // Directly under the back arrow: same column, one button lower.
+        params.topMargin = margin + size + margin;
+        params.rightMargin = margin;
         addContentView(button, params);
     }
 
@@ -105,8 +153,18 @@ public class GameActivity extends SDLActivity {
      * and would otherwise see a key that was never held.
      */
     private void sendEscape(View button) {
-        SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE);
-        button.postDelayed(() -> SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE), 80);
+        sendKey(button, KeyEvent.KEYCODE_ESCAPE);
+    }
+
+    /**
+     * Presses and releases one key.
+     *
+     * The release is delayed because the game samples the keyboard once per
+     * frame and would otherwise see a key that was never held.
+     */
+    private void sendKey(View button, int keyCode) {
+        SDLActivity.onNativeKeyDown(keyCode);
+        button.postDelayed(() -> SDLActivity.onNativeKeyUp(keyCode), 80);
     }
 
     @Override

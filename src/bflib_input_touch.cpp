@@ -150,6 +150,8 @@ static float touch_axis_rotate_cw, touch_axis_rotate_ccw;
 
 /** Two finger tap: a right click where the first finger landed. */
 static TbBool touch_tapped_right_click = false;
+/** While set, an ordinary tap is a right click. Driven by the on screen toggle. */
+static TbBool touch_sticky_rmb = false;
 
 /* Two finger tap: leaves whatever is open. Emitted as Escape rather than as a
    game key because that is the one the menus themselves listen for, and it is
@@ -208,6 +210,17 @@ static int touch_max_fingers_this_contact = 0;
  *
  * @return true when the name was recognised.
  */
+void touch_set_sticky_right_click(TbBool on)
+{
+    touch_sticky_rmb = on;
+    SYNCLOG("Sticky right click %s", on ? "on" : "off");
+}
+
+TbBool touch_sticky_right_click(void)
+{
+    return touch_sticky_rmb;
+}
+
 TbBool touch_tune(const char *name, float value)
 {
     static const struct { const char *name; float *target; float min; float max; } tunables[] = {
@@ -421,6 +434,8 @@ static void touch_press_right(void)
  * the click was ever observed. That is why a tap did nothing while a drag,
  * which holds the button across many frames, worked.
  */
+static void touch_queue_right_click(void);
+
 static void touch_queue_click(void)
 {
     touch_press_left();
@@ -642,7 +657,12 @@ void TEvent(const SDL_Event *ev)
                 // A moving finger is a drag: hold the left button so that
                 // dig areas and rooms can be painted the same way as with a mouse.
                 touch_gesture = TGest_Drag;
-                touch_press_left();
+                // Dragging with the toggle on undesignates an area, which is
+                // what the right button does when held on the desktop.
+                if (touch_sticky_rmb)
+                    touch_press_right();
+                else
+                    touch_press_left();
             }
         }
         break;
@@ -669,7 +689,10 @@ void TEvent(const SDL_Event *ev)
                 if (!was_moved && (held_ms <= TOUCH_TAP_MAX_MS))
                 {
                     touch_move_pointer(up_x, up_y);
-                    touch_queue_click();
+                    if (touch_sticky_rmb)
+                        touch_queue_right_click();
+                    else
+                        touch_queue_click();
                 }
                 break;
             case TGest_Drag:

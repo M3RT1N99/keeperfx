@@ -61,6 +61,16 @@ TbBool touch_parse_control_mode(const char *text, unsigned char *mode);
  */
 TbBool touch_tune(const char *name, float value);
 
+/**
+ * Sticky right click: while on, a plain tap produces a right click.
+ *
+ * The gesture for it is a two finger tap, which works but is not something a
+ * player finds without being told. Android puts a toggle on screen next to the
+ * back arrow and flips this, so the verb is reachable by looking at it.
+ */
+void touch_set_sticky_right_click(TbBool on);
+TbBool touch_sticky_right_click(void);
+
 /** Prepares the touch layer. Called once from init_inputcontrol(). */
 void init_touch_input(void);
 
