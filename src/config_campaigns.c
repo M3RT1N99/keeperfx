@@ -794,13 +794,31 @@ short parse_campaign_speech_blocks(struct GameCampaign *campgn,char *buf,long le
       } else
       if ((cmd_num == install_info.lang_id) || (n == 0))
       {
-          int i = get_conf_parameter_whole(buf, &pos, len, campgn->speech_location, DISKPATH_SIZE);
+          char folder[DISKPATH_SIZE];
+          int i = get_conf_parameter_whole(buf, &pos, len, folder, DISKPATH_SIZE);
           if (i <= 0)
           {
               CONFWRNLOG("Couldn't read folder name in [%s] block parameter of %s file.",
                 block_name, config_textname);
           } else
-            n++;
+          {
+              // The first entry in the block is the fallback and is taken
+              // unconditionally; the one matching the chosen language replaces
+              // it only if it is actually installed. Speech is an optional
+              // download per language, and pointing at a folder that is not
+              // there produced silence rather than the fallback - the same
+              // shape load_sound_banks() already guards against for
+              // speech_<lang>.dat.
+              if ((n == 0) || LbFileExists(folder))
+              {
+                  snprintf(campgn->speech_location, DISKPATH_SIZE, "%s", folder);
+              } else if (cmd_num == install_info.lang_id)
+              {
+                  WARNMSG("Speech folder \"%s\" is not installed, keeping \"%s\".",
+                      folder, campgn->speech_location);
+              }
+              n++;
+          }
       }
       skip_conf_to_next_line(buf,&pos,len);
   }
