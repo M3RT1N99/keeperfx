@@ -373,7 +373,15 @@ struct movie_t {
             desired.userdata = nullptr;
             m_audio_device = SDL_OpenAudioDevice(nullptr, 0, &desired, &obtained, SDL_AUDIO_ALLOW_ANY_CHANGE);
             if (m_audio_device <= 0) {
-                throw std::runtime_error("Cannot open audio device");
+                // Not fatal. SDL's Android backend serves exactly one output
+                // device at a time and SDL_mixer already holds it, so this is
+                // guaranteed to fail there - and throwing threw the picture
+                // away with the sound. Show the film silently instead; a mute
+                // intro beats a black screen.
+                WARNLOG("Cannot open an audio device for the video (%s), playing it silently",
+                    SDL_GetError());
+                set_flag(m_flags, SMK_NoSound);
+                return;
             }
             m_output_audio_channels = obtained.channels;
             m_output_audio_frequency = obtained.freq;
