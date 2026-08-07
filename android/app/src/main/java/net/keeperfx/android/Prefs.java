@@ -67,8 +67,16 @@ public final class Prefs {
         prefs.edit().putBoolean(KEY_BACK_BUTTON, value).apply();
     }
 
+    /**
+     * Off by default, so the game opens the way the original does.
+     *
+     * It used to default to on for a plain reason: the port could not play a
+     * video at all, so the intro was four seconds of nothing. FFmpeg's Smacker
+     * decoder is built in now, so there is no longer a reason to skip it. The
+     * checkbox stays for anyone who would rather get on with it.
+     */
     public boolean isNoIntro() {
-        return prefs.getBoolean(KEY_NO_INTRO, true);
+        return prefs.getBoolean(KEY_NO_INTRO, false);
     }
 
     public void setNoIntro(boolean value) {
