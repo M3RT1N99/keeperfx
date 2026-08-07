@@ -54,6 +54,11 @@ CURL_VERSION=8.21.0
 CURL_TAG=curl-8_21_0
 # Automatic port forwarding. miniupnpc lives in a subdirectory of the miniupnp
 # repository, which also holds the daemon we have no use for.
+# The Smacker videos. Only the demuxer and the two decoders for them are built,
+# so this is a few megabytes rather than the whole of FFmpeg, and
+# src/bflib_fmvids.cpp then compiles unchanged like every other module whose
+# library was missing.
+FFMPEG_VERSION=7.1
 MINIUPNP_TAG=miniupnpc_2_3_3
 LIBNATPMP_COMMIT=134fc89e2781e154e40042641f4d8bcbe42579f1
 LUAJIT_COMMIT=1edc3e52b67eaf6ce5f809be8e17d6862594b8bc
@@ -136,6 +141,8 @@ fetch_git enet6      https://github.com/SirLynix/enet6.git        "${ENET6_TAG}"
 fetch_git astronomy  https://github.com/cosinekitty/astronomy.git "${ASTRONOMY_TAG}"
 fetch_git luajit     https://github.com/LuaJIT/LuaJIT.git         "${LUAJIT_COMMIT}"
 fetch_git centijson  https://github.com/mity/centijson.git        "${CENTIJSON_COMMIT}"
+fetch_tarball ffmpeg     "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"     "ffmpeg-${FFMPEG_VERSION}"
+
 fetch_git miniupnp   https://github.com/miniupnp/miniupnp.git     "${MINIUPNP_TAG}"
 fetch_git libnatpmp  https://github.com/miniupnp/libnatpmp.git    "${LIBNATPMP_COMMIT}"
 

@@ -274,6 +274,83 @@ set(CURL_CA_BUNDLE "none" CACHE STRING "" FORCE)
 add_subdirectory("${KFX_DEPS}/curl" "${CMAKE_CURRENT_BINARY_DIR}/curl" EXCLUDE_FROM_ALL)
 
 #******************************************************************************
+# FFmpeg - Smacker video only
+#
+# The engine plays the intro and the campaign cutscenes through libavformat and
+# libavcodec. Building all of FFmpeg for that would be absurd, so everything is
+# switched off and only the Smacker demuxer and its two decoders are switched
+# back on. No swscale: bflib_fmvids.cpp converts the picture itself and only
+# uses swresample for the audio.
+#
+# FFmpeg has its own configure script rather than CMake, so it is driven as an
+# ExternalProject, the same way LuaJIT is.
+#******************************************************************************
+set(KFX_FFMPEG_SRC "${KFX_DEPS}/ffmpeg")
+set(KFX_FFMPEG_BUILD "${CMAKE_CURRENT_BINARY_DIR}/ffmpeg")
+set(KFX_FFMPEG_PREFIX "${KFX_FFMPEG_BUILD}/install")
+
+get_filename_component(KFX_NDK_BIN "${CMAKE_C_COMPILER}" DIRECTORY)
+
+set(KFX_FFMPEG_LIBS
+    "${KFX_FFMPEG_PREFIX}/lib/libavformat.a"
+    "${KFX_FFMPEG_PREFIX}/lib/libavcodec.a"
+    "${KFX_FFMPEG_PREFIX}/lib/libswresample.a"
+    "${KFX_FFMPEG_PREFIX}/lib/libavutil.a")
+
+ExternalProject_Add(ffmpeg_external
+    SOURCE_DIR "${KFX_FFMPEG_SRC}"
+    BINARY_DIR "${KFX_FFMPEG_BUILD}"
+    DOWNLOAD_COMMAND ""
+    CONFIGURE_COMMAND "${KFX_FFMPEG_SRC}/configure"
+        --prefix=<INSTALL_DIR>
+        --target-os=android
+        --arch=aarch64
+        --enable-cross-compile
+        --cc=${CMAKE_C_COMPILER}
+        --cxx=${CMAKE_CXX_COMPILER}
+        --ar=${CMAKE_AR}
+        --ranlib=${CMAKE_RANLIB}
+        --strip=${CMAKE_STRIP}
+        --nm=${CMAKE_NM}
+        --sysroot=${CMAKE_SYSROOT}
+        --disable-everything
+        --disable-programs
+        --disable-doc
+        --disable-avdevice
+        --disable-avfilter
+        --disable-swscale
+        --disable-postproc
+        --disable-network
+        --disable-iconv
+        --disable-zlib
+        --disable-bzlib
+        --disable-lzma
+        --disable-xlib
+        --disable-vaapi
+        --disable-vdpau
+        --disable-shared
+        --enable-static
+        --enable-pic
+        --enable-demuxer=smacker
+        --enable-decoder=smacker
+        --enable-decoder=smackaud
+        --enable-protocol=file
+    INSTALL_DIR "${KFX_FFMPEG_PREFIX}"
+    BUILD_BYPRODUCTS ${KFX_FFMPEG_LIBS}
+    LOG_CONFIGURE OFF
+    LOG_BUILD OFF)
+
+# The headers only exist after the install step, so declare the directory now.
+file(MAKE_DIRECTORY "${KFX_FFMPEG_PREFIX}/include")
+foreach(lib avformat avcodec swresample avutil)
+    add_library(kfx_${lib} STATIC IMPORTED GLOBAL)
+    set_target_properties(kfx_${lib} PROPERTIES
+        IMPORTED_LOCATION "${KFX_FFMPEG_PREFIX}/lib/lib${lib}.a")
+    add_dependencies(kfx_${lib} ffmpeg_external)
+    target_include_directories(kfx_${lib} INTERFACE "${KFX_FFMPEG_PREFIX}/include")
+endforeach()
+
+#******************************************************************************
 # miniupnpc + libnatpmp
 #
 # Automatic port forwarding when hosting a game.
@@ -391,14 +468,13 @@ target_include_directories(kfx_luajit INTERFACE "${LUAJIT_WORK}/src")
 file(GLOB KFX_SOURCES_C   "${KFX_ROOT}/src/*.c")
 file(GLOB KFX_SOURCES_CXX "${KFX_ROOT}/src/*.cpp" "${KFX_ROOT}/src/kfx/lense/*.cpp")
 
-# Platform files of the other ports, plus the one module replaced by an Android
-# specific stub (FFmpeg is not bundled).
+# Platform files of the other ports. Nothing is stubbed any more: every library
+# the engine needs is built from source above.
 set(KFX_EXCLUDED
     "${KFX_ROOT}/src/linux.cpp"
     "${KFX_ROOT}/src/windows.cpp"
     "${KFX_ROOT}/src/cdrom.cpp"
-    "${KFX_ROOT}/src/steam_api.cpp"
-    "${KFX_ROOT}/src/bflib_fmvids.cpp")
+    "${KFX_ROOT}/src/steam_api.cpp")
 list(REMOVE_ITEM KFX_SOURCES_C   ${KFX_EXCLUDED})
 list(REMOVE_ITEM KFX_SOURCES_CXX ${KFX_EXCLUDED})
 
@@ -446,6 +522,10 @@ target_link_libraries(keeperfx PRIVATE
     kfx_centitoml
     kfx_astronomy
     kfx_luajit
+    kfx_avformat
+    kfx_avcodec
+    kfx_swresample
+    kfx_avutil
     CURL::libcurl
     libminiupnpc-static
     natpmp
