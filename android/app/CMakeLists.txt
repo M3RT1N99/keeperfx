@@ -292,6 +292,11 @@ set(KFX_FFMPEG_BUILD "${CMAKE_CURRENT_BINARY_DIR}/ffmpeg")
 set(KFX_FFMPEG_PREFIX "${KFX_FFMPEG_BUILD}/install")
 
 get_filename_component(KFX_NDK_BIN "${CMAKE_C_COMPILER}" DIRECTORY)
+if(DEFINED ANDROID_PLATFORM_LEVEL AND NOT ANDROID_PLATFORM_LEVEL STREQUAL "")
+    set(KFX_ANDROID_API "${ANDROID_PLATFORM_LEVEL}")
+else()
+    set(KFX_ANDROID_API 28)
+endif()
 
 set(KFX_FFMPEG_LIBS
     "${KFX_FFMPEG_PREFIX}/lib/libavformat.a"
@@ -308,13 +313,15 @@ ExternalProject_Add(ffmpeg_external
         --target-os=android
         --arch=aarch64
         --enable-cross-compile
-        --cc=${CMAKE_C_COMPILER}
-        --cxx=${CMAKE_CXX_COMPILER}
+        # The NDK's per-API wrapper, not the bare clang: configure invokes the
+        # compiler without the flags CMake would normally add, so without the
+        # target triple and sysroot baked in its very first test fails.
+        --cc=${KFX_NDK_BIN}/aarch64-linux-android${KFX_ANDROID_API}-clang
+        --cxx=${KFX_NDK_BIN}/aarch64-linux-android${KFX_ANDROID_API}-clang++
         --ar=${CMAKE_AR}
         --ranlib=${CMAKE_RANLIB}
         --strip=${CMAKE_STRIP}
         --nm=${CMAKE_NM}
-        --sysroot=${CMAKE_SYSROOT}
         --disable-everything
         --disable-programs
         --disable-doc
