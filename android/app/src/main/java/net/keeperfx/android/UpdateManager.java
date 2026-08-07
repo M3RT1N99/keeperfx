@@ -78,9 +78,28 @@ public final class UpdateManager {
             final String current = prefs.getInstalledVersion();
             final String size = GameData.describeBytes(release.sizeInBytes);
             if (!installed) {
+                // Says what is actually wrong rather than just offering a
+                // download: the check now looks inside the directories, so it
+                // can name the files that are absent instead of leaving the
+                // player to guess from silence and black screens.
+                final List<String> gaps = GameData.findMissingKeeperfxEntries(context);
+                final StringBuilder detail = new StringBuilder("Game data, ").append(size);
+                if (!gaps.isEmpty()) {
+                    detail.append("
+    missing: ");
+                    for (int i = 0; i < gaps.size() && i < 4; i++) {
+                        if (i > 0) {
+                            detail.append(", ");
+                        }
+                        detail.append(gaps.get(i));
+                    }
+                    if (gaps.size() > 4) {
+                        detail.append(" and ").append(gaps.size() - 4).append(" more");
+                    }
+                }
                 items.add(new Item(Kind.GAME_DATA,
                     "KeeperFX " + release.version,
-                    "Game data, " + size, null));
+                    detail.toString(), null));
             } else if (current.isEmpty()) {
                 // A hand imported folder carries no version, and there is no way
                 // to tell how complete it is - the one that prompted this came

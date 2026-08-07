@@ -148,9 +148,14 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         useAlphaBox.setOnCheckedChangeListener((v, checked) -> {
             prefs.setAlphaEnabled(checked);
             if (!checked && !prefs.getInstalledAlphaVersion().isEmpty()) {
+                // Restores the files the patch replaced from the copies taken
+                // before it was applied, so switching back deletes nothing and
+                // costs no download. refreshStatus() runs when it finishes.
                 removeAlphaPatch();
             } else {
-                // The list of downloads is built from this, so ask again.
+                // Both the version shown at the top and the list of downloads
+                // depend on this, so refresh one and ask again for the other.
+                refreshStatus();
                 checkForUpdateInBackground();
             }
         });
@@ -202,8 +207,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         final String installed = prefs.getInstalledVersion();
 
         if (hasKeeperfx) {
-            final String version = installed.isEmpty()
-                ? getString(R.string.version_unknown) : installed;
+            final String version = installed.isEmpty() && prefs.getInstalledAlphaVersion().isEmpty()
+                ? getString(R.string.version_unknown)
+                : GameData.describeInstalledVersion(this);
             keeperfxStatus.setText(getString(R.string.status_keeperfx_ready, version,
                 GameData.describeSize(GameData.gameDirectory(this))));
         } else {

@@ -139,7 +139,7 @@ public class LogActivity extends Activity {
         sb.append("KeeperFX for Android\n");
         sb.append("app version    : ").append(appVersion()).append('\n');
         sb.append("KeeperFX data  : ")
-          .append(prefs.getInstalledVersion().isEmpty() ? "imported folder" : prefs.getInstalledVersion())
+          .append(GameData.describeInstalledVersion(this))
           .append('\n');
         sb.append("device         : ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n');
         sb.append("android        : ").append(Build.VERSION.RELEASE)

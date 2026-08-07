@@ -244,6 +244,22 @@ public final class GameData {
     }
 
     /** Human readable size of the installation, for the launcher status line. */
+    /**
+     * What the installation actually is, release and patch together.
+     *
+     * The alpha is laid over the release rather than replacing it, so naming
+     * only one of them is misleading - and after switching the patch on or off
+     * the number at the top of the launcher has to change to match, or nobody
+     * can tell which of the two they are looking at.
+     */
+    public static String describeInstalledVersion(Context context) {
+        final Prefs prefs = new Prefs(context);
+        final String release = prefs.getInstalledVersion();
+        final String alpha = prefs.getInstalledAlphaVersion();
+        final String base = release.isEmpty() ? "imported folder" : release;
+        return alpha.isEmpty() ? base : base + " + alpha " + alpha;
+    }
+
     public static String describeSize(File dir) {
         return describeBytes(directorySize(dir));
     }
