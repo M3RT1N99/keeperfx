@@ -22,14 +22,24 @@
 package net.keeperfx.android;
 
 import android.content.Context;
+import android.util.Log;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 public final class GameData {
+
+    private static final String TAG = "KeeperFX";
 
     private GameData() {
     }
@@ -223,6 +233,106 @@ public final class GameData {
             }
         }
         return false;
+    }
+
+    // --------------------------------------------------------- install manifest
+
+    /**
+     * The manifests written while unpacking, kept outside the game directory so
+     * the engine never mistakes them for data. One for the stable release, one
+     * for the alpha patch laid over it; each line is "<size>\t<relative path>".
+     */
+    public static File stableManifest(Context context) {
+        return new File(new File(context.getFilesDir(), "manifests"), "stable.txt");
+    }
+
+    public static File alphaManifest(Context context) {
+        return new File(new File(context.getFilesDir(), "manifests"), "alpha.txt");
+    }
+
+    public static boolean hasManifest(Context context) {
+        return stableManifest(context).isFile();
+    }
+
+    /** What a verification found, split by which download repairs it. */
+    public static final class VerifyReport {
+        public final List<String> stableProblems = new ArrayList<>();
+        public final List<String> alphaProblems = new ArrayList<>();
+
+        public boolean isClean() {
+            return stableProblems.isEmpty() && alphaProblems.isEmpty();
+        }
+    }
+
+    /**
+     * Compares every file the archives said they unpacked with what is on disk.
+     *
+     * This exists because presence checks lie: a device in the wild carried a
+     * torso of an interrupted unpack - campgns/keeporig_ger held files, just
+     * not the ones the land view asks for - and the handful of spot checks
+     * above called that installation complete.
+     *
+     * A file the alpha patch overwrote is expected at the patch's size, and
+     * damage to it is alpha damage, because re-applying the patch is what fixes
+     * it. Files the bundled configuration overlay owns are checked for
+     * existence only; they are deliberately replaced with the APK's own copies,
+     * so their size says nothing about the health of the unpacked release.
+     */
+    public static VerifyReport verifyInstalledFiles(Context context) {
+        final Map<String, Long> stable = new LinkedHashMap<>();
+        final Map<String, Long> alpha = new LinkedHashMap<>();
+        readManifest(stableManifest(context), stable);
+        readManifest(alphaManifest(context), alpha);
+        final Map<String, Long> expected = new LinkedHashMap<>(stable);
+        expected.putAll(alpha);
+
+        final VerifyReport report = new VerifyReport();
+        if (expected.isEmpty()) {
+            return report;
+        }
+        final Set<String> overlay = BundledConfig.relativePaths(context);
+        final File root = gameDirectory(context);
+        for (Map.Entry<String, Long> want : expected.entrySet()) {
+            final String path = want.getKey();
+            final File f = new File(root, path);
+            boolean damaged;
+            if (!f.isFile()) {
+                damaged = true;
+            } else {
+                final String lower = path.toLowerCase(Locale.US).replace('\\', '/');
+                damaged = f.length() != want.getValue()
+                    && !overlay.contains(lower)
+                    && !lower.equals("keeperfx.cfg");
+            }
+            if (damaged) {
+                (alpha.containsKey(path) ? report.alphaProblems : report.stableProblems)
+                    .add(path);
+            }
+        }
+        return report;
+    }
+
+    private static void readManifest(File file, Map<String, Long> into) {
+        if (!file.isFile()) {
+            return;
+        }
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                final int tab = line.indexOf('\t');
+                if (tab <= 0 || tab == line.length() - 1) {
+                    continue;
+                }
+                try {
+                    into.put(line.substring(tab + 1), Long.parseLong(line.substring(0, tab)));
+                } catch (NumberFormatException ignored) {
+                    // A garbled line loses one file's check, not the whole list.
+                }
+            }
+        } catch (IOException e) {
+            Log.w(TAG, "Could not read " + file.getName(), e);
+        }
     }
 
     /**

@@ -146,7 +146,23 @@ public class LogActivity extends Activity {
           .append(" (API ").append(Build.VERSION.SDK_INT).append(")\n");
         sb.append("abi            : ").append(String.join(", ", Build.SUPPORTED_ABIS)).append('\n');
         sb.append("input mode     : ").append(inputModeName(prefs.getInputMode())).append('\n');
+        sb.append("language       : ").append(prefs.getLanguage()).append('\n');
         sb.append("data complete  : ").append(GameData.isComplete(this)).append('\n');
+        final GameData.VerifyReport verified = GameData.verifyInstalledFiles(this);
+        sb.append("verified       : ");
+        if (!GameData.hasManifest(this)) {
+            sb.append("no manifest yet");
+        } else if (verified.isClean()) {
+            sb.append("clean");
+        } else {
+            sb.append(verified.stableProblems.size() + verified.alphaProblems.size())
+              .append(" files missing or damaged");
+        }
+        sb.append('\n');
+        // Music is a separate download, so "data complete" says nothing about
+        // it - and its absence is the single most reported kind of silence.
+        sb.append("music          : ")
+          .append(GameData.hasMusic(this) ? "installed" : "not installed").append('\n');
         sb.append("------------------------------------------------------------\n\n");
         return sb.toString();
     }

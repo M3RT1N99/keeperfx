@@ -37,6 +37,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 public final class BundledConfig {
 
@@ -114,6 +117,42 @@ public final class BundledConfig {
             written++;
         }
         return written;
+    }
+
+    /**
+     * Relative paths of every file the overlay owns, lowercase with forward
+     * slashes.
+     *
+     * The install verification needs them: these files are replaced with the
+     * APK's own copies after every install and launch, so their size on disk
+     * says nothing about the health of the unpacked release.
+     */
+    public static Set<String> relativePaths(Context context) {
+        final Set<String> paths = new HashSet<>();
+        try {
+            collectPaths(context.getAssets(), ASSET_ROOT, "", paths);
+        } catch (IOException e) {
+            Log.w(TAG, "Could not list the bundled configuration", e);
+        }
+        return paths;
+    }
+
+    private static void collectPaths(AssetManager assets, String assetPath, String relative,
+            Set<String> into) throws IOException {
+        final String[] entries = assets.list(assetPath);
+        if (entries == null || entries.length == 0) {
+            return;
+        }
+        for (String entry : entries) {
+            final String childAsset = assetPath + "/" + entry;
+            final String childRelative = relative.isEmpty() ? entry : relative + "/" + entry;
+            final String[] grandChildren = assets.list(childAsset);
+            if (grandChildren != null && grandChildren.length > 0) {
+                collectPaths(assets, childAsset, childRelative, into);
+            } else {
+                into.add(childRelative.toLowerCase(Locale.US));
+            }
+        }
     }
 
     private static void copyFile(AssetManager assets, String assetPath, File target)

@@ -41,6 +41,8 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public final class ReleaseDownloader {
@@ -263,11 +265,12 @@ public final class ReleaseDownloader {
             // which is a lot to pay for changing one's mind.
             listener.onStage("Saving the files being replaced", -1, "");
             backupBeforePatch(archive);
-            extract(archive);
+            final List<String> unpacked = extract(archive);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
                 return;
             }
+            writeManifest(GameData.alphaManifest(context), unpacked);
 
             new Prefs(context).setInstalledAlphaVersion(version);
             finish(true, "KeeperFX alpha " + version + " applied");
@@ -408,6 +411,10 @@ public final class ReleaseDownloader {
             final int restored = restoreTree(backup, destination);
             deleteTree(backup);
             prefs.setInstalledAlphaVersion("");
+            // The restored files are the stable release's own copies again, so
+            // the stable manifest describes them and the patch's does not.
+            //noinspection ResultOfMethodCallIgnored
+            GameData.alphaManifest(context).delete();
             finish(true, "Alpha patch removed, " + restored + " files restored");
         } catch (Exception e) {
             Log.e(TAG, "Could not remove the alpha patch", e);
@@ -482,11 +489,12 @@ public final class ReleaseDownloader {
                 return;
             }
 
-            extract(archive);
+            final List<String> unpacked = extract(archive);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
                 return;
             }
+            writeManifest(GameData.stableManifest(context), unpacked);
 
             // A full release overwrites whatever the alpha patch had put there,
             // so it is no longer applied and has to be offered again.
@@ -496,6 +504,8 @@ public final class ReleaseDownloader {
             // saved copies describe nothing that is still installed.
             prefs.setInstalledAlphaVersion("");
             deleteTree(alphaBackupDirectory());
+            //noinspection ResultOfMethodCallIgnored
+            GameData.alphaManifest(context).delete();
             finish(true, "KeeperFX " + version + " installed");
         } catch (Exception e) {
             Log.e(TAG, "Release download failed", e);
@@ -576,7 +586,8 @@ public final class ReleaseDownloader {
         return dir;
     }
 
-    private void extract(File archive) throws IOException {
+    /** @return the relative paths of every file written, for the manifest. */
+    private List<String> extract(File archive) throws IOException {
         final File destination = GameData.gameDirectory(context);
         // Unpacked over whatever is already there rather than replacing it, the
         // way the desktop launcher installs a release. Everything the archive
@@ -590,6 +601,7 @@ public final class ReleaseDownloader {
 
         listener.onStage("Unpacking", 0, "");
         final String canonicalRoot = destination.getCanonicalPath() + File.separator;
+        final List<String> written = new ArrayList<>();
         int entries = 0;
 
         try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
@@ -597,7 +609,7 @@ public final class ReleaseDownloader {
             final byte[] buffer = new byte[256 * 1024];
             while ((entry = sevenZ.getNextEntry()) != null) {
                 if (isCancelled()) {
-                    return;
+                    return written;
                 }
                 final String name = entry.getName();
                 if (name == null || name.isEmpty()) {
@@ -627,6 +639,7 @@ public final class ReleaseDownloader {
                         os.write(buffer, 0, read);
                     }
                 }
+                written.add(name);
                 if ((++entries % 100) == 0) {
                     listener.onStage("Unpacking", -1, entries + " files");
                 }
@@ -640,6 +653,46 @@ public final class ReleaseDownloader {
         BundledConfig.install(context, true);
 
         removeRetiredFiles(destination);
+        return written;
+    }
+
+    /**
+     * Records what an unpack left behind, so a later check can tell a whole
+     * installation from the torso an interrupted one leaves.
+     *
+     * Sizes are taken from the disk after the configuration overlay and the
+     * retirement list have run, not from the archive, so verification later
+     * compares like with like; a file the retirement list deleted again simply
+     * falls out. Written to a temporary name first: a manifest that lies is
+     * worse than none.
+     */
+    private void writeManifest(File manifest, List<String> names) throws IOException {
+        final File root = GameData.gameDirectory(context);
+        final File dir = manifest.getParentFile();
+        if (dir != null && !dir.isDirectory() && !dir.mkdirs()) {
+            throw new IOException("Cannot create " + dir.getAbsolutePath());
+        }
+        final StringBuilder lines = new StringBuilder();
+        int listed = 0;
+        for (String name : names) {
+            final File f = new File(root, name);
+            if (f.isFile()) {
+                lines.append(f.length()).append('\t').append(name).append(LINE_END);
+                listed++;
+            }
+        }
+        final File tmp = new File(manifest.getAbsolutePath() + ".tmp");
+        try (OutputStream out = new FileOutputStream(tmp)) {
+            out.write(lines.toString().getBytes("UTF-8"));
+        }
+        if (!tmp.renameTo(manifest)) {
+            //noinspection ResultOfMethodCallIgnored
+            manifest.delete();
+            if (!tmp.renameTo(manifest)) {
+                throw new IOException("Cannot write " + manifest.getAbsolutePath());
+            }
+        }
+        Log.i(TAG, "Manifest " + manifest.getName() + " lists " + listed + " files");
     }
 
     /**

@@ -71,6 +71,10 @@ public final class UpdateManager {
         final List<Item> items = new ArrayList<>();
         final Prefs prefs = new Prefs(context);
 
+        // Local disk work, no network: every file the archives said they
+        // unpacked, compared with what is actually there.
+        final GameData.VerifyReport verified = GameData.verifyInstalledFiles(context);
+
         // --- KeeperFX release -------------------------------------------------
         try {
             final ReleaseDownloader.ReleaseInfo release = ReleaseDownloader.queryLatestRelease();
@@ -110,6 +114,33 @@ public final class UpdateManager {
                 items.add(new Item(Kind.GAME_DATA,
                     "KeeperFX " + release.version,
                     "Update from " + current + ", " + size, null));
+            } else if (!GameData.hasManifest(context)) {
+                // Installed by a build that did not record what it unpacked. A
+                // device in the wild carried the torso of an interrupted unpack
+                // for weeks - campgns/keeporig_ger existed but held no speech -
+                // and nothing could tell. Reinstalling once writes the manifest
+                // and settles the question for good.
+                items.add(new Item(Kind.GAME_DATA,
+                    "Verify KeeperFX " + current,
+                    "This installation predates file verification."
+                        + "\n    Reinstalling checks every file once, " + size, null));
+            } else if (!verified.stableProblems.isEmpty()) {
+                final List<String> gaps = verified.stableProblems;
+                final StringBuilder detail = new StringBuilder()
+                    .append(gaps.size())
+                    .append(gaps.size() == 1 ? " file" : " files")
+                    .append(" missing or damaged, reinstalling repairs them, ")
+                    .append(size)
+                    .append("\n    e.g. ");
+                for (int i = 0; i < gaps.size() && i < 3; i++) {
+                    if (i > 0) {
+                        detail.append(", ");
+                    }
+                    detail.append(gaps.get(i));
+                }
+                items.add(new Item(Kind.GAME_DATA,
+                    "Repair KeeperFX " + current,
+                    detail.toString(), null));
             }
         } catch (Exception e) {
             Log.w(TAG, "Could not check the KeeperFX release", e);
@@ -140,6 +171,18 @@ public final class UpdateManager {
                             ? "Files the current engine needs and 1.4.0 does not have, "
                             : "Update from " + current + ", ")
                             + cost, null));
+                } else if (!alpha.version.isEmpty() && !verified.alphaProblems.isEmpty()) {
+                    // The patch is current but files it brought are gone or
+                    // wrong; re-applying it is the download that fixes them.
+                    final String cost =
+                        ReleaseDownloader.isAlphaCached(context, alpha.version)
+                            ? "already downloaded, only needs applying"
+                            : GameData.describeBytes(alpha.sizeInBytes);
+                    items.add(new Item(Kind.GAME_ALPHA,
+                        "Repair KeeperFX alpha " + alpha.version,
+                        verified.alphaProblems.size()
+                            + (verified.alphaProblems.size() == 1 ? " file" : " files")
+                            + " missing or damaged, " + cost, null));
                 }
             } catch (Exception e) {
                 Log.w(TAG, "Could not check the KeeperFX alpha", e);
