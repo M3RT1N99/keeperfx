@@ -241,11 +241,20 @@ public final class ReleaseDownloader {
             final String version = alpha.version.isEmpty() ? "unknown" : alpha.version;
             Log.i(TAG, "Latest KeeperFX alpha: " + version + " at " + alpha.downloadUrl);
 
-            archive = new File(downloadDirectory(), "keeperfx-alpha.7z");
-            download(alpha.downloadUrl, archive, alpha.sizeInBytes, version);
-            if (isCancelled()) {
-                finish(false, "Download cancelled");
-                return;
+            // Kept between switches. Turning the patch off restores the files
+            // it replaced from a local copy, so turning it back on should not
+            // cost 33 MB again just because it went away in between.
+            final File cache = alphaArchiveCache(version);
+            if (cache.isFile() && cache.length() > 0) {
+                archive = cache;
+                listener.onStage("Using the archive already downloaded", -1, "");
+            } else {
+                archive = cache;
+                download(alpha.downloadUrl, archive, alpha.sizeInBytes, version);
+                if (isCancelled()) {
+                    finish(false, "Download cancelled");
+                    return;
+                }
             }
 
             // Everything the patch is about to replace is copied aside first, so
@@ -265,12 +274,29 @@ public final class ReleaseDownloader {
         } catch (Exception e) {
             Log.e(TAG, "Alpha download failed", e);
             finish(false, "Failed: " + e.getMessage());
-        } finally {
-            if (archive != null && archive.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                archive.delete();
+        }
+        // The archive is deliberately not deleted; see alphaArchiveCache().
+    }
+
+    /**
+     * The alpha archive for one version, kept so switching back and forth is
+     * free. Named after the version, so a newer alpha is still fetched and the
+     * old one can be dropped.
+     */
+    private File alphaArchiveCache(String version) {
+        final File dir = new File(context.getFilesDir(), "alpha-cache");
+        //noinspection ResultOfMethodCallIgnored
+        dir.mkdirs();
+        final File[] stale = dir.listFiles();
+        if (stale != null) {
+            for (File f : stale) {
+                if (!f.getName().equals("alpha-" + version + ".7z")) {
+                    //noinspection ResultOfMethodCallIgnored
+                    f.delete();
+                }
             }
         }
+        return new File(dir, "alpha-" + version + ".7z");
     }
 
     /** Where the release's own copies of the patched files are kept. */
