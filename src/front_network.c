@@ -79,6 +79,27 @@ static int32_t previous_active_players = 0;
 }
 #endif
 /******************************************************************************/
+/**
+ * True when every active player agrees with the host about the version.
+ *
+ * check_frontend_version_mismatch() decides the same thing but also counts
+ * players, watches for a start request and puts an error box on screen, none of
+ * which suits a caller that only wants the answer.
+ */
+static TbBool frontnet_versions_agree(void)
+{
+    const struct NetUser *host_user = &netstate.users[SERVER_ID];
+    for (NetUserId i = 0; i < MAX_NET_USERS; i++) {
+        if (!network_player_active(i)) {
+            continue;
+        }
+        if ((i != SERVER_ID) && !net_versions_match(&host_user->version, &netstate.users[i].version)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static TbBool try_starting_level_from_chat(const char *message, int32_t player_id)
 {
     const char *separator_pos = strchr(message, ':');
@@ -96,15 +117,32 @@ static TbBool try_starting_level_from_chat(const char *message, int32_t player_i
     while (*level_str == ' ') {
         level_str++;
     }
+    // Only the host decides what everyone loads. The campaign-only form, which
+    // ends in '_', used to skip this test, so any peer could put every client
+    // in the lobby into a different campaign by typing one chat line.
+    if (player_id != get_host_player_id()) {
+        return false;
+    }
     LevelNumber level_num = -1;
     if (level_str[0] != '_') {
-        if (!isdigit(level_str[0]) || (player_id != get_host_player_id())) {
+        if (!isdigit(level_str[0])) {
             return false;
         }
         level_num = atoi(level_str);
         if (level_num <= 0) {
             return false;
         }
+    }
+    // The lobby's start button is blocked when the versions disagree, but this
+    // path reaches frontend_set_state(FeSt_START_MPLEVEL) without passing that
+    // check - and it runs on every client, because the chat message is
+    // dispatched to all of them. Without this, one typed line puts mismatched
+    // engines into a strict lockstep simulation, which is a far worse outcome
+    // than the refusal the check exists to produce. -autostart uses the same
+    // path, so it was skipping the check too.
+    if (!frontnet_versions_agree()) {
+        ERRORLOG("Refusing to start a level from chat: player versions differ");
+        return false;
     }
     char campaign_filename[80];
     snprintf(campaign_filename, sizeof(campaign_filename), "%.*s", campaign_len, message);
