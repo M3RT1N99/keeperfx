@@ -122,6 +122,17 @@ extern TbBool process_players_dungeon_control_cheats_packet_action(PlayerNumber 
 TbBool unpausing_in_progress = 0;
 float camera_movement_x = 0.0f;
 float camera_movement_y = 0.0f;
+/**
+ * How hard the view is being rotated this frame, -1.0 to 1.0.
+ *
+ * The rotate packet flags are on or off, so they always turn at one fixed rate.
+ * That is right for a key, which is also on or off, but a twisted pair of
+ * fingers has a speed and turning it into a fixed step is what makes the camera
+ * feel like it is stepping rather than following. Left at zero by every input
+ * that has no speed of its own, in which case the flags below do their usual
+ * fixed amount.
+ */
+float camera_rotation = 0.0f;
 /******************************************************************************/
 #define RESYNC_LIMIT_BEFORE_COOLDOWN 5
 #define RESYNC_COOLDOWN_MS (5 * 60 * 1000)
@@ -427,8 +438,18 @@ void process_camera_controls(struct Camera* cam, struct Packet* pckt, struct Pla
             long limit = (long)(camera_movement_x * inter_val);
             view_set_camera_x_inertia(cam, delta, limit);
         }
+        if (camera_rotation != 0.0f) {
+            const long delta = (long)(camera_rotation * 16.0f);
+            const long limit = (long)(camera_rotation * 64.0f);
+            if (delta != 0) {
+                view_set_camera_rotation_inertia_around(cam, delta, limit,
+                    ((pckt->control_flags & PCtr_MapCoordsValid) != 0) ? pckt->pos_x : -1,
+                    ((pckt->control_flags & PCtr_MapCoordsValid) != 0) ? pckt->pos_y : -1);
+            }
+        }
         camera_movement_x = 0.0f;
         camera_movement_y = 0.0f;
+        camera_rotation = 0.0f;
     }
     else
     {

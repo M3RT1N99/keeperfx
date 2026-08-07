@@ -2359,6 +2359,18 @@ static void get_isometric_view_nonaction_inputs(void)
                 set_packet_control(packet, PCtr_ViewZoomOut);
         } else
         {
+            // A twist has a speed, so it drives the rotation directly rather
+            // than through the on/off packet flags, which always turn by one
+            // fixed step and make the camera look like it is stepping instead
+            // of following the fingers. Keys and pads keep the flags.
+            const float touch_cw = get_game_key_axis_value(Gkey_RotateCW, false);
+            const float touch_ccw = get_game_key_axis_value(Gkey_RotateCCW, false);
+            if (touch_controls_active() && ((touch_cw > 0.0f) || (touch_ccw > 0.0f)))
+            {
+                camera_rotation = touch_ccw - touch_cw;
+                rotating = true;
+            } else
+            {
             if (is_game_key_pressed(Gkey_RotateCW, false, false))
             {
                 if (rotate_around_mouse_option == RotateAroundMouse_NotCtrl)
@@ -2372,6 +2384,7 @@ static void get_isometric_view_nonaction_inputs(void)
                     set_packet_control(packet, PCtr_ViewRotatePos);
                 set_packet_control(packet, PCtr_ViewRotateCCW);
                 rotating = true;
+            }
             }
             if (is_game_key_pressed(Gkey_ZoomIn, false, false))
                 set_packet_control(packet, PCtr_ViewZoomIn);
