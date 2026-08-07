@@ -174,6 +174,93 @@ public final class DataImporter {
         }
     }
 
+    /**
+     * Imports the original game's files out of a zip instead of a folder.
+     *
+     * A CD rip is very often handed around as one archive, and unpacking it
+     * first purely to aim the folder picker at the result is a chore on a
+     * phone. Only the files the game actually needs are taken; everything else
+     * in the archive is skipped, and where each one belongs is decided by the
+     * same GameData.targetSubdirectoryFor() the folder route uses, so an
+     * archive with or without a leading directory works either way.
+     */
+    public void importOriginalDkZip(Uri zipUri) {
+        final File destination = GameData.gameDirectory(context);
+        try {
+            if (!destination.isDirectory() && !destination.mkdirs()) {
+                finish(false, "Cannot create " + destination.getAbsolutePath());
+                return;
+            }
+
+            final Set<String> wanted = new HashSet<>();
+            for (String name : GameData.allOriginalDkFileNames()) {
+                wanted.add(name.toLowerCase(Locale.US));
+            }
+            final Set<String> found = new HashSet<>();
+
+            try (InputStream raw = context.getContentResolver().openInputStream(zipUri)) {
+                if (raw == null) {
+                    finish(false, "Cannot read the archive");
+                    return;
+                }
+                try (java.util.zip.ZipInputStream zip =
+                         new java.util.zip.ZipInputStream(new java.io.BufferedInputStream(raw))) {
+                    java.util.zip.ZipEntry entry;
+                    final byte[] buffer = new byte[64 * 1024];
+                    while (((entry = zip.getNextEntry()) != null) && !cancelled) {
+                        if (entry.isDirectory()) {
+                            continue;
+                        }
+                        // Matched on the file name alone: the archive may hold
+                        // them at any depth, or at none.
+                        final String path = entry.getName().replace('\\', '/');
+                        final int slash = path.lastIndexOf('/');
+                        final String name = (slash >= 0) ? path.substring(slash + 1) : path;
+                        final String key = name.toLowerCase(Locale.US);
+                        if (!wanted.contains(key) || found.contains(key)) {
+                            continue;
+                        }
+                        final File targetDir = new File(destination,
+                            GameData.targetSubdirectoryFor(name));
+                        if (!targetDir.isDirectory() && !targetDir.mkdirs()) {
+                            throw new IOException("Cannot create " + targetDir.getAbsolutePath());
+                        }
+                        try (OutputStream out = new FileOutputStream(new File(targetDir, key))) {
+                            int read;
+                            while ((read = zip.read(buffer)) > 0) {
+                                out.write(buffer, 0, read);
+                            }
+                        }
+                        found.add(key);
+                        filesCopied++;
+                        listener.onProgress(filesCopied, name);
+                    }
+                }
+            }
+
+            if (cancelled) {
+                finish(false, "Import cancelled");
+                return;
+            }
+            final List<String> stillMissing = GameData.findMissingOriginalDkFiles(context);
+            if (stillMissing.isEmpty()) {
+                finish(true, "Copied " + filesCopied + " files from the original game");
+            } else {
+                final StringBuilder sb = new StringBuilder();
+                sb.append("Copied ").append(filesCopied)
+                  .append(" files, but these are still missing:\n\n");
+                for (String n : stillMissing) {
+                    sb.append("  ").append(n).append('\n');
+                }
+                sb.append("\nThe archive has to hold the original game's DATA and SOUND files.");
+                finish(false, sb.toString());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Original game import from a zip failed", e);
+            finish(false, "Import failed: " + e.getMessage());
+        }
+    }
+
     private void searchAndCopy(Uri treeUri, Uri rootUri, Set<String> wanted, Set<String> found)
             throws IOException {
         final ContentResolver resolver = context.getContentResolver();
