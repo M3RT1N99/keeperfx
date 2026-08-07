@@ -310,11 +310,12 @@ static void process_event(const SDL_Event *ev)
     case SDL_KEYDOWN:
 #ifdef __ANDROID__
         // The on screen right click toggle sends this. Android has no key
-        // meaning "the next tap is a right click", so the overlay button
-        // borrows one the game never uses, the same way the back arrow borrows
-        // Escape. Handled here rather than mapped to a game key because it
-        // flips a mode instead of pressing anything.
-        if (ev->key.keysym.sym == SDLK_NUMLOCKCLEAR) {
+        // meaning "the next tap is a right click", so the button borrows one
+        // the game never uses, as the back arrow borrows Escape. It has to be a
+        // key SDL actually delivers: the first attempt used NUM_LOCK, which is
+        // absent from SDL's Android keycode table, so nothing ever arrived.
+        // SDLK_MENU is mapped a few lines above to KC_APPS, which nothing binds.
+        if (ev->key.keysym.sym == SDLK_MENU) {
             touch_set_sticky_right_click(!touch_sticky_right_click());
             return;
         }
@@ -329,7 +330,7 @@ static void process_event(const SDL_Event *ev)
 
     case SDL_KEYUP:
 #ifdef __ANDROID__
-        if (ev->key.keysym.sym == SDLK_NUMLOCKCLEAR) {
+        if (ev->key.keysym.sym == SDLK_MENU) {
             return;
         }
 #endif

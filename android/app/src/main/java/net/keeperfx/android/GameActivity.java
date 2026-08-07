@@ -46,8 +46,13 @@ public class GameActivity extends SDLActivity {
      * Android has no key meaning "the next tap is a right click", so the toggle
      * borrows one the game never uses. bflib_inputctrl.cpp watches for it and
      * flips the mode instead of treating it as a key press.
+     *
+     * It must be a key SDL actually delivers. NUM_LOCK was tried first and does
+     * nothing at all: it is missing from SDL's Android keycode table, so the
+     * press never reached the engine. MENU is universal on Android and the
+     * engine already maps it, to a code nothing is bound to.
      */
-    private static final int KEYCODE_STICKY_RIGHT_CLICK = KeyEvent.KEYCODE_NUM_LOCK;
+    private static final int KEYCODE_STICKY_RIGHT_CLICK = KeyEvent.KEYCODE_MENU;
 
     /** Present but not competing with the game for attention. */
     private static final float IDLE_ALPHA = 0.55f;

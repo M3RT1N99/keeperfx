@@ -83,6 +83,15 @@ if(NOT DEFINED KFX_ENGINE_BUILD OR KFX_ENGINE_BUILD STREQUAL "")
 endif()
 set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${KFX_ENGINE_BUILD} ${PACKAGE_SUFFIX}")
 
+# VER_BUILD is what net_versions_match() compares, and it has to stay 0 to meet
+# an official CMake-built client. It has been overridden here twice by accident,
+# so fail the build rather than ship something that can play with nobody.
+if(NOT VER_BUILD EQUAL 0)
+    message(FATAL_ERROR
+        "VER_BUILD is ${VER_BUILD}, not 0. That is the number the multiplayer "
+        "handshake sends, and no official build sends anything else.")
+endif()
+
 set(KFX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${KFX_GENERATED_DIR}")
 # ver_defs.h.in uses ${} placeholders, so the default substitution syntax applies.

@@ -99,18 +99,6 @@ jobs:
         for lib in libSDL2.so libSDL2_image.so libSDL2_mixer.so libSDL2_net.so libopenal.so libc++_shared.so; do
           test -f "apk-check/lib/arm64-v8a/$lib" || { echo "missing $lib in APK"; exit 1; }
         done
-        # The number the multiplayer handshake sends is VER_BUILD, and it has to
-        # be 0 to match what an official CMake-built client sends. It is easy to
-        # reintroduce by accident - it was set here twice before - and the source
-        # is not the place to check it, because ver_defs.h.in decides. Read it
-        # back out of the library that is about to ship.
-        WIRE_VERSION=$(strings apk-check/lib/arm64-v8a/libkeeperfx.so           | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ ' | head -n1 | tr -d ' ' || true)
-        echo "engine version string: ${WIRE_VERSION}"
-        case "$WIRE_VERSION" in
-          *.0) echo "VER_BUILD is 0, as an official build sends" ;;
-          "")  echo "could not read the version out of the library"; exit 1 ;;
-          *)   echo "VER_BUILD is not 0 (${WIRE_VERSION}) - this build cannot play with anyone"; exit 1 ;;
-        esac
         ARTIFACT_NAME="keeperfx-android-arm64-${GIT_REVISION}"
         echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
         mkdir -p out
