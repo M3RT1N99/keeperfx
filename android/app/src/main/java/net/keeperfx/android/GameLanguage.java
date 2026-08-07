@@ -143,7 +143,33 @@ public final class GameLanguage {
      * written when the file is not there yet; the bundled copy already carries
      * a LANGUAGE line and this runs again on the next launch.
      */
+    /**
+     * Whether the campaign speech for a language is actually installed.
+     *
+     * campgns/keeporig.cfg maps each language to its own directory, and the
+     * engine simply fails to load a file that is not there - so choosing a
+     * language whose speech was never installed produces silence rather than
+     * English. Checking the original campaign is enough; it is the one every
+     * installation has.
+     */
+    public static boolean hasSpeechFor(Context context, String code) {
+        if ("ENG".equalsIgnoreCase(code)) {
+            return true;
+        }
+        final File dir = new File(GameData.gameDirectory(context),
+            "campgns/keeporig_" + code.toLowerCase(Locale.US));
+        final String[] entries = dir.list();
+        return entries != null && entries.length > 0;
+    }
+
     public static void applyToConfig(Context context, String code) {
+        // Silence is worse than the wrong language. If the speech for this one
+        // was never installed, the game runs in English, which every
+        // installation carries.
+        if (!hasSpeechFor(context, code)) {
+            Log.i(TAG, "No speech installed for " + code + ", falling back to English");
+            code = "ENG";
+        }
         final File config = new File(GameData.gameDirectory(context), "keeperfx.cfg");
         if (!config.isFile()) {
             return;
