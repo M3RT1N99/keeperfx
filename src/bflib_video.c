@@ -173,7 +173,30 @@ static int LbScreenBlitScaled(void)
     int blresult = SDL_BlitSurface(lbDrawSurface, NULL, scale_buffer, NULL);
     if (blresult < 0)
         return blresult;
-    return SDL_BlitScaled(scale_buffer, NULL, lbScreenSurface, NULL);
+
+    // Fitted, not stretched. SDL_BlitScaled with a NULL destination fills the
+    // whole surface, so any difference in proportion between the two comes out
+    // as a squashed picture. The largest rectangle of the right shape is
+    // centred instead, and the margins are cleared so nothing from the previous
+    // frame shows through at the edges.
+    const int src_w = scale_buffer->w;
+    const int src_h = scale_buffer->h;
+    const int dst_w = lbScreenSurface->w;
+    const int dst_h = lbScreenSurface->h;
+    SDL_Rect target;
+    if ((long)src_w * dst_h > (long)dst_w * src_h) {
+        target.w = dst_w;
+        target.h = (int)((long)src_h * dst_w / src_w);
+    } else {
+        target.h = dst_h;
+        target.w = (int)((long)src_w * dst_h / src_h);
+    }
+    target.x = (dst_w - target.w) / 2;
+    target.y = (dst_h - target.h) / 2;
+    if ((target.w != dst_w) || (target.h != dst_h)) {
+        SDL_FillRect(lbScreenSurface, NULL, 0);
+    }
+    return SDL_BlitScaled(scale_buffer, NULL, lbScreenSurface, &target);
 #undef scale_buffer
 }
 

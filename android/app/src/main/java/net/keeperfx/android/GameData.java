@@ -58,6 +58,10 @@ public final class GameData {
         "ldata/bullfrog.smk",
         "fxdata/sounds.cfg",
         "fxdata/font12.fxfont",
+        // The English campaign speech, which is what every other language falls
+        // back to. Without it the land view and the campaign menu are silent
+        // and the log only says a file could not be loaded.
+        "campgns/keeporig_eng",
     };
 
     private static final String[] KEEPERFX_FILES = {
@@ -129,7 +133,11 @@ public final class GameData {
             }
         }
         for (String file : KEEPERFX_CONTENT_FILES) {
-            if (!resolveIgnoringCase(root, file).isFile()) {
+            final File f = resolveIgnoringCase(root, file);
+            // Directories count too, and an empty one is as useless as none.
+            final boolean present = f.isFile()
+                || (f.isDirectory() && f.list() != null && f.list().length > 0);
+            if (!present) {
                 missing.add(file);
             }
         }
