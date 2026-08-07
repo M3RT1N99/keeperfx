@@ -24,6 +24,7 @@ extern "C" {
 #include "thread.hpp"
 #include <vector>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
 #include "post_inc.h"
 
 namespace {
@@ -277,6 +278,8 @@ struct movie_t {
 	time_point m_video_start;
 	AVRational m_time_base;
 	SDL_AudioDeviceID m_audio_device = 0;
+	/** Set when the mixer's device was taken so the film could have sound. */
+	bool m_borrowed_mixer_device = false;
 
 	int m_audio_index;
 	int m_video_index;
@@ -326,6 +329,11 @@ struct movie_t {
 			SDL_CloseAudioDevice(m_audio_device);
 			m_audio_device = 0;
 		}
+		if (m_borrowed_mixer_device) {
+			// Give the device back in the same shape bflib_sndlib.cpp opened it.
+			Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 4096);
+			m_borrowed_mixer_device = false;
+		}
 	}
 
 	void open_input(const char * filename) {
@@ -373,11 +381,25 @@ struct movie_t {
             desired.userdata = nullptr;
             m_audio_device = SDL_OpenAudioDevice(nullptr, 0, &desired, &obtained, SDL_AUDIO_ALLOW_ANY_CHANGE);
             if (m_audio_device <= 0) {
-                // Not fatal. SDL's Android backend serves exactly one output
-                // device at a time and SDL_mixer already holds it, so this is
-                // guaranteed to fail there - and throwing threw the picture
-                // away with the sound. Show the film silently instead; a mute
-                // intro beats a black screen.
+                // SDL's Android backend serves one output device at a time and
+                // SDL_mixer already holds it, so the film cannot have its own
+                // until the mixer lets go. Nothing is playing through the mixer
+                // while a film is on screen, so borrowing the device for the
+                // duration costs nothing, and it is handed back in close().
+                Mix_CloseAudio();
+                m_borrowed_mixer_device = true;
+                m_audio_device = SDL_OpenAudioDevice(nullptr, 0, &desired, &obtained,
+                    SDL_AUDIO_ALLOW_ANY_CHANGE);
+            }
+            if (m_audio_device <= 0) {
+                if (m_borrowed_mixer_device) {
+                    Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 4096);
+                    m_borrowed_mixer_device = false;
+                }
+                // Still nothing, so the film runs silently rather than not at
+                // all. Throwing here used to discard the picture along with the
+                // sound, which is how a missing audio device turned into a
+                // black screen.
                 WARNLOG("Cannot open an audio device for the video (%s), playing it silently",
                     SDL_GetError());
                 set_flag(m_flags, SMK_NoSound);
