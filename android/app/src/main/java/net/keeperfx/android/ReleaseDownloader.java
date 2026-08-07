@@ -279,6 +279,18 @@ public final class ReleaseDownloader {
     }
 
     /**
+     * Whether the alpha archive for a version is already on the device.
+     *
+     * Asked before the list of downloads is worded, so an entry that costs
+     * nothing but unpacking does not present itself as a 33 MB download.
+     */
+    public static boolean isAlphaCached(Context context, String version) {
+        final File f = new File(new File(context.getFilesDir(), "alpha-cache"),
+            "alpha-" + version + ".7z");
+        return f.isFile() && f.length() > 0;
+    }
+
+    /**
      * The alpha archive for one version, kept so switching back and forth is
      * free. Named after the version, so a newer alpha is still fetched and the
      * old one can be dropped.

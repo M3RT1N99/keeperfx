@@ -126,12 +126,20 @@ public final class UpdateManager {
                 final ReleaseDownloader.ReleaseInfo alpha = ReleaseDownloader.queryLatestAlpha();
                 final String current = prefs.getInstalledAlphaVersion();
                 if (!alpha.version.isEmpty() && !alpha.version.equals(current)) {
+                    // Nothing to fetch if the archive is still on the device
+                    // from a previous switch, and saying "33 MB" then would be
+                    // a plain untruth about what pressing the button costs.
+                    final boolean cached =
+                        ReleaseDownloader.isAlphaCached(context, alpha.version);
+                    final String cost = cached
+                        ? "already downloaded, only needs applying"
+                        : GameData.describeBytes(alpha.sizeInBytes);
                     items.add(new Item(Kind.GAME_ALPHA,
                         "KeeperFX alpha " + alpha.version,
                         (current.isEmpty()
                             ? "Files the current engine needs and 1.4.0 does not have, "
                             : "Update from " + current + ", ")
-                            + GameData.describeBytes(alpha.sizeInBytes), null));
+                            + cost, null));
                 }
             } catch (Exception e) {
                 Log.w(TAG, "Could not check the KeeperFX alpha", e);
