@@ -85,8 +85,7 @@ public final class UpdateManager {
                 final List<String> gaps = GameData.findMissingKeeperfxEntries(context);
                 final StringBuilder detail = new StringBuilder("Game data, ").append(size);
                 if (!gaps.isEmpty()) {
-                    detail.append("
-    missing: ");
+                    detail.append("\n    missing: ");
                     for (int i = 0; i < gaps.size() && i < 4; i++) {
                         if (i > 0) {
                             detail.append(", ");
@@ -143,9 +142,14 @@ public final class UpdateManager {
         // Only worth offering once the game data is in place; it unpacks into
         // the installation directory.
         if (GameData.isKeeperfxInstalled(context) && !GameData.hasMusic(context)) {
+            // Checked on every sweep, not only on a fresh install: the music is
+            // not part of the release on any platform, so an installation that
+            // is otherwise complete is still silent without it, and the log
+            // only says "Cannot load music from ./music/keeper02.ogg".
             items.add(new Item(Kind.MUSIC,
                 "Background music",
-                "Not included in the release, about 42 MB", null));
+                "Not included in the release, about 42 MB"
+                    + "\n    the game plays no music until this is installed", null));
         }
 
         // --- The app itself ---------------------------------------------------
