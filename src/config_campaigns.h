@@ -80,6 +80,9 @@ struct GameCampaign {
   char fname[DISKPATH_SIZE];
   char levels_location[DISKPATH_SIZE];
   char speech_location[DISKPATH_SIZE];
+  // First entry of the [speech] block; files missing from speech_location are
+  // taken from here, since speech is an optional download per language.
+  char speech_fallback_location[DISKPATH_SIZE];
   char land_location[DISKPATH_SIZE];
   char creatures_location[DISKPATH_SIZE];
   char configs_location[DISKPATH_SIZE];

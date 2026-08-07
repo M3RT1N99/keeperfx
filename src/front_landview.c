@@ -698,46 +698,39 @@ TbBool play_current_description_speech(short play_good)
 
 TbBool play_description_speech(LevelNumber lvnum, short play_good)
 {
-    char *fname;
     if (playing_speech_lvnum == lvnum)
       return true;
     struct LevelInformation* lvinfo = get_level_info(lvnum);
     if (lvinfo == NULL)
       return false;
+    const char* speech = play_good ? lvinfo->speech_before : lvinfo->speech_after;
+    if (speech[0] == '\0')
+      return false;
+    stop_description_speech();
+    char path[DISKPATH_SIZE];
+    if (strchr(speech, '.') == NULL)
+    {
+        WARNLOG("No extension specified for %s speech file; defaulting to '.wav'.",
+            play_good ? "good" : "evil");
+        snprintf(path, sizeof(path), "%s.wav", speech);
+    }
+    else
+    {
+        snprintf(path, sizeof(path), "%s", speech);
+    }
     if (play_good)
+        playing_good_descriptive_speech = 1;
+    else
+        playing_bad_descriptive_speech = 1;
+    char* fname = prepare_file_fmtpath(FGrp_AtlSound, "%s", path);
+    // Speech is an optional download per language. When the chosen folder does
+    // not hold this file, take it from the campaign's first [speech] entry, so
+    // the mentor speaks the fallback language rather than staying silent.
+    if (!LbFileExists(fname) && (campaign.speech_fallback_location[0] != '\0')
+        && (strcasecmp(campaign.speech_location, campaign.speech_fallback_location) != 0))
     {
-      if (lvinfo->speech_before[0] == '\0')
-        return false;
-      stop_description_speech();
-      if (strchr(lvinfo->speech_before, '.') == NULL)
-      {
-          WARNLOG("No extension specified for good speech file; defaulting to '.wav'.");
-          char path[DISKPATH_SIZE];
-          snprintf(path, sizeof(path), "%s.wav", lvinfo->speech_before);
-          fname = prepare_file_fmtpath(FGrp_AtlSound, "%s", path);
-      }
-      else
-      {
-          fname = prepare_file_fmtpath(FGrp_AtlSound,"%s",lvinfo->speech_before);
-      }
-      playing_good_descriptive_speech = 1;
-    } else
-    {
-      if (lvinfo->speech_after[0] == '\0')
-        return false;
-      stop_description_speech();
-      if (strchr(lvinfo->speech_after, '.') == NULL)
-      {
-          WARNLOG("No extension specified for evil speech file; defaulting to '.wav'.");
-          char path[DISKPATH_SIZE];
-          snprintf(path, sizeof(path), "%s.wav", lvinfo->speech_after);
-          fname = prepare_file_fmtpath(FGrp_AtlSound, "%s", path);
-      }
-      else
-      {
-          fname = prepare_file_fmtpath(FGrp_AtlSound,"%s",lvinfo->speech_after);
-      }
-      playing_bad_descriptive_speech = 1;
+        SYNCMSG("Missing %s, using the fallback speech folder", fname);
+        fname = prepare_file_fmtpath(FGrp_Main, "%s/%s", campaign.speech_fallback_location, path);
     }
     playing_speech_lvnum = lvnum;
     SYNCMSG("Playing %s", fname);

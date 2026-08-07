@@ -189,6 +189,7 @@ TbBool clear_campaign(struct GameCampaign *campgn)
   memset(campgn->fname,0,DISKPATH_SIZE);
   memset(campgn->levels_location,0,DISKPATH_SIZE);
   memset(campgn->speech_location,0,DISKPATH_SIZE);
+  memset(campgn->speech_fallback_location,0,DISKPATH_SIZE);
   memset(campgn->land_location,0,DISKPATH_SIZE);
   memset(campgn->creatures_location,0,DISKPATH_SIZE);
   memset(campgn->configs_location,0,DISKPATH_SIZE);
@@ -802,21 +803,16 @@ short parse_campaign_speech_blocks(struct GameCampaign *campgn,char *buf,long le
                 block_name, config_textname);
           } else
           {
-              // The first entry in the block is the fallback and is taken
-              // unconditionally; the one matching the chosen language replaces
-              // it only if it is actually installed. Speech is an optional
-              // download per language, and pointing at a folder that is not
-              // there produced silence rather than the fallback - the same
-              // shape load_sound_banks() already guards against for
+              // The first entry in the block doubles as the fallback folder:
+              // speech is an optional download per language, and a file the
+              // chosen folder does not hold is fetched from there instead -
+              // the counterpart of what load_sound_banks() does for
               // speech_<lang>.dat.
-              if ((n == 0) || LbFileExists(folder))
+              if (n == 0)
               {
-                  snprintf(campgn->speech_location, DISKPATH_SIZE, "%s", folder);
-              } else if (cmd_num == install_info.lang_id)
-              {
-                  WARNMSG("Speech folder \"%s\" is not installed, keeping \"%s\".",
-                      folder, campgn->speech_location);
+                  snprintf(campgn->speech_fallback_location, DISKPATH_SIZE, "%s", folder);
               }
+              snprintf(campgn->speech_location, DISKPATH_SIZE, "%s", folder);
               n++;
           }
       }
