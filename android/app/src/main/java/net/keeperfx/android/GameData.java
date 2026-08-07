@@ -44,6 +44,22 @@ public final class GameData {
         "ldata",
     };
 
+    /**
+     * Content the engine asks for by name, so an install that is merely present
+     * is told apart from one that is usable.
+     *
+     * The four videos are the intro sequence; without them the game opens on a
+     * black screen and the log is the only clue. sounds.cfg and the fonts came
+     * after the 1.4.0 release, so their absence also means the alpha patch has
+     * not been laid over it.
+     */
+    private static final String[] KEEPERFX_CONTENT_FILES = {
+        "ldata/intromix.smk",
+        "ldata/bullfrog.smk",
+        "fxdata/sounds.cfg",
+        "fxdata/font12.fxfont",
+    };
+
     private static final String[] KEEPERFX_FILES = {
         "keeperfx.cfg",
         "campgns/keeporig.cfg",
@@ -99,8 +115,22 @@ public final class GameData {
             return missing;
         }
         for (String dir : KEEPERFX_DIRECTORIES) {
-            if (!resolveIgnoringCase(root, dir).isDirectory()) {
+            final File d = resolveIgnoringCase(root, dir);
+            if (!d.isDirectory()) {
                 missing.add(dir + "/");
+            } else {
+                // Existing but empty counts as missing. A half finished install
+                // used to pass this check and then surface as silence and black
+                // screens, with the launcher insisting the data was complete.
+                final String[] entries = d.list();
+                if (entries == null || entries.length == 0) {
+                    missing.add(dir + "/ (empty)");
+                }
+            }
+        }
+        for (String file : KEEPERFX_CONTENT_FILES) {
+            if (!resolveIgnoringCase(root, file).isFile()) {
+                missing.add(file);
             }
         }
         for (String file : KEEPERFX_FILES) {
