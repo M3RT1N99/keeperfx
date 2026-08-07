@@ -70,20 +70,19 @@ public class GameActivity extends SDLActivity {
         if (extra != null) {
             arguments = extra;
         }
-        // Before super.onCreate(), which is where SDL creates its surface. The
-        // engine fixes its video mode from the first size it is given and never
-        // revisits it, so if the system bars are still up at that moment the
-        // whole session runs at 1404x664 on a 1544x720 panel. Asking for the
-        // cutout and hiding the bars first is what makes that first size the
-        // full one.
+        // Window flags only, before super.onCreate() creates SDL's surface. The
+        // engine takes its video mode from the first size it is handed and
+        // never revisits it, so the bars have to be gone by the time the window
+        // is measured or the whole session runs at 1404x664 on a 1544x720
+        // panel. These three are plain layout parameters and need no decor
+        // view; goImmersive() does, because getInsetsController() reaches
+        // through it, and calling it here threw before the game ever started.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().getAttributes().layoutInDisplayCutoutMode =
             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-        goImmersive();
 
         super.onCreate(savedInstanceState);
-        // Again afterwards: the decor view is rebuilt by setContentView(), and
-        // the controller obtained above belongs to the old one.
         goImmersive();
         if (new Prefs(this).isBackButtonShown()) {
             addBackButton();
