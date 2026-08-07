@@ -48,9 +48,6 @@ foreach(field VER_MAJOR VER_MINOR VER_RELEASE VER_BUILD)
     string(REGEX MATCH "${field}=([0-9]+)" _match "${KFX_VERSION_MK}")
     set(${field} "${CMAKE_MATCH_1}")
 endforeach()
-if(NOT DEFINED KFX_BUILD_NUMBER OR KFX_BUILD_NUMBER STREQUAL "")
-    set(KFX_BUILD_NUMBER "${VER_BUILD}")
-endif()
 # VER_BUILD is deliberately left at version.mk's value, which is 0.
 #
 # It is what goes on the wire: net_current_version carries it and
@@ -62,6 +59,7 @@ endif()
 #
 # The build the engine actually is stays visible in the version string below
 # and in the package suffix, which is where that information belongs.
+
 # version.mk carries the suffix that marks this fork's builds as unofficial;
 # Android adds its own name so a report says which build it came from. Gradle
 # can still override the whole thing with keeperfx.packageSuffix.
@@ -76,8 +74,6 @@ endif()
 if(NOT DEFINED GIT_REVISION OR GIT_REVISION STREQUAL "")
     set(GIT_REVISION "unknown")
 endif()
-# The KeeperFX version this engine is, then the port's own version if Gradle
-# passed one, so the log header says both.
 # The engine reports the KeeperFX build it actually is, which is the merge base
 # with upstream rather than this fork's commit count. That is the same counter
 # an alpha patch is numbered with, so a log says straight away whether engine

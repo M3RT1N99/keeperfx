@@ -68,7 +68,6 @@ android {
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_STL=c++_shared",
-                          "-DKFX_BUILD_NUMBER=${engineBuild}",
                           "-DKFX_PORT_VERSION=${portVersion}",
                           "-DKFX_ENGINE_BUILD=${engineBuild}",
                           // Left empty on purpose: CMake then builds the suffix
