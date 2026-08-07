@@ -64,6 +64,8 @@
     <string name="import_keeperfx_title">KeeperFX-Ordner importieren</string>
     <string name="import_original_title">Original Dungeon Keeper importieren</string>
     <string name="import_choose">Ordner wählen</string>
+    <string name="import_choose_folder">Ordner</string>
+    <string name="import_choose_zip">Zip-Archiv</string>
     <string name="import_failed">Import fehlgeschlagen: %1$s</string>
     <string name="config_failed">Konfiguration konnte nicht geschrieben werden: %1$s</string>
 

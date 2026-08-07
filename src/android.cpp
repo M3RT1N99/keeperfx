@@ -44,6 +44,8 @@
 #include <fnmatch.h>
 #include <android/log.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
+#include <AL/al.h>
 
 #define KFX_ANDROID_LOG_TAG "KeeperFX"
 
@@ -243,6 +245,42 @@ static bool apply_data_directory(std::vector<char *> & args)
 }
 
 /**
+ * Silences the game while it is in the background, and brings it back after.
+ *
+ * The engine itself stops when the activity pauses - that is what
+ * SDL_HINT_ANDROID_BLOCK_ON_PAUSE arranges - but the audio threads do not.
+ * SDL_mixer keeps feeding the device and OpenAL keeps mixing whatever was
+ * playing, so music carried on after the phone was locked.
+ *
+ * This has to be an event watch rather than a case in the normal event loop.
+ * SDL queues the background events and then blocks the main thread inside
+ * SDL_PumpEvents, so nothing that waits for the loop would run until the app
+ * was already back in the foreground. A watch is called synchronously from
+ * SDL_SendAppEvent, before the block.
+ */
+static int SDLCALL background_audio_watch(void *userdata, SDL_Event *event)
+{
+    (void)userdata;
+    switch (event->type)
+    {
+    case SDL_APP_WILLENTERBACKGROUND:
+        Mix_PauseMusic();
+        Mix_Pause(-1);
+        // Sound effects go through OpenAL, which SDL knows nothing about.
+        alListenerf(AL_GAIN, 0.0f);
+        break;
+    case SDL_APP_DIDENTERFOREGROUND:
+        alListenerf(AL_GAIN, 1.0f);
+        Mix_Resume(-1);
+        Mix_ResumeMusic();
+        break;
+    default:
+        break;
+    }
+    return 1; // Leave the event in the queue for whoever else wants it
+}
+
+/**
  * Entry point. SDL renames this to SDL_main and calls it from
  * SDLActivity.nativeRunMain() on the SDL thread.
  */
@@ -262,6 +300,8 @@ extern "C" int main(int argc, char *argv[])
     // out of the game entirely. Trapped, it arrives as SDLK_AC_BACK and the
     // input layer turns it into Escape, which is what leaves a menu.
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+
+    SDL_AddEventWatch(background_audio_watch, nullptr);
 
     args.push_back(nullptr);
     const int result = kfxmain((int)(args.size() - 1), args.data());

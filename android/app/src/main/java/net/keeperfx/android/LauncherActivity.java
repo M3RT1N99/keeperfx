@@ -51,6 +51,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     private static final int REQUEST_PICK_KEEPERFX = 1001;
     private static final int REQUEST_PICK_ORIGINAL_DK = 1002;
+    private static final int REQUEST_PICK_ORIGINAL_DK_ZIP = 1003;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -169,8 +170,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         installButton.setOnClickListener(v -> confirmInstallOrUpdate());
         importKeeperfxButton.setOnClickListener(v -> pickFolder(REQUEST_PICK_KEEPERFX,
             R.string.import_keeperfx_title, R.string.import_keeperfx_explanation));
-        importOriginalButton.setOnClickListener(v -> pickFolder(REQUEST_PICK_ORIGINAL_DK,
-            R.string.import_original_title, R.string.import_original_explanation));
+        importOriginalButton.setOnClickListener(v -> askOriginalDkSource());
         playButton.setOnClickListener(v -> startGame());
         findViewById(R.id.removeData).setOnClickListener(v -> confirmRemoveData());
         updateAppButton.setOnClickListener(v -> checkAppUpdate());
@@ -493,6 +493,35 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     // ---------------------------------------------------------------- import
 
+    /**
+     * Asks whether the original game is a folder or an archive.
+     *
+     * A CD rip is very often passed around as one zip, and unpacking it on a
+     * phone just to point a folder picker at the result is a chore. Both routes
+     * look for the same handful of files and put them in the same places.
+     */
+    private void askOriginalDkSource() {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.import_original_title)
+            .setMessage(R.string.import_original_explanation)
+            .setPositiveButton(R.string.import_choose_folder, (dialog, which) -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivityForResult(intent, REQUEST_PICK_ORIGINAL_DK);
+            })
+            .setNeutralButton(R.string.import_choose_zip, (dialog, which) -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                // Not every provider labels a zip with the same type, so the
+                // filter is widened and the reader decides.
+                intent.setType("*/*");
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivityForResult(intent, REQUEST_PICK_ORIGINAL_DK_ZIP);
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+
     private void pickFolder(int requestCode, int titleRes, int explanationRes) {
         new AlertDialog.Builder(this)
             .setTitle(titleRes)
@@ -512,7 +541,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         if (resultCode != RESULT_OK || data == null) {
             return;
         }
-        if (requestCode != REQUEST_PICK_KEEPERFX && requestCode != REQUEST_PICK_ORIGINAL_DK) {
+        if (requestCode != REQUEST_PICK_KEEPERFX && requestCode != REQUEST_PICK_ORIGINAL_DK
+         && requestCode != REQUEST_PICK_ORIGINAL_DK_ZIP) {
             return;
         }
         final Uri treeUri = data.getData();
@@ -526,10 +556,11 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             // Not every provider offers persistable permissions; the copy below
             // only needs the grant that is alive for this activity result.
         }
-        startImport(treeUri, requestCode == REQUEST_PICK_KEEPERFX);
+        startImport(treeUri, requestCode == REQUEST_PICK_KEEPERFX,
+            requestCode == REQUEST_PICK_ORIGINAL_DK_ZIP);
     }
 
-    private void startImport(Uri treeUri, boolean keeperfxRelease) {
+    private void startImport(Uri treeUri, boolean keeperfxRelease, boolean fromZip) {
         setBusy(true);
         progressBar.setIndeterminate(true);
         detailView.setText("");
@@ -566,6 +597,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         new Thread(() -> {
             if (keeperfxRelease) {
                 importer.importKeeperfxTree(treeUri);
+            } else if (fromZip) {
+                importer.importOriginalDkZip(treeUri);
             } else {
                 importer.importOriginalDkTree(treeUri);
             }
