@@ -62,6 +62,12 @@ public final class GameData {
         // back to. Without it the land view and the campaign menu are silent
         // and the log only says a file could not be loaded.
         "campgns/keeporig_eng",
+        // The sound effect bank and the speech bank. load_sound_banks() reads
+        // sound/sound.dat and sound/speech*.dat, and neither was checked
+        // anywhere - only the three .sbk files the Qt launcher copies - so an
+        // installation without them reported itself complete and then played
+        // nothing at all.
+        "sound/sound.dat",
     };
 
     private static final String[] KEEPERFX_FILES = {
