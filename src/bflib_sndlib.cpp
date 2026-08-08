@@ -1254,6 +1254,12 @@ extern "C" int InitialiseSDLAudio()
 	}
 	Mix_ReserveChannels(1); // reserve for external speech samples
 	Mix_HookMusicFinished(on_music_finished); // register callback so we can do things
+#ifdef __ANDROID__
+	// Which backend actually opened matters when chasing audio glitches;
+	// android.cpp asks for openslES and this line proves whether it got it.
+	const char * audio_driver = SDL_GetCurrentAudioDriver();
+	SYNCLOG("SDL audio driver: %s", (audio_driver != nullptr) ? audio_driver : "none");
+#endif
 	return flags;
 }
 
