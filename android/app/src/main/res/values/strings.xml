@@ -114,4 +114,27 @@ The system back button and the back gesture also leave a menu. On screen: a back
     <string name="option_no_intro">Skip the intro</string>
     <string name="option_no_sound">Start without sound</string>
     <string name="option_extra_args">Extra command line options (optional)</string>
+
+    <string name="button_touch_tuning">Fine-tune touch &amp; frame rate</string>
+    <string name="tuning_title">Touch tuning</string>
+    <string name="tuning_intro">Every knob here reaches the engine as its -touchtune startup option, so the extra command line options field still overrides them. Changes apply the next time the game starts.</string>
+    <string name="tuning_reset">Reset to defaults</string>
+    <string name="tuning_value_default">%1$s · default</string>
+    <string name="tuning_fps">Frame rate limit</string>
+    <string name="tuning_fps_hint">60 divides the display evenly and leaves the phone cool. Unlimited draws as fast as the processor can, which heats it up until everything stutters.</string>
+    <string name="tuning_fps_unlimited">Unlimited (engine default)</string>
+    <string name="tuning_panspeed">Pan speed</string>
+    <string name="tuning_panspeed_hint">Finger travel in pixels per unit of camera speed — lower makes the map faster.</string>
+    <string name="tuning_longpress">Long press time (ms)</string>
+    <string name="tuning_longpress_hint">How long a still finger rests before it turns into a right click.</string>
+    <string name="tuning_dragslop">Drag threshold (px)</string>
+    <string name="tuning_dragslop_hint">Movement below this still counts as a tap rather than a drag.</string>
+    <string name="tuning_commitpan">Pan commit distance (px)</string>
+    <string name="tuning_commitpan_hint">How far two fingers travel before the gesture decides it is a pan. Lower reacts sooner but grabs sloppier gestures.</string>
+    <string name="tuning_commitpinch">Zoom commit distance (px)</string>
+    <string name="tuning_commitpinch_hint">How much the distance between the fingers changes before the gesture decides it is a zoom. Raise this if panning keeps turning into zooming.</string>
+    <string name="tuning_committwist">Rotate commit angle (rad)</string>
+    <string name="tuning_committwist_hint">How far the fingers twist before the gesture decides it is a rotation.</string>
+    <string name="tuning_flickdecay">Flick roll-out</string>
+    <string name="tuning_flickdecay_hint">How much speed a released swipe keeps from frame to frame. 0 stops the map dead the moment the fingers lift.</string>
 </resources>

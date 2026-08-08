@@ -181,6 +181,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         updateAppButton.setOnClickListener(v -> checkAppUpdate());
         findViewById(R.id.showLog).setOnClickListener(
             v -> startActivity(new Intent(this, LogActivity.class)));
+        findViewById(R.id.touchTuning).setOnClickListener(
+            v -> startActivity(new Intent(this, TouchTuningActivity.class)));
     }
 
     @Override
@@ -382,7 +384,10 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     @Override
     public void onDownloadState(DownloadService.State state) {
-        setBusy(state.running);
+        // The service's idle state must not unlock the buttons while a folder
+        // import is still copying - the observer fires with the current state
+        // the moment it attaches, which is also every onResume().
+        setBusy(state.running || runningImport != null);
         if (state.running) {
             keeperfxStatus.setText(state.stage);
             detailView.setText(state.detail);
@@ -589,8 +594,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                     runningImport = null;
                     setBusy(false);
                     if (success && keeperfxRelease) {
-                        // A hand picked folder carries no version we can trust.
-                        prefs.setInstalledVersion("");
+                        // A hand picked folder carries no version we can
+                        // trust, and everything recorded about the previous
+                        // installation - the alpha state, its backup, the
+                        // manifests - now describes files the import may have
+                        // replaced.
+                        ReleaseDownloader.wipeInstallState(LauncherActivity.this);
                     }
                     refreshStatus();
                     if (!success) {
@@ -636,7 +645,11 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             .setMessage(R.string.remove_explanation)
             .setPositiveButton(R.string.remove_confirm, (dialog, which) -> {
                 DataImporter.deleteRecursively(GameData.gameDirectory(this));
-                prefs.setInstalledVersion("");
+                // Not only the version: the alpha backup, the archive cache
+                // and the manifests all describe the installation that was
+                // just deleted, and an alpha backup that survives a reset
+                // would "restore" pieces of it into the next one.
+                ReleaseDownloader.wipeInstallState(this);
                 refreshStatus();
             })
             .setNegativeButton(android.R.string.cancel, null)

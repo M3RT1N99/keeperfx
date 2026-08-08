@@ -472,6 +472,28 @@ public final class ReleaseDownloader {
         return restored;
     }
 
+    /**
+     * Forgets everything recorded about the current installation: both
+     * versions, the alpha backup and archive cache, and the manifests.
+     *
+     * For "Reset" and for a hand-imported folder. All of it describes files
+     * that are gone or replaced, and the pieces are not harmless individually:
+     * an alpha backup that survives a reset would "restore" fragments of the
+     * deleted installation into the next one, and a stale manifest makes the
+     * verification report damage that is really just a different install.
+     */
+    public static void wipeInstallState(Context context) {
+        final Prefs prefs = new Prefs(context);
+        prefs.setInstalledVersion("");
+        prefs.setInstalledAlphaVersion("");
+        deleteTree(new File(context.getFilesDir(), "alpha-backup"));
+        deleteTree(new File(context.getFilesDir(), "alpha-cache"));
+        //noinspection ResultOfMethodCallIgnored
+        GameData.stableManifest(context).delete();
+        //noinspection ResultOfMethodCallIgnored
+        GameData.alphaManifest(context).delete();
+    }
+
     private static void deleteTree(File root) {
         final File[] entries = root.listFiles();
         if (entries != null) {

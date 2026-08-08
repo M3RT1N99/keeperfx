@@ -204,6 +204,16 @@
                     android:textColor="@color/kfx_text_dim"
                     android:textSize="12sp" />
 
+                <Button
+                    android:id="@+id/touchTuning"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/btn_slate"
+                    android:text="@string/button_touch_tuning"
+                    android:textColor="@color/btn_text"
+                    android:textSize="12sp" />
+
             </LinearLayout>
 
             <TextView

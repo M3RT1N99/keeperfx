@@ -24,6 +24,7 @@ import android.content.SharedPreferences;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public final class Prefs {
 
@@ -169,6 +170,81 @@ public final class Prefs {
         prefs.edit().putInt(KEY_DRAW_FPS, fps).apply();
     }
 
+    /** One knob of the engine's -touchtune startup option. */
+    public static final class TouchTunable {
+        public final String key;
+        public final float def;
+        public final float min;
+        public final float max;
+        public final float step;
+
+        TouchTunable(String key, float def, float min, float max, float step) {
+            this.key = key;
+            this.def = def;
+            this.min = min;
+            this.max = max;
+            this.step = step;
+        }
+    }
+
+    /**
+     * Mirrors the table in src/bflib_input_touch.cpp touch_tune() - the names,
+     * defaults and ranges must match, or the engine warns and ignores a value.
+     */
+    public static final TouchTunable[] TOUCH_TUNABLES = {
+        new TouchTunable("panspeed",      7.0f,   1.0f,   60.0f,  1.0f),
+        new TouchTunable("longpress",   420.0f, 120.0f, 2000.0f, 10.0f),
+        new TouchTunable("dragslop",     12.0f,   2.0f,   80.0f,  1.0f),
+        new TouchTunable("commitpan",    20.0f,   4.0f,  200.0f,  1.0f),
+        new TouchTunable("commitpinch",  34.0f,   4.0f,  200.0f,  1.0f),
+        new TouchTunable("committwist",  0.30f,  0.02f,   2.0f, 0.01f),
+        new TouchTunable("flickdecay",   0.90f,   0.0f,  0.99f, 0.01f),
+    };
+
+    public float getTouchTune(TouchTunable tunable) {
+        return prefs.getFloat("tune_" + tunable.key, tunable.def);
+    }
+
+    public void setTouchTune(TouchTunable tunable, float value) {
+        prefs.edit().putFloat("tune_" + tunable.key, value).apply();
+    }
+
+    public void resetTouchTuning() {
+        final SharedPreferences.Editor editor = prefs.edit();
+        for (TouchTunable tunable : TOUCH_TUNABLES) {
+            editor.remove("tune_" + tunable.key);
+        }
+        editor.apply();
+    }
+
+    /** Formats one value the way the engine's atof() reads it back. */
+    public static String formatTouchTune(TouchTunable tunable, float value) {
+        if (tunable.step < 1.0f) {
+            return String.format(Locale.US, "%.2f", value);
+        }
+        return Integer.toString(Math.round(value));
+    }
+
+    /**
+     * The -touchtune value for every knob moved off its default, or null when
+     * none was. Only moved knobs are passed, so engine-side default changes
+     * keep reaching players who never opened the tuning screen.
+     */
+    private String buildTouchTuneValue() {
+        final StringBuilder sb = new StringBuilder();
+        for (TouchTunable tunable : TOUCH_TUNABLES) {
+            final float value = getTouchTune(tunable);
+            if (Math.abs(value - tunable.def) < tunable.step / 2.0f) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(',');
+            }
+            sb.append(tunable.key).append('=').append(formatTouchTune(tunable, value));
+        }
+        return (sb.length() > 0) ? sb.toString() : null;
+    }
+
     public String getExtraArguments() {
         return prefs.getString(KEY_EXTRA_ARGS, "");
     }
@@ -214,6 +290,13 @@ public final class Prefs {
         if (getDrawFps() > 0) {
             args.add("-fps_draw");
             args.add(Integer.toString(getDrawFps()));
+        }
+        // Before the extra arguments, so a hand-typed -touchtune still wins:
+        // the engine applies the options in order and the last name counts.
+        final String touchTune = buildTouchTuneValue();
+        if (touchTune != null) {
+            args.add("-touchtune");
+            args.add(touchTune);
         }
 
         final String extra = getExtraArguments();
