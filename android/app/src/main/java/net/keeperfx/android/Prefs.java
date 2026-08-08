@@ -38,6 +38,7 @@ public final class Prefs {
     private static final String KEY_BACK_BUTTON = "back_button";
     private static final String KEY_NO_INTRO = "no_intro";
     private static final String KEY_NO_SOUND = "no_sound";
+    private static final String KEY_DRAW_FPS = "draw_fps";
     private static final String KEY_EXTRA_ARGS = "extra_args";
     private static final String KEY_INSTALLED_VERSION = "installed_version";
     private static final String KEY_INSTALLED_ALPHA = "installed_alpha";
@@ -148,6 +149,26 @@ public final class Prefs {
         prefs.edit().putBoolean(KEY_USE_ALPHA, value).apply();
     }
 
+    /**
+     * The frame rate the engine is asked to draw at; 0 leaves it alone.
+     *
+     * The engine's own default is unlimited: DELTA_TIME=ON with
+     * FRAMES_PER_SECOND=0 renders as many frames as the CPU can produce, which
+     * on a phone means one big core pinned flat out in the software renderer.
+     * The SoC heats up, the governor pulls the clocks, and the game stutters in
+     * bursts - picture and audio together, since the mixer threads starve with
+     * it. 60 divides a 120 Hz panel evenly and leaves headroom; the value is
+     * passed as "-fps_draw", so anything in the extra arguments field still
+     * overrides it, the engine parsing the last occurrence.
+     */
+    public int getDrawFps() {
+        return prefs.getInt(KEY_DRAW_FPS, 60);
+    }
+
+    public void setDrawFps(int fps) {
+        prefs.edit().putInt(KEY_DRAW_FPS, fps).apply();
+    }
+
     public String getExtraArguments() {
         return prefs.getString(KEY_EXTRA_ARGS, "");
     }
@@ -189,6 +210,10 @@ public final class Prefs {
         }
         if (isNoSound()) {
             args.add("-nosound");
+        }
+        if (getDrawFps() > 0) {
+            args.add("-fps_draw");
+            args.add(Integer.toString(getDrawFps()));
         }
 
         final String extra = getExtraArguments();

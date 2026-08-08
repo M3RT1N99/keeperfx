@@ -28,10 +28,19 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
 
+    <!--
+      appCategory tells the platform this is a game. Samsung's and Google's
+      game services key off it: the scheduler treats the process as a game,
+      Game Booster manages thermals for it, and notifications stay out of the
+      way. Without it the engine is just an anonymous CPU-heavy app, first in
+      line for throttling.
+    -->
     <application
         android:allowBackup="false"
+        android:appCategory="game"
         android:hasFragileUserData="true"
         android:icon="@mipmap/ic_launcher"
+        android:isGame="true"
         android:label="@string/app_name"
         android:largeHeap="true"
         android:theme="@style/Theme.KeeperFX">

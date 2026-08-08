@@ -146,6 +146,9 @@ public class LogActivity extends Activity {
           .append(" (API ").append(Build.VERSION.SDK_INT).append(")\n");
         sb.append("abi            : ").append(String.join(", ", Build.SUPPORTED_ABIS)).append('\n');
         sb.append("input mode     : ").append(inputModeName(prefs.getInputMode())).append('\n');
+        sb.append("draw fps       : ")
+          .append(prefs.getDrawFps() > 0 ? String.valueOf(prefs.getDrawFps()) : "engine default")
+          .append('\n');
         sb.append("language       : ").append(prefs.getLanguage()).append('\n');
         sb.append("data complete  : ").append(GameData.isComplete(this)).append('\n');
         final GameData.VerifyReport verified = GameData.verifyInstalledFiles(this);
