@@ -289,6 +289,13 @@ TbResult LbScreenSwap(void)
         }
     }
     LbMouseOnEndSwap();
+#if defined(__ANDROID__)
+    {
+        // Frame time watchdog; a stutter report then carries numbers.
+        extern void android_frame_watch(void);
+        android_frame_watch();
+    }
+#endif
     return ret;
 }
 

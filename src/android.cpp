@@ -27,6 +27,7 @@
 
 #include "platform.h"
 #include "steam_api.hpp"
+#include "bflib_basics.h"
 #include "bflib_crash.h"
 #include "bflib_fileio.h"
 #include "cdrom.h"
@@ -278,6 +279,49 @@ static int SDLCALL background_audio_watch(void *userdata, SDL_Event *event)
         break;
     }
     return 1; // Leave the event in the queue for whoever else wants it
+}
+
+/**
+ * Logs frames that took far longer than usual, so a stutter report arrives
+ * with numbers in the engine log instead of an impression. Called from
+ * LbScreenSwap() once per presented frame.
+ *
+ * The reference is a slow exponential average of the frame time; a frame is
+ * reported when it takes three times that and at least 50 ms. Reporting is
+ * capped hard: the log is flushed per line, and turning every slow frame
+ * into I/O would cause the next one.
+ */
+extern "C" void android_frame_watch(void)
+{
+    static Uint32 prev_ticks = 0;
+    static Uint32 last_report_ticks = 0;
+    static float avg_ms = 0.0f;
+    static int reports_left = 40;
+    const Uint32 now = SDL_GetTicks();
+    if (prev_ticks == 0) {
+        prev_ticks = now;
+        return;
+    }
+    const Uint32 delta = now - prev_ticks;
+    prev_ticks = now;
+    // Coming back from the background, a level load: not a frame at all.
+    if (delta > 2000) {
+        return;
+    }
+    if (avg_ms <= 0.0f) {
+        avg_ms = (float)delta;
+        return;
+    }
+    const float limit = (avg_ms * 3.0f > 50.0f) ? (avg_ms * 3.0f) : 50.0f;
+    if (((float)delta > limit) && (reports_left > 0) && (now - last_report_ticks > 2000)) {
+        reports_left--;
+        SYNCMSG("Slow frame: %u ms (typical %d ms)%s", (unsigned)delta, (int)(avg_ms + 0.5f),
+            (reports_left == 0) ? ", further ones not logged" : "");
+        last_report_ticks = now;
+    }
+    // Adapts slowly, so a burst of slow frames does not become the norm the
+    // next ones are measured against.
+    avg_ms += ((float)delta - avg_ms) * 0.02f;
 }
 
 /**
