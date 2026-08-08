@@ -79,6 +79,8 @@ void sound_save_id_redirect_snapshot(void);
  */
 void sound_restore_id_redirect_snapshot(void);
 
+/** True while the streamed speech sample is audible, whichever way it plays. */
+TbBool streamed_sample_playing(void);
 void set_music_volume(SoundVolume);
 TbBool play_music(const char * fname);
 TbBool play_music_fgroup(short fgroup, const char * fname);

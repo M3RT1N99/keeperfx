@@ -798,7 +798,10 @@ long speech_sample_playing(void)
          return false;
      }
      SYNCDBG(17,"Starting");
-     if (Mix_Playing(MIX_SPEECH_CHANNEL))
+     // Through the wrapper rather than Mix_Playing directly: on Android the
+     // streamed speech plays on an OpenAL source, everywhere else this is
+     // still exactly the mixer channel query it always was.
+     if (streamed_sample_playing())
      {
          return true;
      }

@@ -1283,6 +1283,78 @@ extern "C" void ShutDownSDLAudio()
 	}
 }
 
+#ifdef __ANDROID__
+// The streamed speech - the land view narration and the mentor phrases - is
+// played through OpenAL here, not through an SDL_mixer channel. On a real
+// device the mixer path stuttered and every layer of it was ruled out one by
+// one: the files verified on disk, the decode ordinary, the locking clean,
+// the CPU idle between frames, both SDL audio backends tried, even the intro
+// video's device borrowing eliminated - while everything OpenAL plays on the
+// very same device is clean. SDL_mixer still does the decoding below, so
+// every format it accepts keeps working; only the playback changes lanes.
+static ALuint speech_al_source = 0;
+static ALuint speech_al_buffer = 0;
+
+static bool speech_al_ready()
+{
+	if (!g_openal_device || !g_openal_context) {
+		return false;
+	}
+	if (speech_al_source == 0) {
+		alGetError();
+		alGenSources(1, &speech_al_source);
+		if (alGetError() != AL_NO_ERROR) {
+			speech_al_source = 0;
+			return false;
+		}
+		alSourcei(speech_al_source, AL_SOURCE_RELATIVE, AL_TRUE);
+		alSource3f(speech_al_source, AL_POSITION, 0.0f, 0.0f, 0.0f);
+	}
+	return true;
+}
+
+static void speech_al_unload()
+{
+	if (speech_al_source != 0) {
+		alSourceStop(speech_al_source);
+		alSourcei(speech_al_source, AL_BUFFER, 0);
+	}
+	if (speech_al_buffer != 0) {
+		alDeleteBuffers(1, &speech_al_buffer);
+		speech_al_buffer = 0;
+	}
+}
+
+static bool speech_al_play(const Mix_Chunk * sample, SoundVolume volume)
+{
+	int freq = 0;
+	int channels = 0;
+	Uint16 fmt = 0;
+	if (!speech_al_ready() || Mix_QuerySpec(&freq, &fmt, &channels) == 0) {
+		return false;
+	}
+	// Chunks come out of Mix_LoadWAV in the mixer's output format; anything
+	// but 16 bit or more than two channels never happens with how the mixer
+	// is opened, but a fallback beats an assumption.
+	if ((fmt != AUDIO_S16SYS) || (channels < 1) || (channels > 2)) {
+		return false;
+	}
+	speech_al_unload();
+	alGetError();
+	alGenBuffers(1, &speech_al_buffer);
+	alBufferData(speech_al_buffer, (channels == 1) ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16,
+		sample->abuf, (ALsizei)sample->alen, freq);
+	alSourcei(speech_al_source, AL_BUFFER, (ALint)speech_al_buffer);
+	alSourcef(speech_al_source, AL_GAIN, (float)volume / FULL_LOUDNESS);
+	alSourcePlay(speech_al_source);
+	if (alGetError() != AL_NO_ERROR) {
+		speech_al_unload();
+		return false;
+	}
+	return true;
+}
+#endif
+
 extern "C" TbBool play_streamed_sample(const char* fname, SoundVolume volume)
 {
 	if (SoundDisabled || fname == nullptr || strlen(fname) == 0) {
@@ -1298,6 +1370,19 @@ extern "C" TbBool play_streamed_sample(const char* fname, SoundVolume volume)
 		ERRORLOG("Cannot load \"%s\": %s", fname, Mix_GetError());
 		return false;
 	}
+#ifdef __ANDROID__
+	if (speech_al_play(sample, volume)) {
+		// The PCM now lives in the OpenAL buffer; the chunk is done.
+		Mix_FreeChunk(sample);
+		std::lock_guard<std::mutex> guard(g_mix_mutex);
+		const auto old_sample = std::exchange(g_streamed_sample, nullptr);
+		if (old_sample) {
+			Mix_FreeChunk(old_sample);
+		}
+		return true;
+	}
+	WARNLOG("Playing \"%s\" through the mixer, OpenAL was not available", fname);
+#endif
 	// SoundVolume ranges 0..255 but MIX_MAX_VOLUME ranges 0..128
 	Mix_VolumeChunk(sample, volume / 2);
 	if (Mix_PlayChannel(MIX_SPEECH_CHANNEL, sample, 0) != 0) {
@@ -1315,6 +1400,9 @@ extern "C" TbBool play_streamed_sample(const char* fname, SoundVolume volume)
 
 extern "C" void stop_streamed_samples()
 {
+#ifdef __ANDROID__
+	speech_al_unload();
+#endif
 	Mix_HaltChannel(MIX_SPEECH_CHANNEL);
 	std::lock_guard<std::mutex> guard(g_mix_mutex);
 	const auto old_sample = std::exchange(g_streamed_sample, nullptr);
@@ -1324,8 +1412,27 @@ extern "C" void stop_streamed_samples()
 }
 
 extern "C" void set_streamed_sample_volume(SoundVolume volume) {
+#ifdef __ANDROID__
+	if (speech_al_source != 0) {
+		alSourcef(speech_al_source, AL_GAIN, (float)volume / FULL_LOUDNESS);
+	}
+#endif
 	// SoundVolume ranges 0..255 but MIX_MAX_VOLUME ranges 0..128
 	Mix_VolumeChunk(g_streamed_sample, volume / 2);
+}
+
+extern "C" TbBool streamed_sample_playing(void)
+{
+#ifdef __ANDROID__
+	if (speech_al_source != 0) {
+		ALint state = AL_STOPPED;
+		alGetSourcei(speech_al_source, AL_SOURCE_STATE, &state);
+		if (state == AL_PLAYING) {
+			return true;
+		}
+	}
+#endif
+	return Mix_Playing(MIX_SPEECH_CHANNEL) != 0;
 }
 
 extern "C" void toggle_bbking_mode() {
