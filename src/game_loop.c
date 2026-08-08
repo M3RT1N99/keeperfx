@@ -910,6 +910,17 @@ static TbBool wait_at_frontend(void)
         fade_palette_in = 0;
       } else {
         if (is_feature_on(Ft_DeltaTime) == true && should_use_delta_time_on_menu()) {
+#if defined(__ANDROID__)
+          // The draw limit applies to the frontend too. This branch never
+          // sleeps, so the land view software-rendered at whatever rate the
+          // CPU could sustain, saturating the cores until the mentor speech
+          // playing underneath began to drop out. fps_limit_current is 0
+          // when no limit is configured, which keeps the branch sleepless
+          // exactly as on the other platforms.
+          if (fps_limit_current > 0) {
+            LbSleepUntil(fe_last_loop_time + max(1, 1000 / fps_limit_current));
+          }
+#endif
           update_frontend_delta_time();
         } else {
           int32_t frame_time;
