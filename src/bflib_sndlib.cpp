@@ -30,6 +30,9 @@
 #include <mutex>
 #include <atomic>
 #include <cmath>
+#ifdef __ANDROID__
+#include <unistd.h>
+#endif
 
 #include "post_inc.h"
 
@@ -678,6 +681,28 @@ extern "C" void set_music_volume(SoundVolume value) {
 	Mix_VolumeMusic(LbLerp(0, MIX_MAX_VOLUME, float(value) / FULL_LOUDNESS));
 }
 
+#ifdef __ANDROID__
+// SDL_RWFromFile does not resolve a relative path against the working
+// directory on Android - it looks in the APK assets and at the internal
+// storage root instead - so the music and the streamed speech, the only
+// things Mix opens by name, have to be handed an absolute path. Every
+// other file goes through LbFileOpen's stdio and is unaffected.
+static const char * mix_file_path(const char * fname, char * buf, size_t bufsize) {
+	if (fname == nullptr || fname[0] == '/') {
+		return fname;
+	}
+	if (getcwd(buf, bufsize) == nullptr) {
+		return fname;
+	}
+	if (fname[0] == '.' && fname[1] == '/') {
+		fname += 2;
+	}
+	const size_t len = strlen(buf);
+	snprintf(buf + len, bufsize - len, "/%s", fname);
+	return buf;
+}
+#endif
+
 extern "C" TbBool play_music(const char * fname) {
 	std::lock_guard<std::mutex> guard(g_mix_mutex);
 	if (g_current_music_fname == fname) {
@@ -691,7 +716,12 @@ extern "C" TbBool play_music(const char * fname) {
 	}
 	// Mix_PlayMusic will stop anything currently playing and eventually
 	// calls on_music_finished so theres no need to call Mix_FreeMusic first.
-	const auto music = Mix_LoadMUS(game.music_fname);
+	const char * music_path = game.music_fname;
+#ifdef __ANDROID__
+	char full_path[2048];
+	music_path = mix_file_path(game.music_fname, full_path, sizeof(full_path));
+#endif
+	const auto music = Mix_LoadMUS(music_path);
 	if (!music) {
 		WARNLOG("Cannot load music from %s: %s", game.music_fname, Mix_GetError());
 		return false;
@@ -1252,7 +1282,12 @@ extern "C" TbBool play_streamed_sample(const char* fname, SoundVolume volume)
 	if (SoundDisabled || fname == nullptr || strlen(fname) == 0) {
 		return false;
 	}
-	const auto sample = Mix_LoadWAV(fname);
+	const char * sample_path = fname;
+#ifdef __ANDROID__
+	char full_path[2048];
+	sample_path = mix_file_path(fname, full_path, sizeof(full_path));
+#endif
+	const auto sample = Mix_LoadWAV(sample_path);
 	if (sample == nullptr) {
 		ERRORLOG("Cannot load \"%s\": %s", fname, Mix_GetError());
 		return false;
