@@ -917,8 +917,27 @@ static TbBool wait_at_frontend(void)
           // playing underneath began to drop out. fps_limit_current is 0
           // when no limit is configured, which keeps the branch sleepless
           // exactly as on the other platforms.
+          //
+          // Through the precise sleeper, not LbSleepUntil(): that one
+          // busy-spins any wait shorter than its 20 ms coarse step, which at
+          // 60 fps is every frame's whole remainder - the core stayed just
+          // as saturated waiting as it had been rendering, and the speech
+          // kept dropping out. LbSleepUntilExt() actually sleeps, down to
+          // the measured timer precision of a millisecond or two.
           if (fps_limit_current > 0) {
-            LbSleepUntil(fe_last_loop_time + max(1, 1000 / fps_limit_current));
+            static long double fe_next_frame_ns = 0;
+            const long double fe_period_ns = 1000000000.0L / fps_limit_current;
+            const long double fe_now_ns = get_time_tick_ns();
+            if ((fe_next_frame_ns < fe_now_ns - fe_period_ns)
+             || (fe_next_frame_ns > fe_now_ns + fe_period_ns)) {
+              // First frame, or the beat was lost to a stall; start over
+              // instead of sprinting to catch up.
+              fe_next_frame_ns = fe_now_ns;
+            }
+            fe_next_frame_ns += fe_period_ns;
+            if (fe_next_frame_ns > fe_now_ns) {
+              LbSleepUntilExt(fe_next_frame_ns);
+            }
           }
 #endif
           update_frontend_delta_time();
