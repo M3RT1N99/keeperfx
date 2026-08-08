@@ -2397,7 +2397,24 @@ static void get_isometric_view_nonaction_inputs(void)
             if (is_game_key_pressed(Gkey_TiltReset, false, false))
                 set_packet_control(packet, PCtr_ViewTiltReset);
 
+            // Drained before get_movement_inputs() so the same travel stops
+            // reporting through the movement axes, and applied after it so
+            // the clamp in there never touches the finger's value.
+            float touch_pan_dx = 0.0f;
+            float touch_pan_dy = 0.0f;
+            TbBool touch_pan = touch_controls_active()
+                && touch_drain_pan_movement(&touch_pan_dx, &touch_pan_dy);
             get_movement_inputs(&camera_movement_x, &camera_movement_y, no_mods);
+            if (touch_pan)
+            {
+                // Added, not assigned: the camera empties these when it takes
+                // them, once per game turn, and several frames land in
+                // between - assigning would throw those frames' travel away,
+                // which is exactly what made panning feel detached before.
+                // The world follows the fingers, so the camera runs opposite.
+                camera_movement_x += -touch_pan_dx;
+                camera_movement_y += -touch_pan_dy;
+            }
         }
         if (! set_rotate_pos)
             unset_packet_control(packet, PCtr_ViewRotatePos);

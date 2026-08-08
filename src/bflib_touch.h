@@ -56,7 +56,8 @@ TbBool touch_parse_control_mode(const char *text, unsigned char *mode);
 /**
  * Adjusts one gesture constant at run time, by name.
  *
- * Names: panspeed, longpress, dragslop, commitpan, commitpinch, committwist.
+ * Names: panspeed, longpress, dragslop, commitpan, commitpinch, committwist,
+ * flickdecay.
  * @return true when the name was recognised.
  */
 TbBool touch_tune(const char *name, float value);
@@ -93,6 +94,19 @@ int touch_game_key_pressed(long key_id, TbBool clear_pressed);
  * Touch equivalent of cbtn_axis_value(); returns 0.0 when the gesture is inactive.
  */
 float touch_game_key_axis_value(long key_id);
+
+/**
+ * Hands over the finger travel collected since the last call, normalised so
+ * that one unit equals the camera speed of a fully pressed movement key, and
+ * including the roll-out of a flick. The isometric camera consumes this
+ * directly, so the world follows the finger at the speed it actually moved;
+ * while it does, the pan gesture stops reporting through the game key axes so
+ * the movement is not applied twice.
+ *
+ * @return true while a pan gesture or its flick is live, even in a frame the
+ * fingers did not move.
+ */
+TbBool touch_drain_pan_movement(float *dx, float *dy);
 
 /******************************************************************************/
 #ifdef __cplusplus
