@@ -100,15 +100,15 @@ static float touch_pan_full_speed_px = 7.0f;
 #define TOUCH_TWIST_DEADZONE_RAD 0.012f
 
 /**
- * How far a two finger gesture has to get from where it started before it
- * commits to being a pan, a pinch or a twist. Two fingers on a screen always
- * produce a little of all three at once, and acting on all of them together is
- * what makes the camera feel like it is fighting back.
+ * How far each part of a two finger gesture has to get from where it started
+ * before its channel unlocks. Two fingers on a screen always produce a little
+ * of all three movements at once; below these thresholds that is treated as
+ * noise, above them the channel flows for the rest of the gesture.
  *
- * Panning is deliberately the easiest to reach and zooming the hardest. It is
- * the movement people make constantly, two fingers dragged across a screen
- * never stay exactly the same distance apart, and being zoomed when you meant
- * to move is far more disruptive than the other way round.
+ * Panning is deliberately the easiest to reach: it is the movement people
+ * make constantly, and a net centre drift is cheap to produce. Zoom and
+ * rotate ask for more because their signals - net distance change, net twist -
+ * barely move during an honest pan, so once crossed the intent is clear.
  */
 static float touch_commit_pan_px = 20.0f;
 static float touch_commit_pinch_px = 34.0f;
@@ -159,13 +159,19 @@ static TbBool touch_sticky_rmb = false;
 static TbBool touch_tapped_back = false;
 static int touch_back_key_frames = 0;
 
-/** What a running two finger gesture has committed to. */
-enum TouchTwoFingerMode {
-    T2F_Undecided = 0,
-    T2F_Pan,
-    T2F_Zoom,
-    T2F_Rotate,
-};
+/* The channels of a two finger gesture. Deliberately not an exclusive mode:
+   a one handed pinch - thumb resting, index finger pulling - moves the centre
+   of the fingers about half as fast as it changes their distance, so a race
+   for a single commitment was always a coin toss. While a mis-call landed on
+   a slow clamped pan it went unnoticed; once panning tracked the finger 1:1
+   it yanked the map and locked the intended zoom out entirely. Instead each
+   channel unlocks by itself once its own net travel is reached, the way every
+   map application layers them: a pinch zooms while the map gently follows the
+   drifting centre, and a plain drag never unlocks zoom because the finger
+   distance stays where it started. */
+static TbBool touch_t2f_pan;
+static TbBool touch_t2f_zoom;
+static TbBool touch_t2f_rotate;
 
 /* Finger travel collected since the last frame, in screen pixels. */
 static float touch_pan_accum_x, touch_pan_accum_y;
@@ -187,8 +193,7 @@ static float touch_pan_frame_x, touch_pan_frame_y;
 static float touch_flick_vx, touch_flick_vy;
 static float touch_flick_decay = 0.90f;
 
-/* State since the two finger gesture began, used to commit to one of them. */
-static unsigned char touch_two_finger_mode = T2F_Undecided;
+/* State since the two finger gesture began, used to unlock the channels. */
 static float touch_start_dist;
 static long touch_start_cx, touch_start_cy;
 /** Signed sum of the per event twists, so that jitter cancels instead of adding up. */
@@ -318,7 +323,7 @@ static void touch_reset_gesture_axes(void)
     touch_pan_frame_x = touch_pan_frame_y = 0.0f;
     // The flick is deliberately not cleared here: it is set at the very
     // moment the gesture ends, which is also when this runs.
-    touch_two_finger_mode = T2F_Undecided;
+    touch_t2f_pan = touch_t2f_zoom = touch_t2f_rotate = false;
     touch_total_twist = 0.0f;
     touch_axis_pan_left = touch_axis_pan_right = 0.0f;
     touch_axis_pan_up = touch_axis_pan_down = 0.0f;
@@ -333,7 +338,7 @@ static void touch_reset_gesture_axes(void)
  */
 static void touch_end_pan_flick(void)
 {
-    if ((touch_gesture != TGest_Camera) || (touch_two_finger_mode != T2F_Pan)
+    if ((touch_gesture != TGest_Camera) || !touch_t2f_pan
      || (touch_flick_decay <= 0.0f)
      || ((fabsf(touch_flick_vx) < 2.0f) && (fabsf(touch_flick_vy) < 2.0f)))
     {
@@ -493,7 +498,7 @@ static void touch_begin_camera_gesture(void)
     touch_start_dist = touch_camera_prev_dist;
     touch_start_cx = touch_camera_prev_cx;
     touch_start_cy = touch_camera_prev_cy;
-    touch_two_finger_mode = T2F_Undecided;
+    touch_t2f_pan = touch_t2f_zoom = touch_t2f_rotate = false;
     touch_total_twist = 0.0f;
     touch_pinch_accum = touch_twist_accum = 0.0f;
     touch_gesture = TGest_Camera;
@@ -531,76 +536,63 @@ static void touch_update_camera_gesture(void)
     while (angle_delta < -TOUCH_PI)
         angle_delta += 2.0f * TOUCH_PI;
 
-    // Decide once what this gesture is, then stick to it until the fingers lift.
-    if (touch_two_finger_mode == T2F_Undecided)
+    // Each channel unlocks on its own once its net travel since the gesture
+    // began crosses its threshold, and stays unlocked until the fingers lift.
+    // Net values rather than summed steps: a digitiser reports a pixel or two
+    // of noise per event and a 120 Hz screen produces dozens of events per
+    // frame, so summing absolute steps made a perfectly parallel drag
+    // accumulate tens of pixels of "pinch" out of nothing.
+    const float net_pan_x = (float)(cx - touch_start_cx);
+    const float net_pan_y = (float)(cy - touch_start_cy);
+    touch_total_twist += angle_delta;
+    if (!touch_t2f_pan
+     && (sqrtf(net_pan_x * net_pan_x + net_pan_y * net_pan_y) >= touch_commit_pan_px))
     {
-        // Measured against where the fingers started, not by adding up the size
-        // of every step. A digitiser reports a pixel or two of noise per event
-        // and a 120 Hz screen produces dozens of events per frame, so summing
-        // absolute steps made a perfectly parallel drag accumulate tens of
-        // pixels of "pinch" out of nothing and commit to a zoom. Net values
-        // cancel that noise instead of collecting it.
-        const float net_pan_x = (float)(cx - touch_start_cx);
-        const float net_pan_y = (float)(cy - touch_start_cy);
-        touch_total_twist += angle_delta;
-
-        const float pan_share =
-            sqrtf(net_pan_x * net_pan_x + net_pan_y * net_pan_y) / touch_commit_pan_px;
-        const float pinch_share = fabsf(dist - touch_start_dist) / touch_commit_pinch_px;
-        const float twist_share = fabsf(touch_total_twist) / touch_commit_twist_rad;
-        if ((pan_share >= 1.0f) || (pinch_share >= 1.0f) || (twist_share >= 1.0f))
-        {
-            if ((pan_share >= pinch_share) && (pan_share >= twist_share))
-            {
-                touch_two_finger_mode = T2F_Pan;
-                // The travel spent deciding what the gesture is would
-                // otherwise be swallowed - a dead first centimetre on every
-                // pan. Handing it over now lets the map catch up to where
-                // the fingers already are.
-                touch_pan_drain_x += net_pan_x;
-                touch_pan_drain_y += net_pan_y;
-            }
-            else if (pinch_share >= twist_share)
-                touch_two_finger_mode = T2F_Zoom;
-            else
-                touch_two_finger_mode = T2F_Rotate;
-        }
+        touch_t2f_pan = true;
+        // The travel spent reaching the threshold would otherwise be
+        // swallowed - a dead first centimetre on every pan. Handing it over
+        // now lets the map catch up to where the fingers already are.
+        touch_pan_drain_x += net_pan_x;
+        touch_pan_drain_y += net_pan_y;
+    }
+    if (!touch_t2f_zoom && (fabsf(dist - touch_start_dist) >= touch_commit_pinch_px))
+    {
+        touch_t2f_zoom = true;
+    }
+    if (!touch_t2f_rotate && (fabsf(touch_total_twist) >= touch_commit_twist_rad))
+    {
+        touch_t2f_rotate = true;
     }
 
-    switch (touch_two_finger_mode)
+    if (touch_t2f_pan)
     {
-    case T2F_Pan:
-        // Only accumulated here. A 120 Hz screen delivers many motion events per
-        // game frame, each a couple of pixels, so turning one event into an axis
-        // value would describe the sampling rate rather than how fast the finger
-        // is actually moving. update_touch_inputs() converts the sum once a frame.
-        // The world follows the fingers, so the camera travels the other way.
+        // Only accumulated here. A 120 Hz screen delivers many motion events
+        // per game frame, each a couple of pixels, so turning one event into
+        // an axis value would describe the sampling rate rather than how fast
+        // the finger is actually moving. update_touch_inputs() converts the
+        // sum once a frame. The world follows the fingers, so the camera
+        // travels the other way; the drain feeds the camera directly and only
+        // empties when the camera reads it, so nothing is lost between the
+        // frame rate and the game's slower turn rate. The frame sum drives
+        // the flick velocity.
         touch_pan_accum_x += pan_dx;
         touch_pan_accum_y += pan_dy;
-        // The drain feeds the camera directly and only empties when the camera
-        // reads it, so nothing is lost between the frame rate and the game's
-        // slower turn rate; the frame sum drives the flick velocity.
         touch_pan_drain_x += pan_dx;
         touch_pan_drain_y += pan_dy;
         touch_pan_frame_x += pan_dx;
         touch_pan_frame_y += pan_dy;
-        break;
-
-    case T2F_Zoom:
-        // Collected, not acted on. Testing one event's delta against a deadzone
-        // measured in whole pixels asks a 120 Hz screen for movement it never
-        // reports in a single event, so a deliberate pinch cleared the commit
-        // threshold - which is measured against the gesture's start - and then
-        // produced nothing at all.
+    }
+    if (touch_t2f_zoom)
+    {
+        // Collected, not acted on. Testing one event's delta against a
+        // deadzone measured in whole pixels asks a 120 Hz screen for movement
+        // it never reports in a single event, so a deliberate pinch cleared
+        // the threshold and then produced nothing at all.
         touch_pinch_accum += dist_delta;
-        break;
-
-    case T2F_Rotate:
+    }
+    if (touch_t2f_rotate)
+    {
         touch_twist_accum += angle_delta;
-        break;
-
-    default:
-        break;
     }
 
     touch_camera_prev_dist = dist;
@@ -866,7 +858,7 @@ void update_touch_inputs(void)
     // The flick velocity averages the travel of the last few frames, but only
     // while the pan is actually live - during the roll-out the frame sum is
     // zero and averaging it in would decay the flick twice.
-    if ((touch_gesture == TGest_Camera) && (touch_two_finger_mode == T2F_Pan))
+    if ((touch_gesture == TGest_Camera) && touch_t2f_pan)
     {
         touch_flick_vx = 0.6f * touch_flick_vx + 0.4f * touch_pan_frame_x;
         touch_flick_vy = 0.6f * touch_flick_vy + 0.4f * touch_pan_frame_y;
@@ -980,8 +972,7 @@ TbBool touch_drain_pan_movement(float *dx, float *dy)
     *dy = 0.0f;
     if (!touch_controls_active())
         return false;
-    const TbBool panning = (touch_gesture == TGest_Camera)
-                        && (touch_two_finger_mode == T2F_Pan);
+    const TbBool panning = (touch_gesture == TGest_Camera) && touch_t2f_pan;
     const TbBool flicking = (touch_flick_vx != 0.0f) || (touch_flick_vy != 0.0f);
     if (!panning && !flicking
      && (touch_pan_drain_x == 0.0f) && (touch_pan_drain_y == 0.0f))
