@@ -64,7 +64,25 @@ public final class ResumableDownload {
      * @return true when the file is complete, false when cancelled.
      */
     public static boolean fetch(String url, File target, Progress progress) throws IOException {
+        return fetch(url, target, -1, progress);
+    }
+
+    /**
+     * Same, with the size the caller was promised by whatever API named the
+     * file. Two protections come from knowing it: a partial file larger than
+     * the whole download cannot be a piece of it and is thrown away instead of
+     * resumed into garbage, and a transfer that ends early is an error rather
+     * than a quietly truncated archive.
+     */
+    public static boolean fetch(String url, File target, long expectedSize, Progress progress)
+            throws IOException {
         long existing = target.isFile() ? target.length() : 0;
+        if (expectedSize > 0 && existing > expectedSize) {
+            Log.w(TAG, "Partial file is larger than the download itself, starting over");
+            //noinspection ResultOfMethodCallIgnored
+            target.delete();
+            existing = 0;
+        }
 
         HttpURLConnection connection = open(url, existing);
         try {
@@ -121,6 +139,21 @@ public final class ResumableDownload {
                     }
                 }
                 progress.onBytes(done, total);
+            }
+            // A stream can end cleanly without being complete - a proxy that
+            // drops the connection, a chunked response cut short - and an
+            // archive missing its tail unpacks into exactly the kind of torso
+            // this launcher once installed without noticing.
+            final long expected = (total > 0) ? total : expectedSize;
+            if (expected > 0 && done != expected) {
+                if (done > expected) {
+                    // More than the download is supposed to be: the file on
+                    // disk is not this download. Resuming it would not help.
+                    //noinspection ResultOfMethodCallIgnored
+                    target.delete();
+                }
+                throw new IOException(
+                    "Download ended at " + done + " of " + expected + " bytes");
             }
             return true;
         } finally {

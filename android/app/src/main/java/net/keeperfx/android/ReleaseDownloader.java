@@ -42,8 +42,10 @@ import java.nio.file.Files;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public final class ReleaseDownloader {
 
@@ -328,21 +330,31 @@ public final class ReleaseDownloader {
      * Copies aside every installed file the archive would overwrite, and notes
      * the ones it only adds.
      *
-     * Only the entry names are read, so nothing is unpacked twice. An existing
-     * backup is left alone: it already holds the plain release's copies, and
-     * taking it again after a patch had been applied would capture patched
-     * files and make the way back a fiction.
+     * Only the entry names are read, so nothing is unpacked twice. A backup
+     * from an earlier patch is extended file by file, never retaken: a copy
+     * already in it is the plain release's and taking it again after a patch
+     * had been applied would capture the patched file and make the way back a
+     * fiction. A newer patch can touch files the earlier one did not, though,
+     * and those are still the release's own at this moment - this is the only
+     * chance to save them, and the files it merely adds have to reach the
+     * added list or a revert would leave them behind forever.
      */
     private void backupBeforePatch(File archive) throws IOException {
         final File destination = GameData.gameDirectory(context);
         final File backup = alphaBackupDirectory();
-        if (backup.isDirectory()) {
-            return;
-        }
-        if (!backup.mkdirs()) {
+        if (!backup.isDirectory() && !backup.mkdirs()) {
             throw new IOException("Cannot create " + backup.getAbsolutePath());
         }
-        final StringBuilder added = new StringBuilder();
+        final Set<String> added = new LinkedHashSet<>();
+        final File addedList = alphaAddedList();
+        if (addedList.isFile()) {
+            for (String line : Files.readAllLines(addedList.toPath(), Charset.forName("UTF-8"))) {
+                final String name = line.trim();
+                if (!name.isEmpty()) {
+                    added.add(name);
+                }
+            }
+        }
         int saved = 0;
         try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
             SevenZArchiveEntry entry;
@@ -353,14 +365,21 @@ public final class ReleaseDownloader {
                     continue;
                 }
                 final File installed = new File(destination, name);
-                if (!installed.isFile()) {
-                    added.append(name).append(LINE_END);
+                // A file the earlier patch added is on disk in the patch's own
+                // version; backing that up as if it were the release's would
+                // make a revert restore it. It stays on the added list instead.
+                if (!installed.isFile() || added.contains(name)) {
+                    added.add(name);
                     continue;
                 }
                 final File target = new File(backup, name);
+                if (target.isFile()) {
+                    continue;
+                }
                 final File parent = target.getParentFile();
                 if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-                    continue;
+                    // Skipping would silently cost this file its way back.
+                    throw new IOException("Cannot create " + parent.getAbsolutePath());
                 }
                 try (InputStream in = new FileInputStream(installed);
                      OutputStream out = new FileOutputStream(target)) {
@@ -372,8 +391,12 @@ public final class ReleaseDownloader {
                 saved++;
             }
         }
-        try (OutputStream out = new FileOutputStream(alphaAddedList())) {
-            out.write(added.toString().getBytes("UTF-8"));
+        final StringBuilder lines = new StringBuilder();
+        for (String name : added) {
+            lines.append(name).append(LINE_END);
+        }
+        try (OutputStream out = new FileOutputStream(addedList)) {
+            out.write(lines.toString().getBytes("UTF-8"));
         }
         Log.i(TAG, "Saved " + saved + " files before applying the alpha patch");
     }
@@ -560,7 +583,7 @@ public final class ReleaseDownloader {
         final String stage = "music".equals(version)
             ? "Downloading the music"
             : "Downloading KeeperFX " + version;
-        ResumableDownload.fetch(url, target, new ResumableDownload.Progress() {
+        ResumableDownload.fetch(url, target, expectedSize, new ResumableDownload.Progress() {
             @Override
             public void onBytes(long done, long total) {
                 final long known = (total > 0) ? total : expectedSize;

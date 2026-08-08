@@ -79,13 +79,17 @@ public final class AppUpdater {
         public final String versionName;
         public final int buildNumber;
         public final String apkUrl;
+        /** Size of the APK as the release lists it, or -1; guards the download. */
+        public final long apkSize;
         /** Changelog lines from the release notes, without their bullets. */
         public final List<String> changes;
 
-        Available(String versionName, int buildNumber, String apkUrl, List<String> changes) {
+        Available(String versionName, int buildNumber, String apkUrl, long apkSize,
+                List<String> changes) {
             this.versionName = versionName;
             this.buildNumber = buildNumber;
             this.apkUrl = apkUrl;
+            this.apkSize = apkSize;
             this.changes = changes;
         }
 
@@ -171,12 +175,14 @@ public final class AppUpdater {
         }
 
         String apkUrl = "";
+        long apkSize = -1;
         final org.json.JSONArray assets = release.optJSONArray("assets");
         if (assets != null) {
             for (int i = 0; i < assets.length(); i++) {
                 final JSONObject asset = assets.getJSONObject(i);
                 if (APK_ASSET.equals(asset.optString("name"))) {
                     apkUrl = asset.optString("browser_download_url", "");
+                    apkSize = asset.optLong("size", -1);
                     break;
                 }
             }
@@ -185,7 +191,7 @@ public final class AppUpdater {
             return null;
         }
 
-        final Available available = new Available(version, buildNumberOf(version), apkUrl,
+        final Available available = new Available(version, buildNumberOf(version), apkUrl, apkSize,
             parseChangelog(release.optString("body", "")));
         if (available.buildNumber <= installedBuildNumber(context)) {
             return null;
@@ -258,7 +264,7 @@ public final class AppUpdater {
             }
 
             listener.onProgress(-1, "");
-            download(available.apkUrl, target);
+            download(available.apkUrl, target, available.apkSize);
             if (isCancelled()) {
                 //noinspection ResultOfMethodCallIgnored
                 target.delete();
@@ -281,8 +287,8 @@ public final class AppUpdater {
         }
     }
 
-    private void download(String url, File target) throws IOException {
-        ResumableDownload.fetch(url, target, new ResumableDownload.Progress() {
+    private void download(String url, File target, long expectedSize) throws IOException {
+        ResumableDownload.fetch(url, target, expectedSize, new ResumableDownload.Progress() {
             @Override
             public void onBytes(long done, long total) {
                 final int percent = (total > 0) ? (int) (done * 100 / total) : -1;
