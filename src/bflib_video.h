@@ -313,6 +313,7 @@ TbBool LbScreenIsLocked(void);
 TbResult LbScreenSwap(void);
 TbResult LbScreenClear(TbPixel colour);
 TbResult LbScreenWaitVbi(void);
+void LbScreenNormalizedToDraw(float nx, float ny, long *x, long *y);
 unsigned short LbGetCurrentDisplayIndex();
 
 long LbPaletteFade(unsigned char *pal, long n, enum TbPaletteFadeFlag flg);

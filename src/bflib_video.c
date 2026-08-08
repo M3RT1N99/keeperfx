@@ -152,6 +152,8 @@ TbResult LbScreenUnlock(void)
 /** Held across frames so the conversion surface is made once, not every frame. */
 static SDL_Surface *lbScaleBuffer = NULL;
 
+static void LbScreenFitRect(int src_w, int src_h, int dst_w, int dst_h, SDL_Rect *target);
+
 static int LbScreenBlitScaled(void)
 {
     SDL_Surface **const scale_buffer_slot = &lbScaleBuffer;
@@ -179,25 +181,70 @@ static int LbScreenBlitScaled(void)
     // as a squashed picture. The largest rectangle of the right shape is
     // centred instead, and the margins are cleared so nothing from the previous
     // frame shows through at the edges.
-    const int src_w = scale_buffer->w;
-    const int src_h = scale_buffer->h;
-    const int dst_w = lbScreenSurface->w;
-    const int dst_h = lbScreenSurface->h;
     SDL_Rect target;
-    if ((long)src_w * dst_h > (long)dst_w * src_h) {
-        target.w = dst_w;
-        target.h = (int)((long)src_h * dst_w / src_w);
-    } else {
-        target.h = dst_h;
-        target.w = (int)((long)src_w * dst_h / src_h);
-    }
-    target.x = (dst_w - target.w) / 2;
-    target.y = (dst_h - target.h) / 2;
-    if ((target.w != dst_w) || (target.h != dst_h)) {
+    LbScreenFitRect(scale_buffer->w, scale_buffer->h,
+        lbScreenSurface->w, lbScreenSurface->h, &target);
+    if ((target.w != lbScreenSurface->w) || (target.h != lbScreenSurface->h)) {
         SDL_FillRect(lbScreenSurface, NULL, 0);
     }
     return SDL_BlitScaled(scale_buffer, NULL, lbScreenSurface, &target);
 #undef scale_buffer
+}
+
+/** The largest src-shaped rectangle that fits dst, centred - the swap's fit. */
+static void LbScreenFitRect(int src_w, int src_h, int dst_w, int dst_h, SDL_Rect *target)
+{
+    if ((long)src_w * dst_h > (long)dst_w * src_h) {
+        target->w = dst_w;
+        target->h = (int)((long)src_h * dst_w / src_w);
+    } else {
+        target->h = dst_h;
+        target->w = (int)((long)src_w * dst_h / src_h);
+    }
+    target->x = (dst_w - target->w) / 2;
+    target->y = (dst_h - target->h) / 2;
+}
+
+/**
+ * Maps a position given as a fraction of the window onto the draw surface.
+ *
+ * Touch positions arrive normalised to the window. While the swap scales, the
+ * picture only covers the fitted rectangle LbScreenBlitScaled() computes, so
+ * the same rectangle has to come out of the finger position again - without
+ * this, a letterboxed frame shifts every touch by the width of the bars. When
+ * the two surfaces match, this is a plain multiplication.
+ */
+void LbScreenNormalizedToDraw(float nx, float ny, long *x, long *y)
+{
+    if ((lbDrawSurface == NULL) || (lbScreenSurface == NULL)
+     || ((lbScreenSurface->w == lbDrawSurface->w)
+      && (lbScreenSurface->h == lbDrawSurface->h)))
+    {
+        long w = (lbDrawSurface != NULL) ? lbDrawSurface->w : lbDisplay.PhysicalScreenWidth;
+        long h = (lbDrawSurface != NULL) ? lbDrawSurface->h : lbDisplay.PhysicalScreenHeight;
+        if (w <= 0)
+            w = 640;
+        if (h <= 0)
+            h = 480;
+        *x = (long)(nx * (float)w);
+        *y = (long)(ny * (float)h);
+        return;
+    }
+    SDL_Rect target;
+    LbScreenFitRect(lbDrawSurface->w, lbDrawSurface->h,
+        lbScreenSurface->w, lbScreenSurface->h, &target);
+    long px = (long)(nx * (float)lbScreenSurface->w) - target.x;
+    long py = (long)(ny * (float)lbScreenSurface->h) - target.y;
+    *x = (target.w > 0) ? (px * lbDrawSurface->w / target.w) : 0;
+    *y = (target.h > 0) ? (py * lbDrawSurface->h / target.h) : 0;
+    if (*x < 0)
+        *x = 0;
+    if (*x >= lbDrawSurface->w)
+        *x = lbDrawSurface->w - 1;
+    if (*y < 0)
+        *y = 0;
+    if (*y >= lbDrawSurface->h)
+        *y = lbDrawSurface->h - 1;
 }
 
 TbResult LbScreenSwap(void)

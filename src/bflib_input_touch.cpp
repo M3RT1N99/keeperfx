@@ -350,18 +350,6 @@ void init_touch_input(void)
 
 /******************************************************************************/
 
-static long touch_screen_width(void)
-{
-    long w = lbDisplay.PhysicalScreenWidth;
-    return (w > 0) ? w : 640;
-}
-
-static long touch_screen_height(void)
-{
-    long h = lbDisplay.PhysicalScreenHeight;
-    return (h > 0) ? h : 480;
-}
-
 static struct TouchFinger *touch_find(SDL_FingerID id)
 {
     for (int i = 0; i < TOUCH_MAX_FINGERS; i++) {
@@ -588,9 +576,6 @@ void TEvent(const SDL_Event *ev)
     if (!touch_controls_active())
         return;
 
-    const long screen_w = touch_screen_width();
-    const long screen_h = touch_screen_height();
-
     switch (ev->type)
     {
     case SDL_FINGERDOWN:
@@ -598,8 +583,11 @@ void TEvent(const SDL_Event *ev)
         struct TouchFinger *finger = touch_alloc(ev->tfinger.fingerId);
         if (finger == NULL)
             break;
-        finger->x = (long)(ev->tfinger.x * (float)screen_w);
-        finger->y = (long)(ev->tfinger.y * (float)screen_h);
+        // Through the swap's fit rectangle, not a plain multiplication: while
+        // the draw surface is being scaled into the window, the picture only
+        // covers part of it, and the finger has to land on the pixel it was
+        // actually over.
+        LbScreenNormalizedToDraw(ev->tfinger.x, ev->tfinger.y, &finger->x, &finger->y);
         finger->start_x = finger->x;
         finger->start_y = finger->y;
         finger->down_ticks = SDL_GetTicks();
@@ -635,11 +623,10 @@ void TEvent(const SDL_Event *ev)
         struct TouchFinger *finger = touch_find(ev->tfinger.fingerId);
         if (finger == NULL)
             break;
-        finger->x = (long)(ev->tfinger.x * (float)screen_w);
-        finger->y = (long)(ev->tfinger.y * (float)screen_h);
+        LbScreenNormalizedToDraw(ev->tfinger.x, ev->tfinger.y, &finger->x, &finger->y);
         const long travel_x = finger->x - finger->start_x;
         const long travel_y = finger->y - finger->start_y;
-        long threshold = screen_w / TOUCH_DRAG_THRESHOLD_DIVISOR;
+        long threshold = LbScreenWidth() / TOUCH_DRAG_THRESHOLD_DIVISOR;
         if (threshold < (long)touch_drag_threshold_min_px)
             threshold = (long)touch_drag_threshold_min_px;
         if ((labs(travel_x) >= threshold) || (labs(travel_y) >= threshold))
