@@ -108,6 +108,16 @@ float touch_game_key_axis_value(long key_id);
  */
 TbBool touch_drain_pan_movement(float *dx, float *dy);
 
+/**
+ * Same hand-over for the zoom and rotate channels: net pinch and twist since
+ * the last call, in key-speed units. Positive zoom means the fingers moved
+ * apart, positive twist means clockwise. While a caller consumes these, the
+ * zoom and rotate game key axes report zero so nothing arrives twice.
+ *
+ * @return true while a camera gesture has either channel unlocked.
+ */
+TbBool touch_drain_zoom_twist(float *zoom, float *twist);
+
 /******************************************************************************/
 #ifdef __cplusplus
 }

@@ -184,9 +184,20 @@ static float touch_pinch_accum, touch_twist_accum;
    accumulator above: the axes are rebuilt every frame while the camera reads
    on the game's own cadence, and whatever landed on the frames in between
    used to be thrown away - at 60 frames against 20 turns, two thirds of every
-   drag. This one only empties when the camera takes it. */
+   drag. These only empty when the camera takes them. Pinch and twist get the
+   same treatment as the pan: their per-frame axes lost two thirds of the
+   motion the same way, and a careful pinch of a pixel or two per frame never
+   even cleared the per-frame deadzone - "zooming does not work" made literal. */
 static float touch_pan_drain_x, touch_pan_drain_y;
+static float touch_pinch_drain;
+static float touch_twist_drain;
 static TbBool touch_pan_drained;
+static TbBool touch_zoom_rotate_drained;
+
+/** Frames per game turn at the default caps; the drains are normalised by it
+ *  so "full speed" keeps meaning what it does for a held key, which is read
+ *  once per turn rather than once per frame. */
+#define TOUCH_FRAMES_PER_TURN 3.0f
 /* A flick keeps the map rolling after the fingers lift, like every map
    application does; its speed is the recent per-frame travel. */
 static float touch_pan_frame_x, touch_pan_frame_y;
@@ -320,6 +331,7 @@ static void touch_reset_gesture_axes(void)
     touch_pan_accum_x = touch_pan_accum_y = 0.0f;
     touch_pinch_accum = touch_twist_accum = 0.0f;
     touch_pan_drain_x = touch_pan_drain_y = 0.0f;
+    touch_pinch_drain = touch_twist_drain = 0.0f;
     touch_pan_frame_x = touch_pan_frame_y = 0.0f;
     // The flick is deliberately not cleared here: it is set at the very
     // moment the gesture ends, which is also when this runs.
@@ -589,10 +601,12 @@ static void touch_update_camera_gesture(void)
         // it never reports in a single event, so a deliberate pinch cleared
         // the threshold and then produced nothing at all.
         touch_pinch_accum += dist_delta;
+        touch_pinch_drain += dist_delta;
     }
     if (touch_t2f_rotate)
     {
         touch_twist_accum += angle_delta;
+        touch_twist_drain += angle_delta;
     }
 
     touch_camera_prev_dist = dist;
@@ -851,9 +865,10 @@ void update_touch_inputs(void)
         touch_back_key_frames = 2;
     }
 
-    // Consumed and set anew each frame; the isometric camera raises it again
-    // for as long as it drains the pan directly.
+    // Consumed and set anew each frame; the isometric camera raises them
+    // again for as long as it drains the gestures directly.
     touch_pan_drained = false;
+    touch_zoom_rotate_drained = false;
 
     // The flick velocity averages the travel of the last few frames, but only
     // while the pan is actually live - during the roll-out the frame sum is
@@ -951,19 +966,39 @@ float touch_game_key_axis_value(long key_id)
         return 0.0f;
     switch (key_id)
     {
-    // While the camera drains the pan directly, the same travel must not
-    // also arrive through the movement axes, or it would be applied twice.
+    // While the camera drains a gesture directly, the same motion must not
+    // also arrive through the axes, or it would be applied twice.
     // Possession never drains, so a creature still walks on these.
     case Gkey_MoveLeft:  return touch_pan_drained ? 0.0f : touch_axis_pan_left;
     case Gkey_MoveRight: return touch_pan_drained ? 0.0f : touch_axis_pan_right;
     case Gkey_MoveUp:    return touch_pan_drained ? 0.0f : touch_axis_pan_up;
     case Gkey_MoveDown:  return touch_pan_drained ? 0.0f : touch_axis_pan_down;
-    case Gkey_ZoomIn:    return touch_axis_zoom_in;
-    case Gkey_ZoomOut:   return touch_axis_zoom_out;
-    case Gkey_RotateCW:  return touch_axis_rotate_cw;
-    case Gkey_RotateCCW: return touch_axis_rotate_ccw;
+    case Gkey_ZoomIn:    return touch_zoom_rotate_drained ? 0.0f : touch_axis_zoom_in;
+    case Gkey_ZoomOut:   return touch_zoom_rotate_drained ? 0.0f : touch_axis_zoom_out;
+    case Gkey_RotateCW:  return touch_zoom_rotate_drained ? 0.0f : touch_axis_rotate_cw;
+    case Gkey_RotateCCW: return touch_zoom_rotate_drained ? 0.0f : touch_axis_rotate_ccw;
     default:             return 0.0f;
     }
+}
+
+TbBool touch_drain_zoom_twist(float *zoom, float *twist)
+{
+    *zoom = 0.0f;
+    *twist = 0.0f;
+    if (!touch_controls_active())
+        return false;
+    const TbBool active = (touch_gesture == TGest_Camera)
+                       && (touch_t2f_zoom || touch_t2f_rotate);
+    if (!active && (touch_pinch_drain == 0.0f) && (touch_twist_drain == 0.0f))
+        return false;
+    touch_zoom_rotate_drained = true;
+    // Normalised like the pan: full-speed pixels of pinch, or radians of
+    // twist, per game turn come out as one unit.
+    *zoom = touch_pinch_drain / (TOUCH_PINCH_FULL_SPEED_PX * TOUCH_FRAMES_PER_TURN);
+    *twist = touch_twist_drain / (TOUCH_TWIST_FULL_SPEED_RAD * TOUCH_FRAMES_PER_TURN);
+    touch_pinch_drain = 0.0f;
+    touch_twist_drain = 0.0f;
+    return true;
 }
 
 TbBool touch_drain_pan_movement(float *dx, float *dy)
@@ -978,11 +1013,13 @@ TbBool touch_drain_pan_movement(float *dx, float *dy)
      && (touch_pan_drain_x == 0.0f) && (touch_pan_drain_y == 0.0f))
         return false;
     touch_pan_drained = true;
-    // Normalised so that touch_pan_full_speed_px of travel equals one unit of
-    // camera movement - the same speed a fully pressed movement key produces -
-    // which keeps the panspeed tuning working the way it always has.
-    *dx = touch_pan_drain_x / touch_pan_full_speed_px;
-    *dy = touch_pan_drain_y / touch_pan_full_speed_px;
+    // Normalised so that touch_pan_full_speed_px of travel per frame equals
+    // the camera speed of a held movement key. The key is read once per game
+    // turn while the fingers deliver every frame, so without the turn factor
+    // the same drag came out three times faster than the key it is calibrated
+    // against - the map raced away from the finger.
+    *dx = touch_pan_drain_x / (touch_pan_full_speed_px * TOUCH_FRAMES_PER_TURN);
+    *dy = touch_pan_drain_y / (touch_pan_full_speed_px * TOUCH_FRAMES_PER_TURN);
     touch_pan_drain_x = touch_pan_drain_y = 0.0f;
     return true;
 }

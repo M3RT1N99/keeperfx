@@ -2359,18 +2359,30 @@ static void get_isometric_view_nonaction_inputs(void)
                 set_packet_control(packet, PCtr_ViewZoomOut);
         } else
         {
-            // A twist has a speed, so it drives the rotation directly rather
-            // than through the on/off packet flags, which always turn by one
-            // fixed step and make the camera look like it is stepping instead
-            // of following the fingers. Keys and pads keep the flags.
-            const float touch_cw = get_game_key_axis_value(Gkey_RotateCW, false);
-            const float touch_ccw = get_game_key_axis_value(Gkey_RotateCCW, false);
-            if (touch_controls_active() && ((touch_cw > 0.0f) || (touch_ccw > 0.0f)))
+            // The pinch and the twist arrive as drained totals, the same
+            // lossless hand-over the pan uses: their per-frame axes lost two
+            // thirds of the motion between the frame rate and the turn rate,
+            // and a careful pinch never even cleared the per-frame deadzone.
+            // The twist drives the rotation directly, with the speed the
+            // fingers actually turned; the zoom is stepwise in the engine, so
+            // the drained total decides whether this turn steps. Draining
+            // silences the zoom and rotate axes, so the key checks below
+            // still serve keyboards and pads without applying anything twice.
+            float touch_zoom = 0.0f;
+            float touch_twist = 0.0f;
+            if (touch_controls_active()
+             && touch_drain_zoom_twist(&touch_zoom, &touch_twist))
             {
-                camera_rotation = touch_ccw - touch_cw;
-                rotating = true;
-            } else
-            {
+                if (touch_twist != 0.0f)
+                {
+                    camera_rotation = -touch_twist;
+                    rotating = true;
+                }
+                if (touch_zoom > 0.05f)
+                    set_packet_control(packet, PCtr_ViewZoomIn);
+                else if (touch_zoom < -0.05f)
+                    set_packet_control(packet, PCtr_ViewZoomOut);
+            }
             if (is_game_key_pressed(Gkey_RotateCW, false, false))
             {
                 if (rotate_around_mouse_option == RotateAroundMouse_NotCtrl)
@@ -2384,7 +2396,6 @@ static void get_isometric_view_nonaction_inputs(void)
                     set_packet_control(packet, PCtr_ViewRotatePos);
                 set_packet_control(packet, PCtr_ViewRotateCCW);
                 rotating = true;
-            }
             }
             if (is_game_key_pressed(Gkey_ZoomIn, false, false))
                 set_packet_control(packet, PCtr_ViewZoomIn);
