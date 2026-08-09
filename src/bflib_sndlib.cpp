@@ -20,6 +20,7 @@
 #include <memory>
 #include <vector>
 #include <fstream>
+#include <iterator>
 #include <sstream>
 #include <string>
 #include <algorithm>
@@ -1325,25 +1326,16 @@ static void speech_al_unload()
 	}
 }
 
-static bool speech_al_play(const Mix_Chunk * sample, SoundVolume volume)
+static bool speech_al_play_buffer(ALenum format, const void * data, ALsizei size,
+	ALsizei freq, SoundVolume volume)
 {
-	int freq = 0;
-	int channels = 0;
-	Uint16 fmt = 0;
-	if (!speech_al_ready() || Mix_QuerySpec(&freq, &fmt, &channels) == 0) {
-		return false;
-	}
-	// Chunks come out of Mix_LoadWAV in the mixer's output format; anything
-	// but 16 bit or more than two channels never happens with how the mixer
-	// is opened, but a fallback beats an assumption.
-	if ((fmt != AUDIO_S16SYS) || (channels < 1) || (channels > 2)) {
+	if (!speech_al_ready()) {
 		return false;
 	}
 	speech_al_unload();
 	alGetError();
 	alGenBuffers(1, &speech_al_buffer);
-	alBufferData(speech_al_buffer, (channels == 1) ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16,
-		sample->abuf, (ALsizei)sample->alen, freq);
+	alBufferData(speech_al_buffer, format, data, size, freq);
 	alSourcei(speech_al_source, AL_BUFFER, (ALint)speech_al_buffer);
 	alSourcef(speech_al_source, AL_GAIN, (float)volume / FULL_LOUDNESS);
 	alSourcePlay(speech_al_source);
@@ -1352,6 +1344,67 @@ static bool speech_al_play(const Mix_Chunk * sample, SoundVolume volume)
 		return false;
 	}
 	return true;
+}
+
+static bool speech_al_play(const Mix_Chunk * sample, SoundVolume volume)
+{
+	int freq = 0;
+	int channels = 0;
+	Uint16 fmt = 0;
+	if (Mix_QuerySpec(&freq, &fmt, &channels) == 0) {
+		return false;
+	}
+	// Chunks come out of Mix_LoadWAV in the mixer's output format; anything
+	// but 16 bit or more than two channels never happens with how the mixer
+	// is opened, but a fallback beats an assumption.
+	if ((fmt != AUDIO_S16SYS) || (channels < 1) || (channels > 2)) {
+		return false;
+	}
+	return speech_al_play_buffer((channels == 1) ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16,
+		sample->abuf, (ALsizei)sample->alen, (ALsizei)freq, volume);
+}
+
+/**
+ * Plays an mp3 straight into the OpenAL source, at the file's own rate.
+ *
+ * The reported lag between an event and its speech was the loading: the mixer
+ * path decodes the whole file and then resamples it to the mixer's output
+ * format, tens of milliseconds on the game thread, before the first sample
+ * can sound. A plain dr_mp3 decode is a fraction of that, and OpenAL
+ * resamples per source anyway, so the 22 kHz mono the speech files are stays
+ * exactly what the hardware gets handed.
+ */
+static bool speech_al_play_mp3_file(const char * path, SoundVolume volume)
+{
+	std::ifstream file(path, std::ios::binary);
+	if (!file) {
+		return false;
+	}
+	std::vector<unsigned char> bytes(
+		(std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	if (bytes.size() < 4) {
+		return false;
+	}
+	drmp3_config cfg = {};
+	drmp3_uint64 frames = 0;
+	drmp3_int16 * pcm = drmp3_open_memory_and_read_pcm_frames_s16(
+		bytes.data(), bytes.size(), &cfg, &frames, nullptr);
+	if (!pcm || frames == 0 || cfg.channels < 1 || cfg.channels > 2) {
+		if (pcm) drmp3_free(pcm, nullptr);
+		return false;
+	}
+	const bool played = speech_al_play_buffer(
+		(cfg.channels == 1) ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16,
+		pcm, (ALsizei)(frames * cfg.channels * sizeof(drmp3_int16)),
+		(ALsizei)cfg.sampleRate, volume);
+	drmp3_free(pcm, nullptr);
+	return played;
+}
+
+static bool speech_path_is_mp3(const char * path)
+{
+	const size_t len = strlen(path);
+	return (len > 4) && (strcasecmp(path + len - 4, ".mp3") == 0);
 }
 #endif
 
@@ -1364,6 +1417,17 @@ extern "C" TbBool play_streamed_sample(const char* fname, SoundVolume volume)
 #ifdef __ANDROID__
 	char full_path[2048];
 	sample_path = mix_file_path(fname, full_path, sizeof(full_path));
+	// The speech files are mp3; decoding them straight into the OpenAL source
+	// skips the mixer-format resample and most of the start-up lag. Anything
+	// else, and any decode failure, still goes through the mixer loader.
+	if (speech_path_is_mp3(sample_path) && speech_al_play_mp3_file(sample_path, volume)) {
+		std::lock_guard<std::mutex> guard(g_mix_mutex);
+		const auto old_sample = std::exchange(g_streamed_sample, nullptr);
+		if (old_sample) {
+			Mix_FreeChunk(old_sample);
+		}
+		return true;
+	}
 #endif
 	const auto sample = Mix_LoadWAV(sample_path);
 	if (sample == nullptr) {
