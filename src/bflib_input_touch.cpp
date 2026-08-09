@@ -865,6 +865,25 @@ void update_touch_inputs(void)
         touch_back_key_frames = 2;
     }
 
+    // The drains only make sense while something consumes them every few
+    // frames. When nothing does - possession, the parchment map, a menu -
+    // whatever a still-running gesture or a flick feeds in would pile up and
+    // unload into the camera in one jolt the moment the isometric view is
+    // back. The camera reads every third frame, so a short grace covers its
+    // cadence and anything older is thrown away.
+    {
+        static int frames_unconsumed = 0;
+        if (touch_pan_drained || touch_zoom_rotate_drained)
+        {
+            frames_unconsumed = 0;
+        }
+        else if (++frames_unconsumed >= 10)
+        {
+            touch_pan_drain_x = touch_pan_drain_y = 0.0f;
+            touch_pinch_drain = touch_twist_drain = 0.0f;
+            touch_flick_vx = touch_flick_vy = 0.0f;
+        }
+    }
     // Consumed and set anew each frame; the isometric camera raises them
     // again for as long as it drains the gestures directly.
     touch_pan_drained = false;
@@ -996,7 +1015,15 @@ TbBool touch_drain_zoom_twist(float *zoom, float *twist)
     // twist, per game turn come out as one unit.
     *zoom = touch_pinch_drain / (TOUCH_PINCH_FULL_SPEED_PX * TOUCH_FRAMES_PER_TURN);
     *twist = touch_twist_drain / (TOUCH_TWIST_FULL_SPEED_RAD * TOUCH_FRAMES_PER_TURN);
-    touch_pinch_drain = 0.0f;
+    // The zoom is stepwise on the consumer side: a drained amount too small
+    // for a step must keep accumulating, or a very careful pinch would be
+    // thrown away one sliver per turn and never zoom at all. The twist is
+    // continuous, so it is always taken whole.
+    if (fabsf(*zoom) >= 0.05f) {
+        touch_pinch_drain = 0.0f;
+    } else {
+        *zoom = 0.0f;
+    }
     touch_twist_drain = 0.0f;
     return true;
 }
