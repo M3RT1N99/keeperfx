@@ -142,6 +142,7 @@ enum NavigationStateValues {
 #define NAVMAP_UNSAFE_SURFACE   0x10
 #define NAVMAP_OWNERSELECT_BIT  5
 #define NAVMAP_OWNERSELECT_MASK 0x3FE0
+#define NAVMAP_ABYSS            0x4000
 
 struct Ariadne { // sizeof = 102
     /** Position where the journey stated. */
@@ -171,7 +172,7 @@ struct Ariadne { // sizeof = 102
   struct Coord3d manoeuvre_requested_position;
   unsigned char manoeuvre_state;
   short wallhug_angle;
-  long straight_dist_to_next_waypoint;
+  int32_t straight_dist_to_next_waypoint;
 };
 
 struct PathWayPoint { // sizeof = 8
@@ -199,7 +200,7 @@ extern const struct HugStart blocked_xy_hug_start[][2][2];
 extern TbBool nav_map_initialised;
 
 extern NavColour *LastTriangulatedMap;
-extern long ix_Border;
+extern int32_t ix_Border;
 extern int32_t Border[BORDER_LENGTH];
 
 /******************************************************************************/

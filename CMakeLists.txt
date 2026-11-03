@@ -27,10 +27,13 @@ foreach(_v VER_MAJOR VER_MINOR VER_RELEASE VER_BUILD)
         message(FATAL_ERROR "version.mk is missing ${_v}")
     endif()
 endforeach()
-# Override via -DBUILD_NUMBER=<n> -DPACKAGE_SUFFIX=<s>; used for the CPack name.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/version.mk")
+
+if(NOT DEFINED BUILD_NUMBER)
+    set(BUILD_NUMBER "${VER_BUILD}")
+endif()
 # The default comes from version.mk, the same way the Makefile takes it, so a
 # fork can mark its builds there once and have every build system agree.
-set(BUILD_NUMBER   "${VER_BUILD}"           CACHE STRING "Monotonic build number")
 set(PACKAGE_SUFFIX "${_kfx_package_suffix}" CACHE STRING "Distribution suffix (e.g. Alpha, Release)")
 set(VER_STRING     "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${BUILD_NUMBER} ${PACKAGE_SUFFIX}")
 set(GIT_REVISION   "${COMMIT_ID}")
@@ -50,3 +53,6 @@ if(WIN32)
 endif()
 
 include(Packaging)
+
+# Optional self-contained Linux/Steam Deck bundle (-DKFX_DECK_BUNDLE=ON).
+include(DeckBundle)

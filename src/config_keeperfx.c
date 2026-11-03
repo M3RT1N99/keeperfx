@@ -23,7 +23,9 @@
 #include "bflib_math.h"
 #include "bflib_fileio.h"
 #include "bflib_dernc.h"
+#include "bflib_enet.h"
 #include "bflib_video.h"
+#include "kfx/renderer/RendererManager.h" // RENDERER_SOFTWARE/RENDERER_OPENGL
 #include "bflib_keybrd.h"
 #include "bflib_datetm.h"
 #include "bflib_mouse.h"
@@ -36,11 +38,13 @@
 #include "front_simple.h"
 #include "front_input.h"
 #include "gui_draw.h"
+#include "gui_msgs.h"
 #include "scrcapt.h"
 #include "sounds.h"
 #include "vidmode.h"
 #include "moonphase.h"
 #include "keeperfx.hpp"
+#include "net_matchmaking.h"
 #include "post_inc.h"
 
 #ifdef __cplusplus
@@ -60,7 +64,13 @@ struct InstallInfo install_info;
 char keeper_runtime_directory[152];
 short api_enabled = false;
 uint16_t api_port = 5599;
+uint32_t packetsave_max_kb = 32768;
+TbBool replays_enabled = true;
+uint32_t max_replays[ReplTyp_Count] = {5, 5, 10};
+uint32_t replay_rewind_buffer_kb = 65536;
 unsigned long features_enabled = 0;
+static unsigned char parchment_map_fade_turns = 0;
+unsigned char viewport_mode = VpMode_Original;
 TbBool exit_on_lua_error = false;
 TbBool FLEE_BUTTON_DEFAULT = false;
 TbBool IMPRISON_BUTTON_DEFAULT = false;
@@ -161,7 +171,33 @@ const struct NamedCommand conf_commands[] = {
   {"DEFAULT_TAG_MODE"              , 41},
   {"ZOOM_TO_MOUSE"                 , 42},
   {"ROTATE_AROUND_MOUSE"           , 43},
+  {"VSYNC"                         , 44},
+  {"RELATIVE_MOUSE_MODE"           , 45},
+  {"CAPTURE_CURSOR"                , 46},
+  {"MATCHMAKING_SERVER"            , 47},
+  {"MULTIPLAYER_PORT"              , 48},
+  {"RENDERER"                      , 49},
+  {"VIEWPORT_MODE"                 , 50},
+  {"PARCHMENT_MAP_FADE"            , 51},
+  {"AUTOMATIC_REPLAYS"             , 52},
+  {"MAX_REPLAYS"                   , 53},
+  {"REPLAY_MAX_SIZE"               , 54},
+  {"CHAT_FONT_SIZE"                , 55},
+  {"REPLAY_REWIND_BUFFER_SIZE"     , 56},
   {NULL,                   0},
+  };
+
+  const struct NamedCommand viewport_mode_desc[] = {
+  {"ORIGINAL",       VpMode_Original},
+  {"FULL",           VpMode_Full},
+  {"FULL_LETTERBOX", VpMode_FullLetterbox},
+  {NULL,             0},
+  };
+
+  const struct NamedCommand renderer_type_desc[] = {
+  {"SOFTWARE",     RENDERER_SOFTWARE},
+  {"OPENGL",       RENDERER_OPENGL},
+  {NULL,           0},
   };
 
   const struct NamedCommand vidscale_type[] = {
@@ -202,17 +238,13 @@ const struct NamedCommand conf_commands[] = {
   };
 
   const struct NamedCommand zoom_to_mouse_options[] = {
-  {"NEVER",    ZoomToMouse_Never},
   {"WHEEL",    ZoomToMouse_Wheel},
-  {"ALWAYS",   ZoomToMouse_Always},
   {NULL,       0},
   };
 
   const struct NamedCommand rotate_around_mouse_options[] = {
-  {"NEVER",         RotateAroundMouse_Never},
-  {"NOT_CTRL",      RotateAroundMouse_NotCtrl},
-  {"ONLY_CTRL",     RotateAroundMouse_OnlyCtrl},
-  {"ALWAYS",        RotateAroundMouse_Always},
+  {"ROTATION_KEYS", RotateAroundMouse_RotationKeys},
+  {"MOVEMENT_KEYS", RotateAroundMouse_MovementKeys},
   {NULL,            0},
   };
 
@@ -229,7 +261,7 @@ unsigned int vid_scale_flags = SMK_FullscreenFit;
  * Returns if the censorship is on. This mostly affects blood.
  * Originally, censorship was on for german language.
  */
-TbBool censorship_enabled(void)
+TbBool local_censorship_enabled(void)
 {
   return ((features_enabled & Ft_Censorship) != 0);
 }
@@ -279,6 +311,19 @@ TbBool lock_cursor_in_possession(void)
   return ((features_enabled & Ft_LockCursorInPossession) != 0);
 }
 
+/**
+ * Returns if the mouse should use SDL relative ("raw") mode instead of the grab-and-warp scheme.
+ */
+TbBool use_relative_mouse_mode(void)
+{
+  return ((features_enabled & Ft_RelativeMouseMode) != 0);
+}
+
+/** This machine's map fade length in turns, from keeperfx.cfg; 0 means no fade. */
+unsigned char get_parchment_map_fade_turns(void)
+{
+    return parchment_map_fade_turns;
+}
 /**
  * Returns if we should pause the music, if the user pauses the game.
  */
@@ -358,29 +403,8 @@ TbBool prepare_diskpath(char *buf,long buflen)
     return true;
 }
 
-static void load_file_configuration(const char *fname, const char *sname, const char *config_textname, unsigned short flags)
+static void load_string_configuration(const char *buf, int32_t len, const char *config_textname)
 {
-  long len = LbFileLengthRnc(fname);
-  if (len < 2)
-  {
-    if ((flags & CnfLd_IgnoreErrors) == 0)
-      WARNMSG("%s file \"%s\" doesn't exist or is too small.", config_textname,sname);
-    return;
-  }
-  if (len > 65536)
-  {
-    WARNMSG("%s file \"%s\" is too large.",config_textname,sname);
-    return;
-  }
-  char* buf = (char*)KfxCalloc(len + 256, 1);
-  if (buf == NULL)
-    return;
-  // Loading file data
-  len = LbFileLoadAt(fname, buf);
-  if (len>0)
-  {
-    SYNCDBG(7,"Processing %s file, %ld bytes",config_textname,len);
-    buf[len] = '\0';
     // Set text line number - we don't have blocks so we need to initialize it manually
     text_line_number = 1;
     int32_t pos = 0;
@@ -392,7 +416,7 @@ static void load_file_configuration(const char *fname, const char *sname, const 
       int cmd_num = recognize_conf_command(buf, &pos, len, conf_commands);
       // Now store the config item in correct place
       int k;
-      char word_buf[32];
+      char word_buf[128];
       switch (cmd_num)
       {
       case 1: // INSTALL_PATH
@@ -414,9 +438,6 @@ static void load_file_configuration(const char *fname, const char *sname, const 
               install_info.inst_path[sizeof(install_info.inst_path)-1] = '\0';
           }
           break;
-      case 2: // INSTALL_TYPE
-          // This command is just skipped...
-          break;
       case 3: // LANGUAGE
           i = recognize_conf_parameter(buf,&pos,len,lang_type);
           if (i <= 0)
@@ -426,9 +447,6 @@ static void load_file_configuration(const char *fname, const char *sname, const 
             break;
           }
           install_info.lang_id = i;
-          break;
-      case 4: // KEYBOARD
-          // Works only in DK Premium
           break;
       case 5: // SCREENSHOT
           i = recognize_conf_parameter(buf,&pos,len,scrshot_type);
@@ -721,19 +739,6 @@ static void load_file_configuration(const char *fname, const char *sname, const 
               }
           }
           break;
-        case 23: //SKIP_HEART_ZOOM
-          i = recognize_conf_parameter(buf,&pos,len,logicval_type);
-          if (i <= 0)
-          {
-              CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
-                COMMAND_TEXT(cmd_num),config_textname);
-            break;
-          }
-          if (i == 1)
-              features_enabled |= Ft_SkipHeartZoom;
-          else
-              features_enabled &= ~Ft_SkipHeartZoom;
-          break;
         case 24: //CURSOR_EDGE_CAMERA_PANNING
           i = recognize_conf_parameter(buf,&pos,len,logicval_type);
           if (i <= 0)
@@ -828,12 +833,6 @@ static void load_file_configuration(const char *fname, const char *sname, const 
               line_box_size = i;
           } else {
               CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",COMMAND_TEXT(cmd_num),config_textname);
-          }
-          break;
-      case 32: // COMMAND_CHAR
-          if (get_conf_parameter_single(buf,&pos,len,word_buf,sizeof(word_buf)) > 0)
-          {
-              cmd_char = word_buf[0];
           }
           break;
       case 33: // API_ENABLED
@@ -941,45 +940,232 @@ static void load_file_configuration(const char *fname, const char *sname, const 
           }
           break;
       case 42: // ZOOM_TO_MOUSE
-          i = recognize_conf_parameter(buf,&pos,len,zoom_to_mouse_options);
-          if (i <= 0)
+          i = recognize_conf_parameter(buf, &pos, len, logicval_type);
+          if (i == 1)
           {
-            CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",COMMAND_TEXT(cmd_num),config_textname);
+              zoom_to_mouse_option = ZoomToMouse_Always;
+              break;
           }
-          else
+          else if (i == 2)
           {
-            zoom_to_mouse_option = i;
+              zoom_to_mouse_option = ZoomToMouse_Never;
+              break;
           }
+          else if (i <= 0)
+          {
+              i = recognize_conf_parameter(buf, &pos, len, zoom_to_mouse_options);
+              if (i > 0)
+              {
+                  zoom_to_mouse_option = i;
+                  break;
+              }
+          }
+          CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
+                     COMMAND_TEXT(cmd_num), config_textname);
           break;
       case 43: // ROTATE_AROUND_MOUSE
-          i = recognize_conf_parameter(buf,&pos,len,rotate_around_mouse_options);
+          i = recognize_conf_parameter(buf, &pos, len, logicval_type);
+          if (i == 1)
+          {
+              rotate_around_mouse_option = RotateAroundMouse_Always;
+              break;
+          }
+          else if (i == 2)
+          {
+              rotate_around_mouse_option = RotateAroundMouse_Never;
+              break;
+          }
+          else if (i <= 0)
+          {
+              i = recognize_conf_parameter(buf, &pos, len, rotate_around_mouse_options);
+              if (i > 0)
+              {
+                rotate_around_mouse_option = i;
+                break;
+              }
+          }
+          CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
+                     COMMAND_TEXT(cmd_num), config_textname);
+          break;
+      case 44: // VSYNC
+          i = recognize_conf_parameter(buf,&pos,len,logicval_type);
           if (i <= 0)
           {
-            CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.", COMMAND_TEXT(cmd_num), config_textname);
+              CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
+                COMMAND_TEXT(cmd_num),config_textname);
+            break;
+          }
+          vsync_enabled = (i == 1);
+          break;
+      case 45: // RELATIVE_MOUSE_MODE
+          i = recognize_conf_parameter(buf,&pos,len,logicval_type);
+          if (i <= 0)
+          {
+              CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
+                COMMAND_TEXT(cmd_num),config_textname);
+            break;
+          }
+          if (i == 1)
+              features_enabled |= Ft_RelativeMouseMode;
+          else
+              features_enabled &= ~Ft_RelativeMouseMode;
+          break;
+      case 46: // CAPTURE_CURSOR
+          i = recognize_conf_parameter(buf,&pos,len,logicval_type);
+          if (i <= 0)
+          {
+              CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
+                COMMAND_TEXT(cmd_num),config_textname);
+            break;
+          }
+          if (i!=1) lbMouseGrab = false;
+          break;
+      case 47: // MATCHMAKING_SERVER
+          get_conf_parameter_single(buf,&pos,len,word_buf,sizeof(word_buf));
+          if (get_id(logicval_type, word_buf) == 2)
+          {
+              matchmaking_enabled = false;
+              matchmaking_set_server(NULL);
+              SYNCLOG("Matchmaking disabled (server set to OFF)");
           }
           else
           {
-            rotate_around_mouse_option = i;
+              matchmaking_enabled = true;
+              matchmaking_set_server(word_buf);
+              SYNCLOG("Matchmaking server: %s", matchmaking_ws_url);
           }
-          if (get_conf_parameter_single(buf,&pos,len,word_buf,sizeof(word_buf)) > 0)
+          break;
+      case 48: // MULTIPLAYER_PORT
+          if (get_conf_parameter_single(buf, &pos, len, word_buf, sizeof(word_buf)) > 0)
           {
-              if (strcasecmp(word_buf, "FOLLOW") == 0)
+            i = atoi(word_buf);
+          }
+          if (i > 0 && i <= UINT16_MAX) {
+            enet_port = i;
+          } else {
+            CONFWRNLOG("Invalid MULTIPLAYER_PORT '%s' in %s file.", COMMAND_TEXT(cmd_num), config_textname);
+          }
+          break;
+      case 49: // RENDERER
+          i = recognize_conf_parameter(buf,&pos,len,renderer_type_desc);
+          if (i <= 0)
+          {
+              CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
+                COMMAND_TEXT(cmd_num),config_textname);
+            break;
+          }
+          requested_renderer_type = i;
+          break;
+      case 50: // VIEWPORT_MODE
+          i = recognize_conf_parameter(buf,&pos,len,viewport_mode_desc);
+          if (i <= 0)
+          {
+              CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
+                COMMAND_TEXT(cmd_num),config_textname);
+            break;
+          }
+          viewport_mode = i;
+          break;
+      case 51: // PARCHMENT_MAP_FADE
+          i = recognize_conf_parameter(buf, &pos, len, logicval_type);
+          if (i == 1)
+          {
+              parchment_map_fade_turns = PARCHMENT_MAP_FADE_FAST_TURNS;
+              break;
+          }
+          else if (i == 2)
+          {
+              parchment_map_fade_turns = 0;
+              break;
+          }
+          else
+          {
+              if (get_conf_parameter_single(buf, &pos, len, word_buf, sizeof(word_buf)) <= 0)
               {
-                  rotate_follow_mouse_option = true;
+                  CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
+                      COMMAND_TEXT(cmd_num), config_textname);
+                  break;
               }
-              if (strcasecmp(word_buf, "NO_FOLLOW") == 0)
-              {
-                  rotate_follow_mouse_option = false;
-              }
+              if (strcasecmp(word_buf, "ORIGINAL") == 0)
+                  parchment_map_fade_turns = PARCHMENT_MAP_FADE_ORIGINAL_TURNS;
               else
+                  CONFWRNLOG("Incorrect value of \"%s\" parameter in %s file; expected OFF or ON.",
+                      COMMAND_TEXT(cmd_num), config_textname);
+          }
+          break;
+      case 52: // AUTOMATIC_REPLAYS
+          i = recognize_conf_parameter(buf, &pos, len, logicval_type);
+          if (i <= 0)
+          {
+              CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.",
+                  COMMAND_TEXT(cmd_num), config_textname);
+              break;
+          }
+          replays_enabled = (i == 1);
+          break;
+      case 53: // MAX_REPLAYS
+          i = 0;
+          for (int typ = 0; typ < ReplTyp_Count; typ++)
+          {
+              if (get_conf_parameter_single(buf,&pos,len,word_buf,sizeof(word_buf)) > 0)
               {
-                  CONFWRNLOG("Couldn't recognize \"%s\" command parameter in %s file.", COMMAND_TEXT(cmd_num), config_textname);
+                  i = atoi(word_buf);
+                  if (i < 0) {
+                      CONFWRNLOG("Invalid \"%s\" value in %s file.",COMMAND_TEXT(cmd_num),config_textname);
+                      i = 0;
+                  }
               }
+              max_replays[typ] = i;
+          }
+          break;
+      case 54: // REPLAY_MAX_SIZE
+          i = -1;
+          if (get_conf_parameter_single(buf, &pos, len, word_buf, sizeof(word_buf)) > 0)
+          {
+              i = atoi(word_buf);
+          }
+          if (i >= 0) {
+              packetsave_max_kb = i;
+          }
+          else {
+              CONFWRNLOG("Invalid \"%s\" value in %s file.", COMMAND_TEXT(cmd_num), config_textname);
+          }
+          break;
+      case 55: // CHAT_FONT_SIZE
+          i = -1;
+          if (get_conf_parameter_single(buf, &pos, len, word_buf, sizeof(word_buf)) > 0)
+          {
+              i = atoi(word_buf);
+          }
+          if (i > 0) {
+              chat_font_size = i;
+          }
+          else {
+              CONFWRNLOG("Invalid \"%s\" value in %s file.", COMMAND_TEXT(cmd_num), config_textname);
+          }
+          break;
+      case 56: // REPLAY_REWIND_BUFFER_SIZE
+          i = -1;
+          if (get_conf_parameter_single(buf, &pos, len, word_buf, sizeof(word_buf)) > 0)
+          {
+              i = atoi(word_buf);
+          }
+          if (i >= 0) {
+              replay_rewind_buffer_kb = i;
+          }
+          else {
+              CONFWRNLOG("Invalid \"%s\" value in %s file.", COMMAND_TEXT(cmd_num), config_textname);
           }
           break;
       case ccr_comment:
           break;
       case ccr_endOfFile:
+          break;
+      case 2: // INSTALL_TYPE
+      case 4: // KEYBOARD
+      case 23: //SKIP_HEART_ZOOM
+      case 32: // COMMAND_CHAR
+          CONFLOG("The \"%s\" setting is depricated.", COMMAND_TEXT(cmd_num));
           break;
       default:
           CONFWRNLOG("Unrecognized command in %s file.",config_textname);
@@ -988,6 +1174,32 @@ static void load_file_configuration(const char *fname, const char *sname, const 
       skip_conf_to_next_line(buf,&pos,len);
     }
 #undef COMMAND_TEXT
+}
+
+static void load_file_configuration(const char *fname, const char *sname, const char *config_textname, unsigned short flags)
+{
+  long len = LbFileLengthRnc(fname);
+  if (len < 2)
+  {
+    if ((flags & CnfLd_IgnoreErrors) == 0)
+      WARNMSG("%s file \"%s\" doesn't exist or is too small.", config_textname,sname);
+    return;
+  }
+  if (len > 65536)
+  {
+    WARNMSG("%s file \"%s\" is too large.", config_textname,sname);
+    return;
+  }
+  char* buf = (char*)KfxCalloc(len + 256, 1);
+  if (buf == NULL)
+    return;
+
+  len = LbFileLoadAt(fname, buf);
+  if (len>0)
+  {
+    SYNCDBG(7,"Processing %s file, %ld bytes", config_textname, len);
+    buf[len] = '\0';
+    load_string_configuration(buf, len, config_textname);
   }
   SYNCDBG(7,"%s loaded", config_textname);
   // Freeing
@@ -1086,6 +1298,9 @@ short load_configuration(void)
 
   load_configuration_for_mod_all();
 
+  if (start_params.config_overrides != NULL)
+    load_string_configuration(start_params.config_overrides, strlen(start_params.config_overrides), "CLI (-cfg)");
+
   // Returning if the setting are valid
   return (install_info.lang_id > 0) && (install_info.inst_path[0] != '\0');
 }
@@ -1096,9 +1311,11 @@ short load_configuration(void)
  */
 void process_cmdline_overrides(void)
 {
+  if (flag_is_set(start_params.operation_flags, GOF_SingleLevel)) {
+    clear_flag(start_params.startup_flags, SFlg_Legal | SFlg_FX | SFlg_Intro);
+  }
   // Use CD for music rather than OGG files
-  if (start_params.overrides[Clo_CDMusic])
-  {
+  if (start_params.overrides[Clo_CDMusic]) {
     features_enabled &= ~Ft_NoCdMusic;
   }
 }

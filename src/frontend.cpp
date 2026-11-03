@@ -17,6 +17,8 @@
  */
 /******************************************************************************/
 #include "pre_inc.h"
+#include "observer.h"
+#include "kfx/renderer/RendererManager.h"
 #include "frontend.h"
 
 #include <string.h>
@@ -52,6 +54,7 @@
 #include "front_input.h"
 #include "front_fmvids.h"
 #include "game_saves.h"
+#include "kfx/save/SaveManager.h"
 #include "engine_render.h"
 #include "engine_redraw.h"
 #include "front_landview.h"
@@ -79,6 +82,7 @@
 #include "local_camera.h"
 #include "player_utils.h"
 #include "config_players.h"
+#include "roomspace_input.h"
 #include "gui_frontmenu.h"
 #include "gui_frontbtns.h"
 #include "gui_soundmsgs.h"
@@ -98,7 +102,7 @@ extern "C" {
 #endif
 
 /******************************************************************************/
-TbClockMSec gui_message_timeout = 0;
+static TbBool frontend_error_pending = false;
 char gui_message_text[TEXT_BUFFER_LENGTH];
 static char path_string[178];
 MenuID vid_change_query_menu = GMnu_CREATURE_QUERY1;
@@ -107,7 +111,7 @@ unsigned char default_tag_mode = 1;
 
 struct GuiButtonInit frontend_main_menu_buttons[] = {
   { LbBtnT_NormalBtn,  BID_MENU_TITLE, 0, 0, NULL,               NULL,        NULL,                 0, 999,  26, 999,  26, 371, 46, frontend_draw_large_menu_button,  0, GUIStr_Empty,  0,       {1},            0, NULL },
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontend_start_new_game,NULL,frontend_over_button,     3, 999,  92, 999,  92, 371, 46, frontend_draw_large_menu_button,  0, GUIStr_Empty,  0,       {2},            0, NULL },
+  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontend_start_new_game,NULL,frontend_over_button,     3, 999,  92, 999,  92, 371, 46, frontend_draw_campaign_menu_button,  0, GUIStr_Empty,  0,       {2},            0, frontend_campaign_menu_button_maintain },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontend_load_continue_game,NULL,frontend_over_button, 0, 999, 138, 999, 138, 371, 46, frontend_draw_large_menu_button,  0, GUIStr_Empty,  0,       {8},            0, frontend_continue_game_maintain },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontend_load_mappacks,NULL,frontend_over_button,     34, 999, 184, 999, 184, 371, 46, frontend_draw_large_menu_button,  0, GUIStr_Empty,  0,     {106},            0, frontend_mappacks_maintain },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontend_change_state,NULL, frontend_over_button,    2, 999, 230,   999, 230, 371, 46, frontend_draw_large_menu_button,  0, GUIStr_Empty,  0,       {3},            0, frontend_main_menu_load_game_maintain },
@@ -134,13 +138,14 @@ struct GuiButtonInit frontend_high_score_score_buttons[] = {
   { LbBtnT_NormalBtn,  BID_DEFAULT,    0, 0, NULL,               NULL,        NULL,                 0, 80,  97, 80,  97,450,286, frontend_draw_high_score_table,    0, GUIStr_Empty,  0,       {0},            0, NULL },
   { LbBtnT_HoldableBtn,BID_DEFAULT,    0, 0, highscore_scroll_up,NULL,frontend_over_button,  0, 530, 96, 530, 96, 26, 14, frontend_draw_slider_button,       0, GUIStr_Empty,  0,      {17},            0, frontend_highscore_scroll_up_maintain},
   { LbBtnT_HoldableBtn,BID_DEFAULT,    0, 0, highscore_scroll_down,NULL,frontend_over_button,0, 530, 374, 530, 374, 26, 14, frontend_draw_slider_button,       0, GUIStr_Empty,  0,      {18},            0, frontend_highscore_scroll_down_maintain},
-  { LbBtnT_HoldableBtn,BID_DEFAULT,    0, 0, highscore_scroll,NULL,NULL,              0, 533, 112, 533, 112, 20,260, frontend_draw_highscores_scroll_tab,   0, GUIStr_Empty,  0,      {40},            0, frontend_highscore_scroll_tab_maintain},
+  { LbBtnT_DraggableBtn,BID_DEFAULT,    0, 0, highscore_scroll,NULL,NULL,              0, 533, 112, 533, 112, 20,260, frontend_draw_highscores_scroll_tab,   0, GUIStr_Empty,  0,      {40},            0, frontend_highscore_scroll_tab_maintain},
   { LbBtnT_NormalBtn,  BID_DEFAULT,    0, 0, frontend_quit_high_score_table,NULL,frontend_over_button,3,999,404, 999, 404,371, 46, frontend_draw_large_menu_button,   0, GUIStr_Empty,  0,      {83},            0, frontend_maintain_high_score_ok_button },
   {-1,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,                 0,   0,   0,   0,   0,  0,  0, NULL,                              0, GUIStr_Empty,  0,       {0},            0, NULL },
 };
 
 struct GuiButtonInit frontend_error_box_buttons[] = {
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,                 0, 999,   0, 999,   0,450, 92, frontend_draw_error_text_box,      0, GUIStr_Empty,  0,{.str = gui_message_text},0, frontend_maintain_error_text_box},
+  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,                 0, 999, 172, 999, 172,450,136, frontend_draw_error_text_box,      0, GUIStr_Empty,  0,{.str = gui_message_text},0, NULL},
+  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontend_close_error_box,NULL,frontend_over_button,  0, 999, 254, 999, 254,247, 46, frontend_draw_small_menu_button,   0, GUIStr_Empty,  0,      {83},            0, NULL },
   {-1,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,                 0,   0,   0,   0,   0,  0,  0, NULL,                              0, GUIStr_Empty,  0,       {0},            0, NULL },
 };
 
@@ -152,7 +157,7 @@ struct GuiMenu frontend_statistics_menu =
 struct GuiMenu frontend_high_score_table_menu =
  { GMnu_FEHIGH_SCORE_TABLE, 0, 1, frontend_high_score_score_buttons,POS_SCRCTR,POS_SCRCTR, 640, 480, NULL, 0, NULL,NULL,                  0, 0, 0,};
 struct GuiMenu frontend_error_box = // Error box has no background defined - the buttons drawing adds it
- { GMnu_FEERROR_BOX,        0, 1, frontend_error_box_buttons,POS_GAMECTR,POS_GAMECTR, 450,  92, NULL,                        0, NULL,    NULL,                    0, 1, 0,};
+ { GMnu_FEERROR_BOX,        0, 1, frontend_error_box_buttons,POS_SCRCTR,POS_SCRCTR, 640, 480, NULL,                        0, NULL,    NULL,                    0, 1, 0,};
 
 // Note: update size in .h file when changing this array.
 struct GuiMenu *menu_list[] = {
@@ -199,7 +204,7 @@ struct GuiMenu *menu_list[] = {
     &frontend_select_level_menu,//40
     &frontend_select_campaign_menu,
     &frontend_error_box,
-    &frontend_add_session_box,
+    NULL,
     &frontend_select_mappack_menu,
     &message_box,
     &spell_menu2,
@@ -313,8 +318,8 @@ struct FrontEndButtonData frontend_button_info[FRONTEND_BUTTON_INFO_COUNT] = {
     {GUIStr_MnuOptions, 0},
     {GUIStr_MnuOptions, 1},
     {GUIStr_MnuRetToOptions, 1},
-    {GUIStr_MnuSoundOptions, 1},
-    {GUIStr_MouseOptions, 1}, // [100]
+    {GUIStr_MnuSoundOptions, 2},
+    {GUIStr_MouseOptions, 2}, // [100]
     {GUIStr_Sensitivity, 1},
     {GUIStr_MnuInvertMouse, 1},
     {GUIStr_MnuComputer, 1},
@@ -329,6 +334,9 @@ struct FrontEndButtonData frontend_button_info[FRONTEND_BUTTON_INFO_COUNT] = {
     {GUIStr_MnuMapPacks, 2},
     {GUIStr_MnuMpMapPacks, 2},
     {GUIStr_MnuReturnToLobby, 1},
+    {GUIStr_MnuContinueCampaign, 1}, // [115]
+    {GUIStr_MnuStartNewGame, 1},
+    {GUIStr_NetSettings, 2},
 };
 
 // bttn_sprite, tooltip_stridx, msg_stridx, lifespan_turns, turns_between_events, replace_event_kind_button;
@@ -401,7 +409,7 @@ long net_comport_index_active;
 long net_speed_index_active;
 long net_number_of_players;
 long net_number_of_enum_players;
-long net_level_hilighted;
+long net_level_highlighted;
 struct NetMessage net_message[NET_MESSAGES_COUNT];
 long net_number_of_messages;
 long net_message_scroll_offset;
@@ -415,6 +423,28 @@ short old_menu_mouse_y;
 unsigned char menu_ids[3];
 unsigned char new_objective;
 int frontend_menu_state;
+/** Menu the player was in when they started loading a saved game. */
+static FrontendMenuState load_game_menu_state = FeSt_FELOAD_GAME;
+static TbBool load_game_failed = false;
+/** Scroll offset (px) for the in-game error box's message, when it's too tall
+ *  for the box; see gui_area_error_message. */
+static int32_t error_box_scroll_y = 0;
+
+static int32_t error_box_overflow = 0;
+static int32_t error_box_visible_height = 0;
+static int32_t error_box_line_step = 0;
+static TbClockMSec holdable_button_repeat_time = 0;
+
+#define HOLDABLE_BUTTON_REPEAT_MS 50
+
+/** Height in px of one line of error message text, before it is scaled. */
+#define ERROR_BOX_TEXT_LINE_HEIGHT 18
+#define ERROR_BOX_TRACK_WIDTH_DIVISOR 3
+#define ERROR_BOX_MIN_THUMB_DIVISOR 6
+/** Palette lookup of the scrollbar thumb colour. */
+#define ERROR_BOX_THUMB_RED 13
+#define ERROR_BOX_THUMB_GREEN 9
+#define ERROR_BOX_THUMB_BLUE 5
 int skip_high_score_screen;
 int load_game_scroll_offset;
 unsigned char video_gamma_correction;
@@ -497,11 +527,13 @@ void add_message(long plyr_idx, char *msg)
     }
     nmsg = &net_message[i];
     nmsg->plyr_idx = plyr_idx;
-    snprintf(nmsg->text, NET_MESSAGE_LEN, "%s", msg);
+    nmsg->connection_id = net_user_info[plyr_idx].connection_id;
+    snprintf(nmsg->text, NET_MESSAGE_LEN, "%s: %s", net_user_info[plyr_idx].name, msg);
     i++;
     net_number_of_messages = i;
-    if (net_message_scroll_offset+4 < i)
-      net_message_scroll_offset = i-4;
+    if (net_message_scroll_offset + frontend_messages_items_visible < i) {
+        net_message_scroll_offset = i - frontend_messages_items_visible;
+    }
 }
 
 /**
@@ -511,12 +543,156 @@ void add_message(long plyr_idx, char *msg)
  */
 void create_error_box(TextStringId msg_idx)
 {
-    if (!game.packet_load_enable)
+    if (!replay.load_enable)
     {
         //change the length into  when gui_error_text will not be exported
         snprintf(gui_error_text, sizeof(gui_error_text), "%s", get_string(msg_idx));
+        error_box_scroll_y = 0;
         turn_on_menu(GMnu_ERROR_BOX);
     }
+}
+
+void gui_close_error_box(struct GuiButton *gbtn)
+{
+    turn_off_menu(GMnu_ERROR_BOX);
+}
+
+static int error_message_padding(const struct GuiButton *gbtn)
+{
+    return (gbtn->height * ERROR_BOX_INSET_PADDING + ERROR_BOX_INSET_HEIGHT / 2) / ERROR_BOX_INSET_HEIGHT;
+}
+
+static int32_t error_message_inner_height(const struct GuiButton *gbtn)
+{
+    return gbtn->height - 2 * error_message_padding(gbtn);
+}
+
+/** Sets the font and the text-drawing window for the error box message inset, and returns the
+ *  text scale. The frontend fonts are not loaded in a running game, so this uses the in-game font. */
+static int error_message_prepare(struct GuiButton *gbtn)
+{
+    const int pad = error_message_padding(gbtn);
+    LbTextSetFont(winfont);
+    LbTextSetJustifyWindow(gbtn->scr_pos_x + pad, gbtn->scr_pos_y + pad, gbtn->width - 2 * pad);
+    LbTextSetClipWindow(gbtn->scr_pos_x + pad, gbtn->scr_pos_y + pad, gbtn->width - 2 * pad, error_message_inner_height(gbtn));
+    const int line_height = LbTextLineHeight();
+    return (line_height > 0) ? (units_per_pixel * ERROR_BOX_TEXT_LINE_HEIGHT / line_height) : units_per_pixel;
+}
+
+/** How many pixels of the wrapped message don't fit in the inset (0 if it all fits). */
+static int32_t error_message_overflow(struct GuiButton *gbtn, int text_units_per_px)
+{
+    int32_t overflow = text_string_height(text_units_per_px, gbtn->content.str) - error_message_inner_height(gbtn);
+    return (overflow > 0) ? overflow : 0;
+}
+
+static void error_message_scroll_by(int32_t delta)
+{
+    error_box_scroll_y += delta;
+    if (error_box_scroll_y > error_box_overflow)
+        error_box_scroll_y = error_box_overflow;
+    if (error_box_scroll_y < 0)
+        error_box_scroll_y = 0;
+}
+
+/** Tracks how far the error box message overflows its inset and scrolls it with the
+ *  mouse wheel; otherwise keeps it reset so a shorter message that follows a
+ *  scrolled one always starts at the top. */
+void maintain_error_message(struct GuiButton *gbtn)
+{
+    const int text_units_per_px = error_message_prepare(gbtn);
+    error_box_overflow = error_message_overflow(gbtn, text_units_per_px);
+    error_box_visible_height = error_message_inner_height(gbtn);
+    error_box_line_step = LbTextLineHeight() * text_units_per_px / 16;
+    if (error_box_overflow <= 0)
+    {
+        error_box_scroll_y = 0;
+        return;
+    }
+    if (wheel_scrolled_up)
+        error_message_scroll_by(-error_box_line_step);
+    if (wheel_scrolled_down)
+        error_message_scroll_by(error_box_line_step);
+    error_message_scroll_by(0);
+}
+
+/** Draws the in-game error box's message in a dark inset, word-wrapped and centred;
+ *  text too tall for the inset is clipped and scrolled with the scrollbar beside it
+ *  (see maintain_error_message) instead of spilling out of the box. */
+void gui_area_error_message(struct GuiButton *gbtn)
+{
+    if ((gbtn->flags & LbBtnF_Enabled) == 0)
+        return;
+    const unsigned short flg_mem = RendererGetDrawFlags();
+    RendererSetDrawFlags(Lb_SPRITE_TRANSPAR4);
+    LbDrawBox(gbtn->scr_pos_x, gbtn->scr_pos_y, gbtn->width, gbtn->height, 0);
+    const int text_units_per_px = error_message_prepare(gbtn);
+    const int32_t overflow = error_message_overflow(gbtn, text_units_per_px);
+    RendererSetDrawFlags(Lb_TEXT_HALIGN_CENTER);
+    int32_t y = (overflow > 0) ? -error_box_scroll_y
+        : (error_message_inner_height(gbtn) - text_string_height(text_units_per_px, gbtn->content.str)) / 2;
+    LbTextDrawResized(0, y, text_units_per_px, gbtn->content.str);
+    RendererSetDrawFlags(flg_mem);
+}
+
+void gui_error_message_scroll_up(struct GuiButton *gbtn)
+{
+    error_message_scroll_by(-error_box_line_step);
+}
+
+void gui_error_message_scroll_down(struct GuiButton *gbtn)
+{
+    error_message_scroll_by(error_box_line_step);
+}
+
+void maintain_error_message_scroll(struct GuiButton *gbtn)
+{
+    const TbBool overflows = (error_box_overflow > 0);
+    const int arrow = gbtn->btype_value & LbBFeF_IntValueMask;
+    if (arrow == ERROR_BOX_ARROW_UP)
+        gbtn->flags ^= (gbtn->flags ^ LbBtnF_Enabled * (overflows && (error_box_scroll_y > 0))) & LbBtnF_Enabled;
+    else if (arrow == ERROR_BOX_ARROW_DOWN)
+        gbtn->flags ^= (gbtn->flags ^ LbBtnF_Enabled * (overflows && (error_box_scroll_y < error_box_overflow))) & LbBtnF_Enabled;
+}
+
+static int32_t error_box_thumb_height(struct GuiButton *gbtn)
+{
+    int32_t thumb_h = gbtn->height * error_box_visible_height / (error_box_visible_height + error_box_overflow);
+    if (thumb_h < gbtn->height / ERROR_BOX_MIN_THUMB_DIVISOR) {
+        thumb_h = gbtn->height / ERROR_BOX_MIN_THUMB_DIVISOR;
+    }
+    return thumb_h;
+}
+
+void gui_error_message_scroll_drag(struct GuiButton *gbtn)
+{
+    if (error_box_overflow <= 0) {
+        return;
+    }
+    const int32_t thumb_h = error_box_thumb_height(gbtn);
+    const int32_t travel = gbtn->height - thumb_h;
+    if (travel <= 0) {
+        return;
+    }
+    error_box_scroll_y = (GetMouseY() - gbtn->scr_pos_y - thumb_h / 2) * error_box_overflow / travel;
+    error_message_scroll_by(0);
+}
+
+void gui_area_error_scrollbar(struct GuiButton *gbtn)
+{
+    const unsigned short flg_mem = RendererGetDrawFlags();
+    const int track_w = gbtn->width / ERROR_BOX_TRACK_WIDTH_DIVISOR;
+    const int track_x = gbtn->scr_pos_x + (gbtn->width - track_w) / 2;
+    RendererSetDrawFlags(Lb_SPRITE_TRANSPAR4);
+    LbDrawBox(track_x, gbtn->scr_pos_y, track_w, gbtn->height, 0);
+    if (error_box_overflow > 0)
+    {
+        const int32_t thumb_h = error_box_thumb_height(gbtn);
+        const int32_t thumb_y = gbtn->scr_pos_y + (gbtn->height - thumb_h) * error_box_scroll_y / error_box_overflow;
+        RendererSetDrawFlags(Lb_SPRITE_TRANSPAR8);
+        LbDrawBox(track_x, thumb_y, track_w, thumb_h, colours[ERROR_BOX_THUMB_RED][ERROR_BOX_THUMB_GREEN][ERROR_BOX_THUMB_BLUE]);
+    }
+    RendererSetDrawFlags(flg_mem);
 }
 
 
@@ -534,17 +710,33 @@ void create_message_box(const char *title, const char *line1, const char *line2,
 
 short game_is_busy_doing_gui(void)
 {
-    struct PlayerInfo *player = get_my_player();
     if (battle_creature_over > 0) {
         return true;
     }
-    if (player->one_click_lock_cursor) {
+    if (local_cursor_is_locked()) {
         return false;
     }
     if (!busy_doing_gui) {
         return false;
     }
     return true;
+}
+
+// force finish text entry
+// (if text field is empty, reverts as though esc was pressed.)
+void finish_button_area_input(void)
+{
+    if (input_button == NULL)
+        return;
+    TbKeyCode prev_key = lbInkey;
+    lbInkey = KC_RETURN;
+    get_button_area_input(input_button, input_button->id_num);
+    if (input_button != NULL)
+    {
+        lbInkey = KC_ESCAPE;
+        get_button_area_input(input_button, input_button->id_num);
+    }
+    lbInkey = prev_key;
 }
 
 TbBool get_button_area_input(struct GuiButton *gbtn, int modifiers)
@@ -565,7 +757,9 @@ TbBool get_button_area_input(struct GuiButton *gbtn, int modifiers)
         if ((str[0] != '\0') || (modifiers == -3))
         {
             gbtn->button_state_left_pressed = 0;
-            (gbtn->click_event)(gbtn);
+            if (gbtn->click_event != NULL) {
+                gbtn->click_event(gbtn);
+            }
             input_button = 0;
             LbStopTextInput();
             if ((gbtn->flags & LbBtnF_Clickable) != 0)
@@ -694,7 +888,7 @@ void frontend_continue_game_maintain(struct GuiButton *gbtn)
 
 void frontend_main_menu_load_game_maintain(struct GuiButton *gbtn)
 {
-    if (number_of_saved_games > 0)
+    if (SaveManager_SavedGamesCount() > 0)
         gbtn->flags |= LbBtnF_Enabled;
     else
         gbtn->flags &= ~LbBtnF_Enabled;
@@ -727,14 +921,6 @@ TbBool frontend_is_player_allied(long idx1, long idx2)
     if ((idx2 < 0) || (idx2 >= PLAYER_GOOD))
       return false;
     return ((frontend_alliances & alliance_grid[idx1][idx2]) != 0);
-}
-
-void frontend_set_alliance(long idx1, long idx2)
-{
-    if (frontend_is_player_allied(idx1, idx2))
-      frontend_alliances &= ~alliance_grid[idx1][idx2];
-    else
-      frontend_alliances |= alliance_grid[idx1][idx2];
 }
 
 TbResult frontend_load_data(void)
@@ -828,12 +1014,13 @@ long player_state_to_packet(PlayerState work_state, PowerKind pwkind, TbBool alr
 
 TbBool set_players_packet_change_spell(struct PlayerInfo *player,PowerKind pwkind)
 {
+    const struct UserState* ustate = get_user_state_prediction(get_my_user());
     if (power_is_instinctive(game.chosen_spell_type) && (game.chosen_spell_type != 0))
         return false;
     const struct PowerConfigStats *powerst;
     powerst = get_power_model_stats(pwkind);
     TbBool already_in;
-    already_in = (powerst->work_state != PSt_None) && (player->work_state == powerst->work_state);
+    already_in = (powerst->work_state != PSt_None) && (ustate->work_state == powerst->work_state);
     int pcktype;
     pcktype = player_state_to_packet(powerst->work_state, pwkind, already_in);
     if (pcktype != PckA_None)
@@ -944,6 +1131,12 @@ long frontend_scroll_tab_to_offset(struct GuiButton *gbtn, long scr_pos, long fi
 
 void gui_quit_game(struct GuiButton *gbtn)
 {
+    if (replay.load_enable)
+    {
+        turn_off_all_menus();
+        quit_game = 1;
+        return;
+    }
     struct PlayerInfo *player = get_my_player();
     set_players_packet_action(player, PckA_QuitToMainMenu, 0, 0, 0, 0);
 }
@@ -1009,71 +1202,6 @@ void gui_area_slider(struct GuiButton *gbtn)
     }
     LbSpriteDrawResized(gbtn->scr_pos_x + shift_x + 24*units_per_px/16, gbtn->scr_pos_y + 6*units_per_px/16, bs_units_per_px, spr);
 }
-
-#if (BFDEBUG_LEVEL > 0)
-// Code for font testing screen (debug version only)
-TbBool fronttestfont_draw(void)
-{
-  const struct TbSprite *spr;
-  unsigned long i;
-  unsigned long k;
-  long w;
-  long h;
-  long x;
-  long y;
-  SYNCDBG(9,"Starting");
-  for (y=0; y < lbDisplay.GraphicsScreenHeight; y++)
-    for (x=0; x < lbDisplay.GraphicsScreenWidth; x++)
-    {
-        lbDisplay.WScreen[y*lbDisplay.GraphicsScreenWidth+x] = 0;
-    }
-  LbTextSetWindow(0/pixel_size, 0/pixel_size, MyScreenHeight/pixel_size, MyScreenWidth/pixel_size);
-  // Drawing
-  w = 32;
-  h = 48;
-  for (i=31; i < num_chars_in_font+31; i++)
-  {
-    k = (i-31);
-    SYNCDBG(9,"Drawing char %lu",i);
-    x = (k%32)*w + 2;
-    y = (k/32)*h + 2;
-    if (lbFontPtr != NULL)
-      spr = LbFontCharSprite(lbFontPtr,i);
-    else
-      spr = NULL;
-    if (spr != NULL)
-    {
-      LbDrawBox(x, y, spr->SWidth+2, spr->SHeight+2, 255);
-      LbSpriteDraw(x+1, y+1, spr);
-    }
-//TODO SPRITES enhance font support
-  }
-  // Displaying the new frame
-  return true;
-}
-
-TbBool fronttestfont_input(void)
-{
-  const unsigned int keys[] = {KC_Z,KC_1,KC_2,KC_3,KC_4,KC_5,KC_6,KC_7,KC_8,KC_9,KC_0};
-  int i;
-  for (i=0; i < sizeof(keys)/sizeof(keys[0]); i++)
-  {
-    if (lbKeyOn[keys[i]])
-    {
-      lbKeyOn[keys[i]] = 0;
-      num_chars_in_font = num_sprites(testfont[i]);
-      SYNCDBG(9,"Characters in font %d: %ld",i,num_chars_in_font);
-      if (i < 4)
-        LbPaletteSet(frontend_palette);//testfont_palette[0]
-      else
-        LbPaletteSet(testfont_palette[1]);
-      LbTextSetFont(testfont[i]);
-      return true;
-    }
-  }
-  return false;
-}
-#endif
 
 
 void frontend_draw_icon(struct GuiButton *gbtn)
@@ -1224,14 +1352,11 @@ void frontend_set_player_number(long plr_num)
 
 const char *frontend_button_caption_text(const struct GuiButton *gbtn)
 {
-    unsigned long febtn_idx;
-    int text_idx;
-    febtn_idx = gbtn->content.lval;
-    if (febtn_idx < FRONTEND_BUTTON_INFO_COUNT)
-        text_idx = frontend_button_info[febtn_idx].capstr_idx;
-    else
-        text_idx = GUIStr_Empty;
-    return get_string(text_idx);
+    int32_t index = gbtn->content.lval;
+    if (index < 0 || index >= FRONTEND_BUTTON_INFO_COUNT) {
+        return get_string(GUIStr_Empty);
+    }
+    return get_string(frontend_button_info[index].capstr_idx);
 }
 
 int frontend_button_caption_font(const struct GuiButton *gbtn, long mouse_over_btn_idx)
@@ -1250,7 +1375,7 @@ int frontend_button_caption_font(const struct GuiButton *gbtn, long mouse_over_b
 
 void frontend_draw_text(struct GuiButton *gbtn)
 {
-    lbDisplay.DrawFlags = Lb_TEXT_HALIGN_LEFT;
+    RendererSetDrawFlags(Lb_TEXT_HALIGN_LEFT);
     int font_idx;
     if ((gbtn->flags & LbBtnF_Enabled) == 0)
         font_idx = 3;
@@ -1261,6 +1386,7 @@ void frontend_draw_text(struct GuiButton *gbtn)
     tx_units_per_px = gbtn->height * 16 / LbTextLineHeight();
     LbTextSetWindow(gbtn->scr_pos_x, gbtn->scr_pos_y, gbtn->width, gbtn->height);
     LbTextDrawResized(0, 0, tx_units_per_px, frontend_button_caption_text(gbtn));
+    RendererSetDrawFlags(0);
 }
 
 void frontend_change_state(struct GuiButton *gbtn)
@@ -1283,8 +1409,6 @@ void frontend_draw_enter_text(struct GuiButton *gbtn)
     }
     char *srctext;
     srctext = gbtn->content.str;
-    while (LbTextStringWidth(srctext) > 240)
-        srctext[strlen(srctext)-2] = 0;
     char text[2048];
     // Prepare text buffer
     TbBool print_with_cursor = 0;
@@ -1295,10 +1419,10 @@ void frontend_draw_enter_text(struct GuiButton *gbtn)
     }
     snprintf(text, sizeof(text), "%s%s", srctext, print_with_cursor?"_":"");
     LbTextSetFont(frontend_font[font_idx]);
-    lbDisplay.DrawFlags = Lb_TEXT_HALIGN_LEFT;
+    RendererSetDrawFlags(0);
     int tx_units_per_px;
     tx_units_per_px = gbtn->height * 16 / LbTextLineHeight();
-    LbTextSetWindow(gbtn->scr_pos_x, gbtn->scr_pos_y, (240 + LbTextCharWidth('_')) * tx_units_per_px / 16, gbtn->height);
+    LbTextSetWindow(gbtn->scr_pos_x, gbtn->scr_pos_y, gbtn->width, gbtn->height);
     LbTextDrawResized(0, 0, tx_units_per_px, text);
 }
 
@@ -1317,50 +1441,9 @@ void frontend_toggle_computer_players(struct GuiButton *gbtn)
     {
         screen_packet_set_action(nspck, NetAct_SetComputerPlayers);
         nspck->action_par1 = (fe_computer_players == 0);
+        net_config_info.computer_players = nspck->action_par1;
+        save_settings();
     }
-}
-
-void frontend_draw_computer_players(struct GuiButton *gbtn)
-{
-    int font_idx;
-    font_idx = frontend_button_caption_font(gbtn,frontend_mouse_over_button);
-    LbTextSetFont(frontend_font[font_idx]);
-    const char *text;
-    if (fe_computer_players) {
-        text = get_string(GUIStr_On);
-    } else {
-        text = get_string(GUIStr_Off);
-    }
-    int tx_units_per_px;
-    tx_units_per_px = gbtn->height * 16 / LbTextLineHeight();
-    int ln_height;
-    ln_height = LbTextLineHeight() * tx_units_per_px / 16;
-    LbTextSetWindow(gbtn->scr_pos_x, gbtn->scr_pos_y, gbtn->width, ln_height);
-    lbDisplay.DrawFlags = Lb_TEXT_HALIGN_LEFT;
-    LbTextDrawResized(0, 0, tx_units_per_px, frontend_button_caption_text(gbtn));
-    lbDisplay.DrawFlags = Lb_TEXT_HALIGN_RIGHT;
-    LbTextDrawResized(0, 0, tx_units_per_px, text);
-    lbDisplay.DrawFlags = 0;
-}
-
-
-void frontend_draw_mp_mappack(struct GuiButton *gbtn)
-{
-    int font_idx;
-    font_idx = frontend_button_caption_font(gbtn,frontend_mouse_over_button);
-    LbTextSetFont(frontend_font[font_idx]);
-    const char *text;
-    text = campaign.display_name;
-    
-    int tx_units_per_px;
-    tx_units_per_px = gbtn->height * 16 / LbTextLineHeight();
-    int ln_height;
-    ln_height = LbTextLineHeight() * tx_units_per_px / 16;
-    LbTextSetWindow(gbtn->scr_pos_x, gbtn->scr_pos_y, gbtn->width, ln_height);
-    
-    lbDisplay.DrawFlags = Lb_TEXT_HALIGN_LEFT;
-    LbTextDrawResized(0, 0, tx_units_per_px, text);
-    lbDisplay.DrawFlags = 0;
 }
 
 void set_packet_start(struct GuiButton *gbtn)
@@ -1371,24 +1454,22 @@ void set_packet_start(struct GuiButton *gbtn)
         screen_packet_set_action(nspck, NetAct_OpenLandView);
 }
 
-void draw_scrolling_button_string(struct GuiButton *gbtn, const char *text)
+/**
+ * Draws scrolling text within given screen rectangle, maintaining the scroll state.
+ * Unlike gui_area_scroll_window(), this needs no GuiButton, so it can be used to place
+ * a scrolling text box anywhere - including screens which have no menu behind them.
+ * Text colouring flags of the renderer are left as the caller set them, so the caller
+ * may e.g. combine it with Lb_TEXT_ONE_COLOR to stay independent of the active palette.
+ */
+void draw_scrolling_text_at(long pos_x, long pos_y, long width, long height, struct TextScrollWindow *scrollwnd, const char *text)
 {
-  struct TextScrollWindow *scrollwnd;
   unsigned short flg_mem;
   long text_height;
   long area_height;
-  flg_mem = lbDisplay.DrawFlags;
-  lbDisplay.DrawFlags &= ~Lb_TEXT_ONE_COLOR;
-  lbDisplay.DrawFlags |= Lb_TEXT_HALIGN_CENTER;
-  LbTextSetWindow(gbtn->scr_pos_x, gbtn->scr_pos_y, gbtn->width, gbtn->height);
-  scrollwnd = (struct TextScrollWindow *)gbtn->content.ptr;
-  if (scrollwnd == NULL)
-  {
-      ERRORLOG("Cannot have a TEXT_SCROLLING box type without a pointer to a TextScrollWindow");
-      LbTextSetWindow(0/pixel_size, 0/pixel_size, MyScreenHeight/pixel_size, MyScreenWidth/pixel_size);
-      return;
-  }
-  area_height = gbtn->height;
+  flg_mem = RendererGetDrawFlags();
+  RendererAddDrawFlags(Lb_TEXT_HALIGN_CENTER);
+  LbTextSetWindow(pos_x, pos_y, width, height);
+  area_height = height;
   scrollwnd->window_height = area_height;
   text_height = scrollwnd->text_height;
   int tx_units_per_px;
@@ -1440,9 +1521,9 @@ void draw_scrolling_button_string(struct GuiButton *gbtn, const char *text)
     } else
     if (scrollwnd->action != 0)
     {
-      if (scrollwnd->start_y < gbtn->height-text_height)
+      if (scrollwnd->start_y < height-text_height)
       {
-        scrollwnd->start_y = gbtn->height-text_height;
+        scrollwnd->start_y = height-text_height;
       } else
       if (scrollwnd->start_y > 0)
       {
@@ -1455,7 +1536,21 @@ void draw_scrolling_button_string(struct GuiButton *gbtn, const char *text)
   LbTextDrawResized(0, scrollwnd->start_y, tx_units_per_px, text);
   // And restore default drawing options
   LbTextSetWindow(0/pixel_size, 0/pixel_size, MyScreenHeight/pixel_size, MyScreenWidth/pixel_size);
-  lbDisplay.DrawFlags = flg_mem;
+  RendererSetDrawFlags(flg_mem);
+}
+
+void draw_scrolling_button_string(struct GuiButton *gbtn, const char *text)
+{
+  struct TextScrollWindow* scrollwnd = (struct TextScrollWindow *)gbtn->content.ptr;
+  if (scrollwnd == NULL)
+  {
+      ERRORLOG("Cannot have a TEXT_SCROLLING box type without a pointer to a TextScrollWindow");
+      return;
+  }
+  unsigned short flg_mem = RendererGetDrawFlags();
+  RendererClearDrawFlags(Lb_TEXT_ONE_COLOR);
+  draw_scrolling_text_at(gbtn->scr_pos_x, gbtn->scr_pos_y, gbtn->width, gbtn->height, scrollwnd, text);
+  RendererSetDrawFlags(flg_mem);
 }
 
 void gui_area_scroll_window(struct GuiButton *gbtn)
@@ -1560,13 +1655,31 @@ TbBool frontend_start_new_campaign(const char *cmpgn_fname)
     return true;
 }
 
+void frontend_draw_campaign_menu_button(struct GuiButton *gbtn)
+{
+    const char *text;
+    if (campaigns_list.items_num == 1)
+        text = frontend_button_caption_text(gbtn);
+    else
+        text = get_string(GUIStr_MnuCampaign);
+    frontend_draw_button(gbtn, 1, text, Lb_TEXT_HALIGN_CENTER);
+}
+
+void frontend_campaign_menu_button_maintain(struct GuiButton *gbtn)
+{
+    if (campaigns_list.items_num > 0)
+        gbtn->flags |= LbBtnF_Enabled;
+    else
+        gbtn->flags &= ~LbBtnF_Enabled;
+}
+
 void frontend_start_new_game(struct GuiButton *gbtn)
 {
     const char *cmpgn_fname;
     SYNCDBG(6,"Clicked");
     // Check if we can just start the game without campaign selection screen
     if (campaigns_list.items_num < 1)
-      cmpgn_fname = "";
+      return;
     else
     if (campaigns_list.items_num == 1)
       cmpgn_fname = campaigns_list.items[0].fname;
@@ -1612,18 +1725,6 @@ void frontend_load_mappacks(struct GuiButton *gbtn)
     }
 }
 
-void frontend_load_mp_mappacks(struct GuiButton *gbtn)
-{
-    SYNCDBG(6,"Clicked");
-    frontend_set_state(FeSt_MP_MAPPACK_SELECT);
-}
-
-/**
- * Writes the continue game file.
- * If allow_lvnum_grow is true and my_player has won the singleplayer level,
- * then next level is written into continue file. This should be the case
- * if complete_level() wasn't called yet.
- */
 short frontend_save_continue_game(short allow_lvnum_grow)
 {
     struct PlayerInfo *player;
@@ -1631,6 +1732,7 @@ short frontend_save_continue_game(short allow_lvnum_grow)
     unsigned short victory_state;
     short flg_mem;
     LevelNumber lvnum;
+    struct UserState *ustate = get_user_state(get_local_user());
     lvnum = get_loaded_level_number();
     SYNCDBG(6,"Starting");
     player = get_my_player();
@@ -1641,54 +1743,104 @@ short frontend_save_continue_game(short allow_lvnum_grow)
     }
     // Save some of the data from clearing
     victory_state = player->victory_state;
+    GameTurn play_turns = game.play_gameturn;
     memcpy(scratch, &dungeon->lvstats, sizeof(struct LevelStats));
-    flg_mem = ((player->additional_flags & PlaAF_UnlockedLordTorture) != 0);
+    flg_mem = ((ustate->additional_flags & UsrAF_UnlockedLordTorture) != 0);
     // clear all data
     clear_game_for_save();
     // Restore saved data
     player->victory_state = victory_state;
     memcpy(&dungeon->lvstats, scratch, sizeof(struct LevelStats));
-    set_flag_value(player->additional_flags, PlaAF_UnlockedLordTorture, flg_mem);
-    // Only save continue if level was won, not a free play level, not a multiplayer level and not in packet mode
+    set_flag_value(ustate->additional_flags, UsrAF_UnlockedLordTorture, flg_mem);
+    TbBool won = (player->victory_state == VicS_WonLevel);
+    
+    // If we win a mappack file, 'Continue Game' button should not return to that map
+    // (Instead of deleting continue file, maybe record the mappack itself as the place to return to?)
+    if (won && is_freeplay_level(lvnum) && !network_is_active() && !replay.load_enable
+     && (play_turns >= 30 * start_params.num_fps /* prevent broken maps from deleting a perfectly good continue */))
+        SaveManager_DeleteContinueLink();
+        
+    // Only save progress if not a free play level, not a multiplayer level and not in packet mode
     if (network_is_active()
      || ((game.operation_flags & GOF_SingleLevel) != 0)
-     || (game.packet_load_enable)
+     || (replay.load_enable)
      || (is_freeplay_level(lvnum))
      || (is_multiplayer_level(lvnum)))
         return false;
+    
     // Select the continue level (move the campaign forward)
-    if ((allow_lvnum_grow) && (player->victory_state == VicS_WonLevel)) {
-        // If level number growth makes sense, do it
+    if (allow_lvnum_grow && won) {
         SYNCDBG(7,"Progressing the campaign");
-        lvnum = move_campaign_to_next_level();
-    } else {
-        SYNCDBG(7,"No change in campaign position, victory state %d",(int)player->victory_state);
-        lvnum = get_continue_level_number();
+        move_campaign_to_next_level();
     }
-    return save_continue_game(lvnum);
+    return SaveManager_SaveLevelProgress(lvnum, player->victory_state);
 }
 
 void frontend_load_continue_game(struct GuiButton *gbtn)
 {
-  if (!load_continue_game())
-  {
-    continue_game_option_available = 0;
-    return;
-  }
-  frontend_set_state(FeSt_LAND_VIEW);
+    switch (SaveManager_LoadContinue())
+    {
+    case CntT_SavedGame:
+        frontend_set_state(FeSt_LOAD_GAME);
+        break;
+    case CntT_CampaignProgress:
+        frontend_set_state(FeSt_LAND_VIEW);
+        break;
+    default:
+        continue_game_option_available = 0;
+        break;
+    }
 }
 
 void frontend_load_game_maintain(struct GuiButton *gbtn)
 {
     int32_t game_index=load_game_scroll_offset+(gbtn->content.lval)-45;
-    if (game_index < number_of_saved_games)
+    if (game_index < SaveManager_SavedGamesCount())
         gbtn->flags |= LbBtnF_Enabled;
     else
         gbtn->flags &= ~LbBtnF_Enabled;
 }
 
+struct ObserverButtonCallback {
+    Gf_Btn_Callback callback;
+    TbBool camera_only;
+};
+
+static const struct ObserverButtonCallback observer_button_callbacks[] = {
+    {gui_set_menu_mode, false}, {gui_set_page, false},
+    {gui_go_to_map, false}, {gui_scroll_activity_up, false}, {gui_scroll_activity_down, false},
+    {gui_switch_players_visible, false},
+    {gui_go_to_next_creature, false}, {gui_go_to_next_creature_activity, false},
+    {gui_go_to_next_wanderer, false}, {gui_go_to_next_worker, false}, {gui_go_to_next_fighter, false},
+    {gui_go_to_next_room, false}, {gui_go_to_next_trap, false}, {gui_go_to_next_door, false},
+    {gui_go_to_next_spell, false}, {gui_go_to_person_in_battle, false},
+    {gui_zoom_in, true}, {gui_zoom_out, true}, {gui_set_query, true}, {gui_open_event, true}, {gui_kill_event, true},
+    {gui_query_next_creature_of_owner, true}, {gui_query_next_creature_of_owner_and_model, true},
+};
+#define OBSERVER_BUTTON_CALLBACK_COUNT (sizeof(observer_button_callbacks) / sizeof(observer_button_callbacks[0]))
+
+static TbBool observer_panel_button_blocked(const struct GuiButton *gbtn, Gf_Btn_Callback callback)
+{
+    if (!observer_is_active() || !is_toggleable_menu(get_active_menu(gbtn->gmenu_idx)->ident)) {
+        return false;
+    }
+    if (callback == NULL && gbtn->gbtype == LbBtnT_NormalBtn && gbtn->parent_menu != NULL) {
+        return false;
+    }
+    for (size_t i = 0; i < OBSERVER_BUTTON_CALLBACK_COUNT; i++) {
+        const struct ObserverButtonCallback *allowed = &observer_button_callbacks[i];
+        if (allowed->callback == callback && (!allowed->camera_only || is_observer_camera_active())) {
+            return false;
+        }
+    }
+    return true;
+}
+
 void do_button_click_actions(struct GuiButton *gbtn, unsigned char *s, Gf_Btn_Callback callback)
 {
+    if (observer_panel_button_blocked(gbtn, callback)) {
+        return;
+    }
     SYNCDBG(9,"Starting for button type %d",(int)gbtn->gbtype);
     if (gbtn->gbtype == LbBtnT_RadioBtn)
     {
@@ -1729,6 +1881,9 @@ void do_button_click_actions(struct GuiButton *gbtn, unsigned char *s, Gf_Btn_Ca
 
 void do_button_press_actions(struct GuiButton *gbtn, unsigned char *s, Gf_Btn_Callback callback)
 {
+    if (observer_panel_button_blocked(gbtn, callback)) {
+        return;
+    }
     SYNCDBG(9,"Starting for button type %d",(int)gbtn->gbtype);
     if (gbtn->gbtype == LbBtnT_RadioBtn)
     {
@@ -1741,10 +1896,18 @@ void do_button_press_actions(struct GuiButton *gbtn, unsigned char *s, Gf_Btn_Ca
         switch (gbtn->gbtype)
         {
         case LbBtnT_HoldableBtn:
-            if ((*s > 5) && (callback != NULL)) {
+            if (*s == 0) {
+                holdable_button_repeat_time = LbTimerClock() + HOLDABLE_BUTTON_REPEAT_MS;
+                *s = 1;
+            } else if ((callback != NULL) && (LbTimerClock() >= holdable_button_repeat_time)) {
+                holdable_button_repeat_time = LbTimerClock() + HOLDABLE_BUTTON_REPEAT_MS;
                 callback(gbtn);
-            } else {
-                (*s)++;
+            }
+            break;
+        case LbBtnT_DraggableBtn:
+            *s = 1;
+            if (callback != NULL) {
+                callback(gbtn);
             }
             break;
         case LbBtnT_Hotspot:
@@ -1815,6 +1978,10 @@ static void autofill_savegame_name(struct GuiButton *gbtn)
 
 void do_button_release_actions(struct GuiButton *gbtn, unsigned char *s, Gf_Btn_Callback callback)
 {
+    if (observer_panel_button_blocked(gbtn, callback)) {
+        *s = 0;
+        return;
+    }
   SYNCDBG(17,"Starting");
   int i;
   struct GuiMenu *gmnu;
@@ -1822,6 +1989,7 @@ void do_button_release_actions(struct GuiButton *gbtn, unsigned char *s, Gf_Btn_
   {
   case LbBtnT_NormalBtn:
   case LbBtnT_HoldableBtn:
+  case LbBtnT_DraggableBtn:
       if ((*s != 0) && (callback != NULL))
       {
           do_sound_button_click(gbtn);
@@ -1955,6 +2123,7 @@ int create_button(struct GuiMenu *gmnu, struct GuiButtonInit *gbinit, int units_
     gbtn->gbtype = gbinit->gbtype;
     gbtn->id_num = gbinit->id_num;
     gbtn->flags ^= (gbtn->flags ^ LbBtnF_Clickable * (gbinit->button_flags & 0xff)) & LbBtnF_Clickable;
+    gbtn->flags ^= (gbtn->flags ^ LbBtnF_NoClickAway * ((gbinit->button_flags >> 1) & 1)) & LbBtnF_NoClickAway;
     gbtn->click_event = gbinit->click_event;
     gbtn->rclick_event = gbinit->rclick_event;
     gbtn->ptover_event = gbinit->ptover_event;
@@ -2019,8 +2188,6 @@ int create_button(struct GuiMenu *gmnu, struct GuiButtonInit *gbinit, int units_
 
 long compute_menu_position_x(long desired_pos,int menu_width, int units_per_px)
 {
-  struct PlayerInfo *player;
-  player = get_my_player();
   long scaled_width;
   scaled_width = (menu_width * units_per_px + 8) / 16;
   long pos;
@@ -2030,7 +2197,7 @@ long compute_menu_position_x(long desired_pos,int menu_width, int units_per_px)
       pos = GetMouseX() - (scaled_width >> 1);
       break;
   case POS_GAMECTR: // Player-based positioning
-      pos = (player->engine_window_x) + (player->engine_window_width >> 1) - (scaled_width >> 1);
+      pos = (local_state.engine_window_x) + (local_state.engine_window_width >> 1) - (scaled_width >> 1);
       break;
   case POS_MOUSPRV: // Place menu centered over previous mouse position
       pos = old_menu_mouse_x - (scaled_width >> 1);
@@ -2043,8 +2210,8 @@ long compute_menu_position_x(long desired_pos,int menu_width, int units_per_px)
       break;
   default: // Desired position have direct coordinates
       pos = ((desired_pos*(long)units_per_pixel)>>4)*((long)pixel_size);
-      if (pos+scaled_width > lbDisplay.PhysicalScreenWidth*((long)pixel_size))
-        pos = lbDisplay.PhysicalScreenWidth*((long)pixel_size)-scaled_width;
+      if (pos+scaled_width > RendererPhysicalWidth()*((long)pixel_size))
+        pos = RendererPhysicalWidth()*((long)pixel_size)-scaled_width;
 /* Helps not to touch left panel - disabling, as needs additional conditions
       if (pos < status_panel_width)
         pos = status_panel_width;
@@ -2056,8 +2223,8 @@ long compute_menu_position_x(long desired_pos,int menu_width, int units_per_px)
   {
     if (pos+scaled_width > MyScreenWidth)
       pos = MyScreenWidth-scaled_width;
-    if (pos < player->engine_window_x)
-      pos = player->engine_window_x;
+    if (pos < local_state.engine_window_x)
+      pos = local_state.engine_window_x;
   } else
   {
     if (pos+scaled_width > MyScreenWidth)
@@ -2070,7 +2237,6 @@ long compute_menu_position_x(long desired_pos,int menu_width, int units_per_px)
 
 long compute_menu_position_y(long desired_pos,int menu_height, int units_per_px)
 {
-    struct PlayerInfo *player = get_my_player();
     long scaled_height;
     scaled_height = (menu_height * units_per_px + 8) / 16;
     long pos;
@@ -2080,7 +2246,7 @@ long compute_menu_position_y(long desired_pos,int menu_height, int units_per_px)
         pos = GetMouseY() - (scaled_height >> 1);
         break;
     case POS_GAMECTR: // Player-based positioning
-        pos = (player->engine_window_height >> 1) - ((scaled_height+20*units_per_px/16) >> 1);
+        pos = (local_state.engine_window_height >> 1) - ((scaled_height+20*units_per_px/16) >> 1);
         break;
     case POS_MOUSPRV: // Place menu centered over previous mouse position
         pos = old_menu_mouse_y - (scaled_height >> 1);
@@ -2119,7 +2285,7 @@ MenuNumber create_menu(struct GuiMenu *gmnu)
         amnu = get_active_menu(mnu_num);
         amnu->visual_state = 1;
         amnu->fade_time = gmnu->fade_time;
-        amnu->is_turned_on = ((game.operation_flags & GOF_ShowGui) != 0) || (!is_toggleable_menu(gmnu->ident));
+        amnu->is_turned_on = local_state.show_gui || !is_toggleable_menu(gmnu->ident);
         SYNCDBG(18,"Menu number %d already active",(int)mnu_num);
         return mnu_num;
     }
@@ -2145,10 +2311,10 @@ MenuNumber create_menu(struct GuiMenu *gmnu)
     int units_per_px;
     units_per_px = min((int)units_per_pixel,units_per_pixel_min*16/10);
     // Decrease scale factor if for some reason resulting size would exceed screen (wierd aspec ratio support)
-    if (gmnu->width * units_per_px > LbScreenWidth() * 16)
-        units_per_px = LbScreenWidth() * 16 / gmnu->width;
-    if (gmnu->height * units_per_px > LbScreenHeight() * 16)
-        units_per_px = LbScreenHeight() * 16 / gmnu->height;
+    if (gmnu->width * units_per_px > RendererPhysicalWidth() * 16)
+        units_per_px = RendererPhysicalWidth() * 16 / gmnu->width;
+    if (gmnu->height * units_per_px > RendererPhysicalHeight() * 16)
+        units_per_px = RendererPhysicalHeight() * 16 / gmnu->height;
     // Setting position X
     amnu->pos_x = compute_menu_position_x(gmnu->pos_x,gmnu->width,units_per_px);
     // Setting position Y
@@ -2165,7 +2331,7 @@ MenuNumber create_menu(struct GuiMenu *gmnu)
     amnu->create_cb = gmnu->create_cb;
     amnu->is_monopoly_menu = gmnu->is_monopoly_menu;
     amnu->is_active_panel = gmnu->is_active_panel;
-    amnu->is_turned_on = ((game.operation_flags & GOF_ShowGui) != 0) || (!is_toggleable_menu(gmnu->ident));
+    amnu->is_turned_on = local_state.show_gui || !is_toggleable_menu(gmnu->ident);
     callback = amnu->create_cb;
     if (callback != NULL)
         callback(amnu);
@@ -2224,6 +2390,7 @@ unsigned long toggle_status_menu(short visible)
     if ( visible )
     {
       set_menu_visible_on(GMnu_MAIN);
+      set_menu_visible_on(game.active_panel_mnu_idx);
       if ( room_on )
         set_menu_visible_on(GMnu_ROOM);
       if ( room_2_on )
@@ -2402,45 +2569,36 @@ TbBool toggle_first_person_menu(TbBool visible)
 
 void set_gui_visible(TbBool visible)
 {
-  SYNCDBG(6,"Starting");
-  set_flag_value(game.operation_flags, GOF_ShowGui, visible);
-  struct PlayerInfo *player=get_my_player();
-  unsigned char is_visbl = ((game.operation_flags & GOF_ShowGui) != 0);
-  switch (player->view_type)
-  {
-  case PVT_CreatureContrl:
-  case PVT_CreaturePasngr:
-      toggle_first_person_menu(is_visbl);
-      break;
-  case PVT_MapScreen:
-  case PVT_MapFadeIn:
-  case PVT_MapFadeOut:
-      toggle_status_menu(0);
-      break;
-  case PVT_DungeonTop:
-  default:
-      toggle_status_menu(is_visbl);
-      break;
-  }
-  if (((game.view_mode_flags & GNFldD_StatusPanelDisplay) != 0) && ((game.operation_flags & GOF_ShowGui) != 0))
-  {
-      setup_engine_window(status_panel_width, 0, MyScreenWidth, MyScreenHeight);
-  }
-  else
-  {
-      setup_engine_window(0, 0, MyScreenWidth, MyScreenHeight);
-  }
+    SYNCDBG(6,"Starting");
+    local_state.show_gui = visible;
+    switch (get_local_view_type()) {
+    case PVT_CreatureContrl:
+    case PVT_CreaturePasngr:
+        toggle_first_person_menu(visible);
+        break;
+    case PVT_MapScreen:
+    case PVT_MapFadeIn:
+    case PVT_MapFadeOut:
+        local_state.show_panel = visible;
+        toggle_status_menu(false);
+        break;
+    case PVT_DungeonTop:
+    default:
+        toggle_status_menu(visible);
+        break;
+    }
+    setup_engine_window(0, 0, MyScreenWidth, MyScreenHeight);
 }
 
 void toggle_gui(void)
 {
-    TbBool visible = ((game.operation_flags & GOF_ShowGui) == 0);
+    TbBool visible = !local_state.show_gui;
     set_gui_visible(visible);
 }
 
 void reinit_all_menus(void)
 {
-    TbBool visible = ((game.operation_flags & GOF_ShowGui) != 0);
+    TbBool visible = local_state.show_gui;
     init_gui();
     reset_gui_based_on_player_mode();
     set_gui_visible(visible);
@@ -2621,6 +2779,7 @@ void frontend_shutdown_state(FrontendMenuState pstate)
     case FeSt_QUIT_GAME:
     case FeSt_LOAD_GAME:
     case FeSt_INTRO:
+    case FeSt_DRAG:
     case FeSt_CAMPAIGN_INTRO:
     case FeSt_DEMO: //demo state (intro/credits)
     case FeSt_OUTRO:
@@ -2655,12 +2814,7 @@ FrontendMenuState frontend_setup_state(FrontendMenuState nstate)
           break;
       case FeSt_MAIN_MENU:
           stop_music(true);
-          continue_game_option_available = continue_game_available();
-          if (!continue_game_option_available)
-          {
-              char* fname = prepare_file_path(FGrp_Save, continue_game_filename);
-              LbFileDelete(fname);
-          }
+          continue_game_option_available = SaveManager_ContinueAvailable();
           if (!is_campaign_loaded()) {
               change_campaign(CampgnT_Default,"");
           }
@@ -2669,7 +2823,7 @@ FrontendMenuState frontend_setup_state(FrontendMenuState nstate)
           last_mouse_y = GetMouseY();
           time_last_played_demo = LbTimerClock();
           fe_high_score_table_from_main_menu = true;
-          clear_flag(game.system_flags, GSF_NetworkActive);
+          clear_flag(local_system_flags, GSF_NetworkActive);
           skip_high_score_screen = 0;
           set_pointer_graphic_menu();
           break;
@@ -2694,21 +2848,21 @@ FrontendMenuState frontend_setup_state(FrontendMenuState nstate)
       case FeSt_NET_SESSION:
           turn_on_menu(GMnu_FENET_SESSION);
           frontnet_session_setup();
-          clear_flag(game.system_flags, GSF_NetworkActive);
+          clear_flag(local_system_flags, GSF_NetworkActive);
           set_pointer_graphic_menu();
           break;
       case FeSt_NET_START:
+          frontnet_start_setup();
           turn_on_menu(GMnu_FENET_START);
-          if (frontend_menu_state != FeSt_MP_MAPPACK_SELECT)
-            frontnet_start_setup();
           LbStartTextInput();
-          set_flag(game.system_flags, GSF_NetworkActive);
+          set_flag(local_system_flags, GSF_NetworkActive);
           set_pointer_graphic_menu();
           break;
       case FeSt_START_KPRLEVEL:
       case FeSt_QUIT_GAME:
       case FeSt_LOAD_GAME:
       case FeSt_INTRO:
+      case FeSt_DRAG:
       case FeSt_CAMPAIGN_INTRO:
       case FeSt_DEMO:
       case FeSt_OUTRO:
@@ -2727,11 +2881,14 @@ FrontendMenuState frontend_setup_state(FrontendMenuState nstate)
           set_pointer_graphic_none();
           credits_offset = lbDisplay.PhysicalScreenHeight;
           credits_end = 0;
-          LbTextSetWindow(0, 0, lbDisplay.PhysicalScreenWidth, lbDisplay.PhysicalScreenHeight);
-          lbDisplay.DrawFlags = Lb_TEXT_HALIGN_CENTER;
+          LbTextSetWindow(0, 0, RendererPhysicalWidth(), lbDisplay.PhysicalScreenHeight);
+          RendererSetDrawFlags(Lb_TEXT_HALIGN_CENTER);
           play_music_track(7);
           break;
       case FeSt_LEVEL_STATS:
+          if (network_is_active()) {
+              LbNetwork_Stop();
+          }
           turn_on_menu(GMnu_FESTATISTICS);
           frontstats_set_timer();
           set_pointer_graphic_menu();
@@ -2775,8 +2932,8 @@ FrontendMenuState frontend_setup_state(FrontendMenuState nstate)
         set_pointer_graphic_menu();
         break;
     case FeSt_CAMPAIGN_SELECT:
-        turn_on_menu(GMnu_FECAMPAIGN_SELECT);
         frontend_campaign_list_load();
+        turn_on_menu(GMnu_FECAMPAIGN_SELECT);
         set_pointer_graphic_menu();
         break;
     case FeSt_MP_MAPPACK_SELECT:
@@ -2853,6 +3010,13 @@ FrontendMenuState frontend_set_state(FrontendMenuState nstate)
         frontend_menu_state, menu_state_str(frontend_menu_state),
         nstate, menu_state_str(nstate));
     frontend_menu_state = frontend_setup_state(nstate);
+    if (frontend_menu_state == FeSt_NETLAND_VIEW) {
+        net_lobby_set_phase(NetPhase_InLandview);
+    } else if (frontend_menu_state == FeSt_NET_START) {
+        net_lobby_set_phase(NetPhase_Lobby);
+    } else if (frontend_menu_state == FeSt_START_MPLEVEL) {
+        net_lobby_set_phase(NetPhase_Loading);
+    }
     return frontend_menu_state;
 }
 
@@ -2878,7 +3042,7 @@ TbBool frontmainmnu_input(void)
     }
     if (lbKeyOn[KC_T] && lbKeyOn[KC_LSHIFT])
     {
-        if (game.easter_eggs_enabled == true)
+        if (start_params.easter_egg == true)
         {
             lbKeyOn[KC_T] = 0;
             set_player_as_won_level(get_my_player());
@@ -2889,7 +3053,7 @@ TbBool frontmainmnu_input(void)
 #if (BFDEBUG_LEVEL > 0)
     if (lbKeyOn[KC_F] && lbKeyOn[KC_LSHIFT])
     {
-        if (game.easter_eggs_enabled == true)
+        if (start_params.easter_egg == true)
         {
             lbKeyOn[KC_F] = 0;
             frontend_set_state(FeSt_FONT_TEST);
@@ -2963,6 +3127,17 @@ short get_frontend_global_inputs(void)
 void frontend_input(void)
 {
     SYNCDBG(7,"Starting");
+    if (menu_is_active(GMnu_FEERROR_BOX)) {
+        time_last_played_demo = LbTimerClock();
+        get_gui_inputs(0);
+        if (is_key_pressed(KC_ESCAPE, KMod_DONTCARE)) {
+            clear_key_pressed(KC_ESCAPE);
+            frontend_close_error_box(NULL);
+        }
+        get_frontend_global_inputs();
+        get_screen_capture_inputs();
+        return;
+    }
     TbBool input_consumed;
     input_consumed = false;
     switch (frontend_menu_state)
@@ -3032,7 +3207,7 @@ void frontend_input(void)
         if (input_consumed) {
             break;
         }
-        fronttestfont_input();
+        //fronttestfont_input();
         break;
 #endif
     default:
@@ -3063,9 +3238,9 @@ char update_menu_fade_level(struct GuiMenu *gmnu)
             gmnu->visual_state = 2;
             return 0;
         }
-        if (game.frame_skip == 0)
+        if (local_state.fast_forward == 0)
         {
-            gmnu->fade_time -= game.delta_time;
+            gmnu->fade_time -= local_state.delta_time;
         } else {
             gmnu->fade_time -= 1.0;
         }
@@ -3076,9 +3251,9 @@ char update_menu_fade_level(struct GuiMenu *gmnu)
             gmnu->fade_time = 0.0;
             return -1; // Kill menu
         }
-        if (game.frame_skip == 0)
+        if (local_state.fast_forward == 0)
         {
-            gmnu->fade_time -= game.delta_time;
+            gmnu->fade_time -= local_state.delta_time;
         } else {
             gmnu->fade_time -= 1.0;
         }
@@ -3091,7 +3266,7 @@ char update_menu_fade_level(struct GuiMenu *gmnu)
 
 void toggle_gui_overlay_map(void)
 {
-    toggle_flag(game.operation_flags, GOF_ShowGui);
+    local_state.show_gui = !local_state.show_gui;
 }
 
 void draw_menu_buttons(struct GuiMenu *gmnu)
@@ -3160,14 +3335,14 @@ void draw_active_menus_buttons(void)
             {
               if (gmnu->menu_init != NULL)
                 if (gmnu->menu_init->fade_time)
-                  lbDisplay.DrawFlags |= Lb_SPRITE_TRANSPAR4;
+                  RendererAddDrawFlags(Lb_SPRITE_TRANSPAR4);
             }
             callback = gmnu->draw_cb;
             if (callback != NULL)
               callback(gmnu);
             if (gmnu->visual_state == 2)
               draw_menu_buttons(gmnu);
-            lbDisplay.DrawFlags &= ~Lb_SPRITE_TRANSPAR4;
+            RendererClearDrawFlags(Lb_SPRITE_TRANSPAR4);
         }
     }
     SYNCDBG(9,"Finished");
@@ -3253,7 +3428,7 @@ void draw_gui(void)
     SYNCDBG(6,"Starting");
     unsigned int flg_mem;
     LbTextSetFont(winfont);
-    flg_mem = lbDisplay.DrawFlags;
+    flg_mem = RendererGetDrawFlags();
     LbTextSetWindow(0/pixel_size, 0/pixel_size, MyScreenWidth/pixel_size, MyScreenHeight/pixel_size);
     update_fade_active_menus();
     draw_active_menus_buttons();
@@ -3262,20 +3437,20 @@ void draw_gui(void)
         draw_active_menus_highlights();
         if (game.flash_button_time > 0)
         {
-            game.flash_button_time -= game.delta_time;
+            game.flash_button_time -= local_state.delta_time;
             if (game.flash_button_time <= 0) {
                 game.flash_button_index = 0;
             }
         }
     }
-    lbDisplay.DrawFlags = flg_mem;
+    RendererSetDrawFlags(flg_mem);
     SYNCDBG(8,"Finished");
 }
 
 void draw_debug_messages() {
     LbTextSetFont(frontend_font[0]);
     LbTextSetWindow(0, 0, 640, 200);
-    lbDisplay.DrawFlags = 0;
+    RendererSetDrawFlags(0);
     const int x = 8 / pixel_size;
     int y = 8 / pixel_size;
     for (auto message = debug_messages_head; message != nullptr; ) {
@@ -3316,7 +3491,7 @@ short frontend_draw(void)
         return 0;
     }
 
-    if (LbScreenLock() != Lb_SUCCESS)
+    if (!RendererBeginFrame())
         return 2;
 
     result = 1;
@@ -3364,24 +3539,27 @@ short frontend_draw(void)
         break;
 #if (BFDEBUG_LEVEL > 0)
     case FeSt_FONT_TEST:
-        fronttestfont_draw();
+        //fronttestfont_draw();
         break;
 #endif
     default:
         break;
     }
+    if ((frontend_menu_state == FeSt_LAND_VIEW || frontend_menu_state == FeSt_NETLAND_VIEW) && menu_is_active(GMnu_FEERROR_BOX)) {
+        draw_gui();
+    }
     draw_debug_messages();
     perform_any_screen_capturing();
-    LbScreenUnlock();
+    RendererEndFrame();
     return result;
 }
 
 void load_game_update(void)
 {
-    if ((number_of_saved_games>0) && (load_game_scroll_offset>=0))
+    if ((SaveManager_SavedGamesCount()>0) && (load_game_scroll_offset>=0))
     {
-        if ( load_game_scroll_offset > number_of_saved_games-1 )
-          load_game_scroll_offset = number_of_saved_games-1;
+        if ( load_game_scroll_offset > SaveManager_SavedGamesCount()-1 )
+          load_game_scroll_offset = SaveManager_SavedGamesCount()-1;
     } else
     {
         load_game_scroll_offset = 0;
@@ -3390,30 +3568,14 @@ void load_game_update(void)
 
 void gui_set_autopilot(struct GuiButton *gbtn)
 {
-  struct PlayerInfo *player;
-  player = get_my_player();
-  int ntype;
-  if (game.comp_player_aggressive)
+  do_sound_button_click(gbtn);
+  uint8_t kind = gbtn->btype_value + 1;
+  if (!replay.load_enable)
   {
-    ntype = 1;
-  } else
-  if (game.comp_player_defensive)
-  {
-    ntype = 2;
-  } else
-  if (game.comp_player_construct)
-  {
-    ntype = 3;
-  } else
-  if (game.comp_player_creatrsonly)
-  {
-    ntype = 4;
-  } else
-  {
-    ERRORLOG("Illegal Autopilot type, resetting to default");
-    ntype = 1;
+    settings.computer_assistant_kind = kind;
+    save_settings();
   }
-  set_players_packet_action(player, PckA_SetComputerKind, ntype, 0, 0, 0);
+  set_players_packet_action(get_my_player(), PckA_SetComputerKind, kind, 0, 0, 0);
 }
 
 void set_level_objective(PlayerNumber plyr_idx, const char *msg_text)
@@ -3435,7 +3597,7 @@ void update_player_objectives(PlayerNumber plyr_idx)
     struct PlayerInfo *player;
     SYNCDBG(6,"Starting for player %d",(int)plyr_idx);
     player = get_player(plyr_idx);
-    if (network_is_active())
+    if (game.game_kind == GKind_MultiGame)
     {
       if ((!player->display_objective_turn) && (player->victory_state != VicS_Undecided))
         player->display_objective_turn = get_gameturn()+1;
@@ -3450,7 +3612,7 @@ void update_player_objectives(PlayerNumber plyr_idx)
           break;
       case VicS_LostLevel:
           TextStringId msg_idx = CpgStr_LevelLost;
-          if (network_is_active() && (player->id_number == get_host_player_id()) && network_human_contenders_remain()) {
+          if ((game.game_kind == GKind_MultiGame) && (player->id_number == get_net_user_player_number(SERVER_ID)) && network_human_contenders_remain()) {
               msg_idx = GUIStr_NetHostLostWaitingForPlayers;
           }
           set_level_objective(player->id_number, get_string(msg_idx));
@@ -3461,6 +3623,11 @@ void update_player_objectives(PlayerNumber plyr_idx)
 }
 
 void display_objectives(PlayerNumber plyr_idx, MapSubtlCoord x, MapSubtlCoord y)
+{
+    display_objectives_with_icon(plyr_idx, x, y, -1);
+}
+
+void display_objectives_with_icon(PlayerNumber plyr_idx, MapSubtlCoord x, MapSubtlCoord y, short icon_idx)
 {
     MapCoord cor_x;
     MapCoord cor_y;
@@ -3483,6 +3650,7 @@ void display_objectives(PlayerNumber plyr_idx, MapSubtlCoord x, MapSubtlCoord y)
         if (event->kind == EvKind_Objective)
         {
             event_create_event_or_update_old_event(cor_x, cor_y, EvKind_Objective, plyr_idx, 0);
+            game.event[evidx].icon_idx = icon_idx;
             return;
         }
     }
@@ -3495,9 +3663,23 @@ void display_objectives(PlayerNumber plyr_idx, MapSubtlCoord x, MapSubtlCoord y)
             cor_y = creatng->mappos.y.val;
         }
         event_create_event_or_update_old_event(cor_x, cor_y, EvKind_Objective, plyr_idx, creatng->index);
+        struct Event *event = get_event_of_type_for_player(
+            EvKind_Objective, plyr_idx);
+
+        if (!event_is_invalid(event))
+        {
+            event->icon_idx = icon_idx;
+        }
     } else
     {
         event_create_event_or_update_old_event(cor_x, cor_y, EvKind_Objective, plyr_idx, 0);
+        struct Event *event = get_event_of_type_for_player(
+            EvKind_Objective, plyr_idx);
+
+        if (!event_is_invalid(event))
+        {
+            event->icon_idx = icon_idx;
+        }
     }
 }
 
@@ -3618,14 +3800,7 @@ FrontendMenuState get_menu_state_when_back_from_substate(FrontendMenuState subst
     case FeSt_NET_START:
         return FeSt_NET_SESSION;
     case FeSt_MP_MAPPACK_SELECT:
-        if (net_service_index_selected == FrontendNetSvc_Skirmish)
-        {
-            return FeSt_NET_SERVICE;
-        }
-        else
-        {
-            return FeSt_NET_START;
-        }
+        return FeSt_NET_SERVICE;
     case FeSt_LEVEL_SELECT:
          return FeSt_MAPPACK_SELECT;
     case FeSt_NET_SESSION:
@@ -3670,7 +3845,14 @@ FrontendMenuState get_menu_state_when_back_from_substate(FrontendMenuState subst
 FrontendMenuState get_startup_menu_state(void)
 {
   struct PlayerInfo *player;
+  struct UserState *ustate = get_user_state(get_local_user());
   LevelNumber lvnum;
+  if (load_game_failed)
+  {
+      load_game_failed = false;
+      SYNCLOG("Failed load; back to the menu it started from");
+      return load_game_menu_state;
+  }
   if (game_flags2 & GF2_Server)
   {
       game_flags2 &= ~GF2_Server;
@@ -3730,9 +3912,9 @@ FrontendMenuState get_startup_menu_state(void)
     if (network_is_active())
     { // If played real network game, then resulting screen isn't changed based on victory
         SYNCLOG("Network game summary state selected");
-        if ((player->additional_flags & PlaAF_UnlockedLordTorture) != 0)
+        if ((ustate->additional_flags & UsrAF_UnlockedLordTorture) != 0)
         { // Player has won - go FeSt_TORTURE before any others
-          player->additional_flags &= ~PlaAF_UnlockedLordTorture;
+          ustate->additional_flags &= ~UsrAF_UnlockedLordTorture;
           return FeSt_TORTURE;
         } else
         if ((player->display_flags & PlaF6_PlyrHasQuit) == 0)
@@ -3767,9 +3949,9 @@ FrontendMenuState get_startup_menu_state(void)
             {
                 return FeSt_OUTRO;
             } else
-            if ((player->additional_flags & PlaAF_UnlockedLordTorture) != 0)
+            if ((ustate->additional_flags & UsrAF_UnlockedLordTorture) != 0)
             {
-                player->additional_flags &= ~PlaAF_UnlockedLordTorture;
+                ustate->additional_flags &= ~UsrAF_UnlockedLordTorture;
                 return FeSt_DRAG;
             } else
             {
@@ -3798,42 +3980,106 @@ FrontendMenuState get_startup_menu_state(void)
   return FeSt_MAIN_MENU;
 }
 
+void frontend_start_load_game(long slot_num)
+{
+    game.save_game_slot = slot_num;
+    load_game_menu_state = frontend_menu_state;
+    frontend_set_state(FeSt_LOAD_GAME);
+}
+
+/**
+ * Queues a message to show the next time the frontend is entered, without
+ * forcing which menu it lands on. Use this for a failure that ends a running
+ * game (in-game load, console load): the usual victory/campaign logic still
+ * decides the destination screen, e.g. the landview mid-campaign.
+ */
+void frontend_queue_message(TextStringId msg_idx)
+{
+    snprintf(gui_message_text, TEXT_BUFFER_LENGTH, "%s", get_string(msg_idx));
+    frontend_error_pending = true;
+}
+
+/**
+ * Called when a load has failed, before the frontend is entered again: the
+ * frontend opens on the menu the load started from, showing the message.
+ * Only for a load that starts from the frontend itself, before any game is
+ * running (frontend_start_load_game's FeSt_LOAD_GAME) -- an in-game failure
+ * should use frontend_queue_message instead, so it doesn't hijack the normal
+ * post-game menu (see get_startup_menu_state).
+ */
+void frontend_load_game_failed(TextStringId msg_idx)
+{
+    load_game_failed = true;
+    // Shown by try_restore_frontend_error_box() once the frontend is up
+    frontend_queue_message(msg_idx);
+}
+
 void try_restore_frontend_error_box()
 {
-    if (LbTimerClock() < gui_message_timeout)
-    {
+    if (frontend_error_pending) {
         turn_on_menu(GMnu_FEERROR_BOX);
     }
 }
 
-void create_frontend_error_box(long showTime, const char * text)
+void queue_frontend_error_box(const char *text)
 {
     snprintf(gui_message_text, TEXT_BUFFER_LENGTH, "%s", text);
-    gui_message_timeout = LbTimerClock()+showTime;
+    frontend_error_pending = true;
+}
+
+void create_frontend_error_box(const char *text)
+{
+    if (game_is_busy_doing_gui_string_input()) {
+        kill_button_area_input();
+    }
+    queue_frontend_error_box(text);
     turn_on_menu(GMnu_FEERROR_BOX);
+}
+
+void frontend_close_error_box(struct GuiButton *gbtn)
+{
+    frontend_error_pending = false;
+    turn_off_menu(GMnu_FEERROR_BOX);
 }
 
 void frontend_draw_error_text_box(struct GuiButton *gbtn)
 {
-    draw_text_box(gbtn->content.str);
+    int units_per_px = scroll_box_get_units_per_px(gbtn);
+    draw_scroll_box(gbtn, units_per_px, 5);
+    int border = 20 * units_per_px / 16;
+    int window_height = 64 * units_per_px / 16;
+    LbTextSetFont(frontend_font[2]);
+    RendererSetDrawFlags(Lb_TEXT_HALIGN_CENTER);
+    LbTextSetWindow(gbtn->scr_pos_x + border, gbtn->scr_pos_y + 12 * units_per_px / 16, gbtn->width - 2 * border, window_height);
+    int text_units_per_px = units_per_px;
+    int32_t text_height = text_string_height(text_units_per_px, gbtn->content.str);
+    while (text_height > window_height && text_units_per_px > 1) {
+        text_units_per_px--;
+        text_height = text_string_height(text_units_per_px, gbtn->content.str);
+    }
+    LbTextDrawResized(0, max(0, (window_height - text_height) / 2), text_units_per_px, gbtn->content.str);
 }
 
-void frontend_maintain_error_text_box(struct GuiButton *gbtn)
+static TbClockMSec last_click_time = 0;
+static int32_t last_click_x = -1;
+static int32_t last_click_y = -1;
+
+// returns true if this click is the second of a double-click (same mouse position)
+TbBool frontend_register_click(void)
 {
-    if (is_key_pressed(KC_ESCAPE, KMod_DONTCARE)) {
-        clear_key_pressed(KC_ESCAPE);
-        gui_message_timeout = 0;
-        turn_off_menu(GMnu_FEERROR_BOX);
-        return;
-    }
-    if (LbTimerClock() > gui_message_timeout) {
-        turn_off_menu(GMnu_FEERROR_BOX);
-    }
+    TbClockMSec now = LbTimerClock();
+    int32_t x = GetMouseX();
+    int32_t y = GetMouseY();
+    TbBool double_click = (last_click_x == x) && (last_click_y == y) && (now - last_click_time <= DOUBLE_CLICK_MS);
+    last_click_x = x;
+    last_click_y = y;
+    last_click_time = double_click ? 0 : now;
+    return double_click;
 }
 
 void frontend_draw_product_version(struct GuiButton *gbtn)
 {
-    lbDisplay.DrawFlags = Lb_TEXT_HALIGN_LEFT;
+    RendererSetDrawFlags(Lb_TEXT_HALIGN_LEFT);
     LbTextSetFont(frontend_font[1]);
     int units_per_px = simple_frontend_sprite_height_units_per_px(gbtn, GFS_hugebutton_a05l, 100);
     int h = LbTextLineHeight() * units_per_px / 16;

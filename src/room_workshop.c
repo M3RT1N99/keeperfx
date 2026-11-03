@@ -37,6 +37,7 @@
 #include "player_instances.h"
 #include "creature_states.h"
 #include "keeperfx.hpp"
+#include "api.h"
 #include "post_inc.h"
 
 /******************************************************************************/
@@ -442,17 +443,11 @@ TbBool placing_offmap_workshop_item(PlayerNumber plyr_idx, ThingClass tngclass, 
     switch (tngclass)
     {
     case TCls_Trap:
-        if (dungeon->mnfct_info.trap_amount_stored[tngmodel] > 0) {
-            return false;
-        }
         if (dungeon->mnfct_info.trap_amount_offmap[tngmodel] > 0) {
             return true;
         }
         break;
     case TCls_Door:
-        if (dungeon->mnfct_info.door_amount_stored[tngmodel] > 0) {
-            return false;
-        }
         if (dungeon->mnfct_info.door_amount_offmap[tngmodel] > 0) {
             return true;
         }
@@ -644,22 +639,22 @@ static short process_player_manufacturing(PlayerNumber plyr_idx)
 
     switch (dungeon->manufacture_class)
     {
-    case TCls_Trap:
-        dungeon->lvstats.manufactured_traps++;
-        // If that's local player - make a message
-        if (is_my_player_number(plyr_idx))
-            output_message(SMsg_ManufacturedTrap, 0);
-        break;
-    case TCls_Door:
-        dungeon->lvstats.manufactured_doors++;
-        // If that's local player - make a message
-        if (is_my_player_number(plyr_idx))
-            output_message(SMsg_ManufacturedDoor, 0);
-        break;
-    default:
-        ERRORLOG("Invalid type of new manufacture: %d (%s)",(int)dungeon->manufacture_class, thing_class_code_name(dungeon->manufacture_class));
-        return false;
+        case TCls_Trap:
+            dungeon->lvstats.manufactured_traps++;
+            // If that's the displayed player - make a message
+            output_player_message(plyr_idx, SMsg_ManufacturedTrap, 0);
+            break;
+        case TCls_Door:
+            dungeon->lvstats.manufactured_doors++;
+            // If that's the displayed player - make a message
+            output_player_message(plyr_idx, SMsg_ManufacturedDoor, 0);
+            break;
+        default:
+            ERRORLOG("Invalid type of new manufacture: %d (%s)",(int)dungeon->manufacture_class, thing_class_code_name(dungeon->manufacture_class));
+            return false;
     }
+ 
+    send_manufacture_complete_event(dungeon, plyr_idx);
 
     dungeon->manufacture_progress -= (k << 8);
     dungeon->turn_last_manufacture = get_gameturn();
@@ -680,7 +675,7 @@ void update_manufacturing(void)
     for (i=0; i<PLAYERS_COUNT; i++)
     {
         player = get_player(i);
-        if (player_exists(player) && (player->is_active == 1))
+        if (is_active_keeper(player))
         {
             process_player_manufacturing(i);
         }
@@ -690,23 +685,20 @@ void update_manufacturing(void)
 EventIndex update_workshop_object_pickup_event(struct Thing *creatng, struct Thing *picktng)
 {
     EventIndex evidx;
-    struct PlayerInfo* player;
+    const struct UserState* ustate;
     ThingClass tngclass = crate_thing_to_workshop_item_class(picktng);
     if (tngclass == TCls_Trap)
     {
         evidx = event_create_event_or_update_nearby_existing_event(
             picktng->mappos.x.val, picktng->mappos.y.val,
             EvKind_TrapCrateFound, creatng->owner, picktng->index);
-            if ( (is_my_player_number(picktng->owner)) && (!is_my_player_number(creatng->owner)) )
-            {
+            if ( (is_my_player_number(picktng->owner)) && (!is_my_player_number(creatng->owner)) ) {
                 output_message(SMsg_TrapStolen, 0);
-            }
-            else if ( (is_my_player_number(creatng->owner)) && (!is_my_player_number(picktng->owner)) )
-            {
+            } else if ( (is_my_player_number(creatng->owner)) && (!is_my_player_number(picktng->owner)) ) {
                 if (picktng->owner != game.neutral_player_num)
                 {
-                    player = get_my_player();
-                    if (creatng->index != player->influenced_thing_idx)
+                    ustate = get_local_user_state();
+                    if (creatng->index != ustate->influenced_thing_idx)
                     {
                         output_message(SMsg_TrapTaken, 0);
                     }
@@ -717,16 +709,13 @@ EventIndex update_workshop_object_pickup_event(struct Thing *creatng, struct Thi
        evidx = event_create_event_or_update_nearby_existing_event(
             picktng->mappos.x.val, picktng->mappos.y.val,
             EvKind_DoorCrateFound, creatng->owner, picktng->index);
-            if ( (is_my_player_number(picktng->owner)) && (!is_my_player_number(creatng->owner)) )
-            {
+            if ( (is_my_player_number(picktng->owner)) && (!is_my_player_number(creatng->owner)) ) {
                 output_message(SMsg_DoorStolen, 0);
-            }
-            else if ( (is_my_player_number(creatng->owner)) && (!is_my_player_number(picktng->owner)) )
-            {
+            } else if ( (is_my_player_number(creatng->owner)) && (!is_my_player_number(picktng->owner)) ) {
                 if (picktng->owner != game.neutral_player_num)
                 {
-                    player = get_my_player();
-                    if (creatng->index != player->influenced_thing_idx)
+                    ustate = get_local_user_state();
+                    if (creatng->index != ustate->influenced_thing_idx)
                     {
                         output_message(SMsg_DoorTaken, 0);
                     }
@@ -788,7 +777,7 @@ int check_crates_on_subtile_for_reposition_in_room(struct Room *room, MapSubtlCo
             // If exceeded capacity of the library
             if (room->used_capacity >= room->total_capacity)
             {
-                WARNLOG("The %s capacity %d exceeded; space used is %d",room_code_name(room->kind),(int)room->total_capacity,(int)room->used_capacity);
+                SYNCDBG(7,"The %s capacity %d exceeded; space used is %d",room_code_name(room->kind),(int)room->total_capacity,(int)room->used_capacity);
                 return -1; // re-create all (this could save the object if there are duplicates)
             } else
             // If the thing is in wall, remove it but store to re-create later
@@ -933,9 +922,44 @@ void count_crates_in_room(struct Room *room)
         }
     }
     if (rrepos.used > 0) {
-        ERRORLOG("The %s index %d capacity %d wasn't enough; %d items belonging to player %d dropped",
+        SYNCLOG("The %s index %d capacity %d wasn't enough; %d items belonging to player %d dropped",
           room_code_name(room->kind),(int)room->index,(int)room->total_capacity,(int)rrepos.used,(int)room->owner);
     }
     room->capacity_used_for_storage = room->used_capacity;
 }
+
+void send_manufacture_complete_event(struct Dungeon *dungeon, PlayerNumber plyr_idx)
+{   
+    const char *kind_description = NULL;
+    const char *class_description = NULL;
+
+    switch (dungeon->manufacture_class)
+    {
+        case TCls_Trap:
+            kind_description = trap_code_name(dungeon->manufacture_kind);
+            class_description = "Trap";
+            break;
+        case TCls_Door:
+            kind_description = door_code_name(dungeon->manufacture_kind);
+            class_description = "Door";
+            break;
+        default:
+            ERRORLOG("Invalid manufacture class %d", (int)dungeon->manufacture_class);
+            return;
+    }
+
+    struct ApiEventData event_data[] = {
+        {"player", API_EVENT_DATA_INT32, {.int32_value = (int32_t)plyr_idx}},
+        {"class", API_EVENT_DATA_INT32, {.int32_value = (int32_t)dungeon->manufacture_class}},
+        {"class_description", API_EVENT_DATA_STRING, {.string_value = class_description}},
+        {"kind", API_EVENT_DATA_INT32, {.int32_value = (int32_t)dungeon->manufacture_kind}},
+        {"kind_description", API_EVENT_DATA_STRING, {.string_value = kind_description}},
+        {"level_number", API_EVENT_DATA_INT32, {.int32_value = get_loaded_level_number()}}
+    };
+
+    api_event_with_data("MANUFACTURE_COMPLETED",event_data,sizeof(event_data) / sizeof(event_data[0]));
+
+}
+
+
 /******************************************************************************/

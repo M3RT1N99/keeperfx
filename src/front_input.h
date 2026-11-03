@@ -140,7 +140,10 @@ struct GuiLayer {
     long current_gui_layer;
 };
 
+// These structs hold pointers in static tables, which must stay aligned on arm64.
+#ifdef __ANDROID__
 #pragma pack()
+#endif
 struct GamekeySettings {
     const char* toml_name;
     TextStringId string_id; // For display in the key binding menu
@@ -150,7 +153,9 @@ struct GamekeySettings {
     uint8_t binding_menu_visibility;
 
 };
+#ifdef __ANDROID__
 #pragma pack(1)
+#endif
 
 extern const struct GamekeySettings game_key_settings[GAME_KEYS_COUNT];
 
@@ -165,12 +170,11 @@ extern enum ZoomToMouseOptions zoom_to_mouse_option;
 enum RotateAroundMouseOptions
 {
     RotateAroundMouse_Never = 1,
-    RotateAroundMouse_NotCtrl = 2,
-    RotateAroundMouse_OnlyCtrl = 3,
+    RotateAroundMouse_RotationKeys = 2,
+    RotateAroundMouse_MovementKeys = 3,
     RotateAroundMouse_Always = 4
 };
 extern enum RotateAroundMouseOptions rotate_around_mouse_option;
-extern TbBool rotate_follow_mouse_option;
 
 #pragma pack()
 /******************************************************************************/

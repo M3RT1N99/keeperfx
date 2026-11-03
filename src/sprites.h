@@ -200,7 +200,17 @@ enum GUIButtonSprite {
     GBS_borders_frame_thck_mr = 213,
     GBS_creature_portrait_avatr = 214,
 
-    GUI_BUTTON_SPRITES_COUNT = 239,
+    // In-game Load/Save vertical scrollbar. The two caps carry their arrow and its base;
+    // the _act ones are the lit (moused-over) variants. The track is one tileable segment:
+    // it is vertically uniform, so it fits any track length with the last tile clipped.
+    GBS_vscroll_cap_top_std = 239,
+    GBS_vscroll_cap_top_act = 240,
+    GBS_vscroll_track = 241,
+    GBS_vscroll_cap_bottom_std = 242,
+    GBS_vscroll_cap_bottom_act = 243,
+    GBS_vscroll_thumb = 244,
+
+    GUI_BUTTON_SPRITES_COUNT = 245,
 };
 
 // Based on gui2-64/filelist_gui2.txt
@@ -752,8 +762,9 @@ enum GUIPanelSprite {
     GPS_rpanel_manufacture_dis = 838,
     GPS_rpanel_manufacture_cant = 839,
     GPS_portrt_qmark = 840,
+    GPS_message_rpanel_msg_blank_std = 920,
 
-    GUI_PANEL_SPRITES_COUNT = 900,
+    GUI_PANEL_SPRITES_COUNT = 950,
     GUI_PANEL_SPRITES_NEW = 512,
 };
 
@@ -854,6 +865,16 @@ enum GUIFrontendSprite {
     GFS_slider_horiz_c = 93,
     GFS_slider_horiz_r = 94,
     GFS_specicon_voice = 95,
+    GFS_random_colour = 104,
+    GFS_random_team = 105,
+    GFS_team_1 = 106,
+    GFS_team_2 = 107,
+    GFS_team_3 = 108,
+    GFS_team_4 = 109,
+    GFS_team_5 = 110,
+    GFS_team_6 = 111,
+    GFS_team_7 = 112,
+    GFS_team_8 = 113,
 };
 
 #endif

@@ -39,6 +39,9 @@ enum MessageTypes {
     MsgType_Query, //5
     MsgType_Blank,
     MsgType_CreatureInstance,
+    MsgType_Custom,
+    MsgType_Spectator,
+    MsgType_Local,
 };
 /******************************************************************************/
 #pragma pack(1)
@@ -51,19 +54,25 @@ unsigned long expiration_turn;
 
 struct GuiMessage {
     char text[64];
-PlayerNumber plyr_idx;
-unsigned long expiration_turn;
-PlayerNumber target_idx;
-char type;
+    short plyr_idx; //not playernumber because it is abused for other icons too
+    uint32_t expiration_turn;
+    short target_idx;
+    int8_t type;
+    short icon_idx;
 };
 
 #pragma pack()
 /******************************************************************************/
+#define CHAT_LINE_SPACING_PERCENT 125
+
+extern int chat_font_size;
+
 void message_update(void);
 void message_draw(void);
 void zero_messages(void);
-void message_add(char type, PlayerNumber plyr_idx, const char *text);
-void message_add_fmt(char type, PlayerNumber plyr_idx, const char *fmt_str, ...);
+void message_add(char type, short idx, const char *text);
+void message_add_custom_icon(short icon_idx, const char *text);
+void message_add_fmt(char type, short idx, const char *fmt_str, ...);
 void show_game_time_taken(unsigned long fps, unsigned long turns);
 void show_real_time_taken(void);
 void clear_messages_from_player(char type, PlayerNumber plyr_idx);

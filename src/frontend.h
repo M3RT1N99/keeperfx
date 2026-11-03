@@ -22,7 +22,7 @@
 #include "globals.h"
 #include "bflib_guibtns.h"
 #include "gui_frontmenu.h"
-#include "game_saves.h"
+#include "kfx/save/SaveTypes.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,10 +31,11 @@ extern "C" {
 /******************************************************************************/
 // Limits for GUI arrays
 #define ACTIVE_BUTTONS_COUNT        100
+#define DOUBLE_CLICK_MS 250
 #define MENU_LIST_ITEMS_COUNT       52
-#define FRONTEND_BUTTON_INFO_COUNT 115
+#define FRONTEND_BUTTON_INFO_COUNT 118
 #define NET_MESSAGES_COUNT           8
-#define NET_MESSAGE_LEN             64
+#define NET_MESSAGE_LEN             192
 // Sprite limits
 #define PANEL_SPRITES_COUNT 514
 #define FRONTEND_FONTS_COUNT 4
@@ -233,19 +234,26 @@ enum IngameButtonDesignationIDs {
 struct GuiMenu;
 struct GuiButton;
 struct TbLoadFiles;
+struct TextScrollWindow;
 
+// These structs hold pointers in static tables, which must stay aligned on arm64.
+#ifdef __ANDROID__
 #pragma pack()
-struct DemoItem {
+#endif
+struct DemoItem { //sizeof = 5
     uint8_t kind;
     union {
       FrontendMenuState state;
       const char *fname;
     };
 };
+#ifdef __ANDROID__
 #pragma pack(1)
+#endif
 
-struct NetMessage { // sizeof = 0x41
+struct NetMessage {
   unsigned char plyr_idx;
+  uint32_t connection_id;
   char text[NET_MESSAGE_LEN];
 };
 
@@ -261,7 +269,7 @@ extern long net_service_scroll_offset;
 extern long net_number_of_services;
 extern long net_number_of_players;
 extern long net_number_of_enum_players;
-extern long net_level_hilighted;
+extern long net_level_highlighted;
 extern struct NetMessage net_message[NET_MESSAGES_COUNT];
 extern long net_number_of_messages;
 extern long net_message_scroll_offset;
@@ -309,7 +317,6 @@ extern struct GuiMenu frontend_statistics_menu;
 extern struct GuiMenu frontend_high_score_table_menu;
 extern struct FrontEndButtonData frontend_button_info[FRONTEND_BUTTON_INFO_COUNT];
 extern char gui_message_text[];
-extern TbClockMSec gui_message_timeout;
 
 extern struct GuiMenu *menu_list[MENU_LIST_ITEMS_COUNT];
 
@@ -327,10 +334,41 @@ const char * mdlf_default(const char *);
 int frontend_font_char_width(int fnt_idx,char c);
 int frontend_font_string_width(int fnt_idx, const char *str);
 
+/** Layout of the in-game error box, in menu units. */
+#define ERROR_BOX_WIDTH            300
+#define ERROR_BOX_HEIGHT           244
+#define ERROR_BOX_INSET_X          24
+#define ERROR_BOX_INSET_Y          46
+#define ERROR_BOX_INSET_WIDTH      226
+#define ERROR_BOX_INSET_HEIGHT     138
+#define ERROR_BOX_INSET_PADDING    6
+#define ERROR_BOX_SCROLL_X         (ERROR_BOX_INSET_X + ERROR_BOX_INSET_WIDTH + 4)
+#define ERROR_BOX_SCROLL_WIDTH     22
+#define ERROR_BOX_ARROW_HEIGHT     24
+#define ERROR_BOX_ARROW_GAP        2
+#define ERROR_BOX_ARROW_DOWN_Y     (ERROR_BOX_INSET_Y + ERROR_BOX_INSET_HEIGHT - ERROR_BOX_ARROW_HEIGHT)
+#define ERROR_BOX_TRACK_Y          (ERROR_BOX_INSET_Y + ERROR_BOX_ARROW_HEIGHT + ERROR_BOX_ARROW_GAP)
+#define ERROR_BOX_TRACK_HEIGHT     (ERROR_BOX_INSET_HEIGHT - 2 * (ERROR_BOX_ARROW_HEIGHT + ERROR_BOX_ARROW_GAP))
+/** btype_value of the scroll arrow buttons. */
+#define ERROR_BOX_ARROW_UP         1
+#define ERROR_BOX_ARROW_DOWN       2
+/** The close button's sprite has empty space above its artwork, so it is hit lower than it is drawn. */
+#define ERROR_BOX_BUTTON_Y         170
+#define ERROR_BOX_BUTTON_HIT_Y     200
+
 void create_error_box(TextStringId msg_idx);
+void gui_close_error_box(struct GuiButton *gbtn);
+void gui_area_error_message(struct GuiButton *gbtn);
+void maintain_error_message(struct GuiButton *gbtn);
+void gui_error_message_scroll_up(struct GuiButton *gbtn);
+void gui_error_message_scroll_down(struct GuiButton *gbtn);
+void gui_error_message_scroll_drag(struct GuiButton *gbtn);
+void maintain_error_message_scroll(struct GuiButton *gbtn);
+void gui_area_error_scrollbar(struct GuiButton *gbtn);
 void create_message_box(const char *title, const char *line1, const char *line2, const char *line3, const char *line4, const char* line5);
 void gui_area_text(struct GuiButton *gbtn);
 TbBool get_button_area_input(struct GuiButton *gbtn, int a2);
+void finish_button_area_input(void);
 const char *frontend_button_caption_text(const struct GuiButton *gbtn);
 int frontend_button_caption_font(const struct GuiButton *gbtn, long mouse_over_btn_idx);
 void maintain_loadsave(struct GuiButton *gbtn);
@@ -347,7 +385,8 @@ void gui_quit_game(struct GuiButton *gbtn);
 void gui_area_slider(struct GuiButton *gbtn);
 void frontend_draw_icon(struct GuiButton *gbtn);
 void frontend_draw_error_text_box(struct GuiButton *gbtn);
-void frontend_maintain_error_text_box(struct GuiButton *gbtn);
+void frontend_close_error_box(struct GuiButton *gbtn);
+void frontend_queue_message(TextStringId msg_idx);
 short is_toggleable_menu(short mnu_idx);
 
 void activate_room_build_mode(RoomKind rkind, TextStringId tooltip_id);
@@ -365,10 +404,9 @@ void frontend_change_state(struct GuiButton *gbtn);
 void frontend_draw_enter_text(struct GuiButton *gbtn);
 void frontend_draw_small_menu_button(struct GuiButton *gbtn);
 void frontend_toggle_computer_players(struct GuiButton *gbtn);
-void frontend_draw_computer_players(struct GuiButton *gbtn);
-void frontend_draw_mp_mappack(struct GuiButton *gbtn);
 void set_packet_start(struct GuiButton *gbtn);
 void gui_area_scroll_window(struct GuiButton *gbtn);
+void draw_scrolling_text_at(long pos_x, long pos_y, long width, long height, struct TextScrollWindow *scrollwnd, const char *text);
 void gui_go_to_event(struct GuiButton *gbtn);
 void maintain_zoom_to_event(struct GuiButton *gbtn);
 void gui_close_objective(struct GuiButton *gbtn);
@@ -380,8 +418,10 @@ void gui_scroll_text_down(struct GuiButton *gbtn);
 void frontend_ldcampaign_change_state(struct GuiButton *gbtn);
 void frontend_netservice_change_state(struct GuiButton *gbtn);
 void frontend_start_new_game(struct GuiButton *gbtn);
+void frontend_draw_campaign_menu_button(struct GuiButton *gbtn);
+TbBool frontend_register_click(void);
+void frontend_campaign_menu_button_maintain(struct GuiButton *gbtn);
 void frontend_load_mappacks(struct GuiButton *gbtn);
-void frontend_load_mp_mappacks(struct GuiButton *gbtn);
 void frontend_load_continue_game(struct GuiButton *gbtn);
 short frontend_save_continue_game(short allow_lvnum_grow);
 void frontend_continue_game_maintain(struct GuiButton *gbtn);
@@ -397,7 +437,6 @@ void init_video_menu(struct GuiMenu *gmnu);
 void init_audio_menu(struct GuiMenu *gmnu);
 void frontend_init_options_menu(struct GuiMenu *gmnu);
 TbBool frontend_is_player_allied(long idx1, long idx2);
-void frontend_set_alliance(long idx1, long idx2);
 char update_menu_fade_level(struct GuiMenu *gmnu);
 void draw_menu_buttons(struct GuiMenu *gmnu);
 MenuNumber create_menu(struct GuiMenu *mnu);
@@ -410,11 +449,14 @@ void gui_set_autopilot(struct GuiButton *gbtn);
 
 FrontendMenuState frontend_set_state(FrontendMenuState nstate);
 FrontendMenuState get_startup_menu_state(void);
+void frontend_start_load_game(long slot_num);
+void frontend_load_game_failed(TextStringId msg_idx);
 FrontendMenuState get_menu_state_when_back_from_substate(FrontendMenuState substate);
 void frontend_input(void);
 void frontend_update(short *finish_menu);
 short frontend_draw(void);
-void create_frontend_error_box(long showTime, const char * text);
+void queue_frontend_error_box(const char *text);
+void create_frontend_error_box(const char *text);
 void try_restore_frontend_error_box(); // Restore error box if frontend state was switched
 
 short menu_is_active(short idx);
@@ -430,6 +472,7 @@ void toggle_gui_overlay_map(void);
 void update_player_objectives(PlayerNumber plyr_idx);
 void set_level_objective(PlayerNumber plyr_idx, const char *msg_text);
 void display_objectives(PlayerNumber plyr_idx,MapSubtlCoord x,MapSubtlCoord y);
+void display_objectives_with_icon(PlayerNumber plyr_idx,MapSubtlCoord x,MapSubtlCoord y, short icon_idx);
 
 short toggle_main_cheat_menu(void);
 TbBool close_main_cheat_menu(void);

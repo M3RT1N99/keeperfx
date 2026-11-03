@@ -20,6 +20,8 @@
 #ifndef DK_ROOMSPACE_H
 #define DK_ROOMSPACE_H
 
+#include "net_main.h"
+
 // This is included at the end of "slab_data.h"
 
 #ifdef __cplusplus
@@ -66,8 +68,17 @@ enum DigTagMode {
     DigTagMode_Untag = 2,
 };
 
-// RoomSpace describes a space or "roomspace" - i.e. a collection of slabs that are a valid
-// location from the currently selected room type (when placing rooms).
+struct DigTagPrediction {
+    unsigned char slab_tag_modes[MAX_TILES_X * MAX_TILES_Y];
+    GameTurn slab_turns[MAX_TILES_X * MAX_TILES_Y];
+    SlabCodedCoords slabs[MAX_TILES_X * MAX_TILES_Y];
+    int slab_count;
+    int task_count;
+    GameTurn turn;
+};
+
+// RoomSpace describes a collection of slabs that are a valid
+// location for the currently selected room type (when placing rooms).
 // The 2D array of booleans, slab_grid[][] describes each of the slabs within
 // the roomspace's extents. A value of 1 indicates a slab that is part of the roomspace,
 // a value of 0 indicates a slab that is not part of the roomspace.
@@ -86,6 +97,7 @@ struct RoomSpace {
     MapSlabCoord centreY;
     int total_roomspace_cost;
     int invalid_slabs_count;
+    NetUserId user;
     PlayerNumber plyr_idx;
     RoomKind rkind;
     TbBool is_roomspace_a_single_subtile;
@@ -111,7 +123,7 @@ int calc_distance_from_roomspace_centre(int total_distance, TbBool offset);
 
 struct RoomSpace create_box_roomspace(struct RoomSpace roomspace, int width,
 int height, int centre_x, int centre_y);
-struct RoomSpace check_roomspace_for_diggable_slabs(struct RoomSpace roomspace, PlayerNumber plyr_idx, const unsigned char *predicted_slab_tag_modes);
+struct RoomSpace check_roomspace_for_diggable_slabs(struct RoomSpace roomspace, PlayerNumber plyr_idx, const struct DigTagPrediction *prediction);
 
 int can_build_roomspace_of_dimensions(PlayerNumber plyr_idx, RoomKind rkind,
     MapSlabCoord slb_x, MapSlabCoord slb_y, int width, int height,
@@ -133,19 +145,17 @@ struct RoomSpace get_current_room_as_roomspace(PlayerNumber current_plyr_idx,
                                                MapSlabCoord cursor_x, 
                                                MapSlabCoord cursor_y);
 
-void get_dungeon_highlight_user_roomspace(struct RoomSpace *roomspace, struct PlayerInfo *player, const struct Packet *pckt, MapSubtlCoord stl_x, MapSubtlCoord stl_y, const unsigned char *predicted_slab_tag_modes);
+void get_dungeon_highlight_user_roomspace(struct RoomSpace *roomspace, struct PlayerInfo *player, NetUserId user, const struct Packet *pckt, MapSubtlCoord stl_x, MapSubtlCoord stl_y, const struct DigTagPrediction *prediction);
 
-void get_dungeon_sell_user_roomspace(struct RoomSpace *roomspace, PlayerNumber plyr_idx, MapSubtlCoord stl_x, MapSubtlCoord stl_y);
+void get_dungeon_sell_user_roomspace(struct RoomSpace *roomspace, NetUserId user, MapSubtlCoord stl_x, MapSubtlCoord stl_y);
 
-void get_dungeon_build_user_roomspace(struct RoomSpace *roomspace, PlayerNumber plyr_idx, RoomKind rkind, MapSubtlCoord stl_x, MapSubtlCoord stl_y, unsigned char mode);
-TbBool update_dungeon_build_roomspace_preview(PlayerNumber plyr_idx, MapSubtlCoord stl_x, MapSubtlCoord stl_y);
-TbBool update_dungeon_sell_roomspace_preview(PlayerNumber plyr_idx, MapSubtlCoord stl_x, MapSubtlCoord stl_y);
-void apply_roomspace_packet_action(struct PlayerInfo *player, const struct Packet *pckt);
+void get_dungeon_build_user_roomspace(struct RoomSpace *roomspace, NetUserId user, RoomKind rkind, MapSubtlCoord stl_x, MapSubtlCoord stl_y, unsigned char mode);
+TbBool update_dungeon_build_roomspace_preview(NetUserId user, MapSubtlCoord stl_x, MapSubtlCoord stl_y);
+TbBool update_dungeon_sell_roomspace_preview(NetUserId user, MapSubtlCoord stl_x, MapSubtlCoord stl_y);
+void apply_roomspace_packet_action(NetUserId user, const struct Packet *pckt);
 
-void keeper_highlight_roomspace(PlayerNumber plyr_idx, struct RoomSpace *roomspace);
-int apply_roomspace_dig_tag_selection(PlayerNumber plyr_idx, struct RoomSpace *roomspace, MapSlabCoord previous_slb_x, MapSlabCoord previous_slb_y, unsigned char highlight_mode, unsigned char *predicted_slab_tag_modes, SlabCodedCoords *predicted_slabs, int *predicted_slab_count, int *predicted_task_count);
-void keeper_sell_roomspace(PlayerNumber plyr_idx, struct RoomSpace *roomspace);
-void keeper_build_roomspace(PlayerNumber plyr_idx, struct RoomSpace *roomspace);
+int apply_roomspace_dig_tag_selection(PlayerNumber plyr_idx, struct RoomSpace *roomspace, MapSlabCoord previous_slb_x, MapSlabCoord previous_slb_y, unsigned char highlight_mode, struct DigTagPrediction *prediction);
+void keeper_start_roomspace(NetUserId user, const struct RoomSpace *roomspace, RoomKind rkind);
 
 void update_roomspaces();
 
@@ -153,13 +163,13 @@ void process_build_roomspace_inputs(PlayerNumber plyr_idx);
 void process_sell_roomspace_inputs(PlayerNumber plyr_idx);
 void process_highlight_roomspace_inputs(PlayerNumber plyr_idx);
 
-void reset_dungeon_build_room_ui_variables(PlayerNumber plyr_idx);
+void reset_dungeon_build_room_ui_variables(NetUserId user);
 
-void update_slab_grid(struct RoomSpace* roomspace, unsigned char mode, TbBool sell);
+void update_slab_grid(struct RoomSpace* roomspace, unsigned char mode);
 
-TbBool roomspace_can_build_room_at_slab(PlayerNumber plyr_idx, RoomKind rkind, MapSlabCoord slb_x, MapSlabCoord slb_y);
+TbBool roomspace_can_build_room_at_slab(const struct RoomSpace *roomspace, MapSlabCoord slb_x, MapSlabCoord slb_y);
 void detect_roomspace_direction(struct RoomSpace *roomspace);
-void detect_bridge_shape(PlayerNumber plyr_idx);
+void detect_bridge_shape(NetUserId user, const struct RoomSpace *roomspace);
 TbBool roomspace_liquid_path_is_blocked(PlayerNumber plyr_idx, MapSlabCoord start, MapSlabCoord end, MapSlabCoord other_axis, TbBool vertical);
 TbBool roomspace_slab_blocks_bridge(PlayerNumber plyr_idx, MapSlabCoord slb_x, MapSlabCoord slb_y);
 

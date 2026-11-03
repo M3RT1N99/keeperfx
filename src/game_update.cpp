@@ -11,6 +11,7 @@
  */
 /******************************************************************************/
 #include "pre_inc.h"
+#include "kfx/renderer/RendererManager.h"
 #include "platform.h"
 #include "keeperfx.hpp"
 
@@ -27,10 +28,12 @@
 #include "lua_triggers.h"
 #include "lvl_script.h"
 #include "thing_list.h"
+#include "thing_physics.h"
 #include "player_utils.h"
 #include "player_computer.h"
 #include "engine_camera.h"
 #include "local_camera.h"
+#include "local_possession.h"
 #include "engine_textures.h"
 #include "thing_stats.h"
 #include "thing_creature.h"
@@ -50,6 +53,7 @@
 #include "power_process.h"
 #include "power_hand.h"
 #include "game_merge.h"
+#include "net_game.h"
 #include "gui_soundmsgs.h"
 #include "sounds.h"
 #include "vidfade.h"
@@ -59,51 +63,12 @@
 #include "room_workshop.h"
 #include <cstdint>
 
+#include "kfx/profiling/KfxProfiling.h"
 #include "post_inc.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-static void check_players_won(void)
-{
-  SYNCDBG(8,"Starting");
-
-    if (!network_is_active())
-        return;
-
-    struct PlayerInfo* curPlayer;
-    for (PlayerNumber playerIdx = 0; playerIdx < PLAYERS_COUNT; ++playerIdx)
-    {
-        curPlayer = get_player(playerIdx);
-        if (!player_exists(curPlayer) || (curPlayer->is_active != 1) || (curPlayer->victory_state != VicS_Undecided))
-            continue;
-
-        // check if any other player is still alive
-        TbBool LivingOpponent = false;
-        for (PlayerNumber secondPlayerIdx = 0; secondPlayerIdx < PLAYERS_COUNT; ++secondPlayerIdx)
-        {
-            if (secondPlayerIdx == playerIdx)
-                continue;
-
-            struct PlayerInfo* otherPlayer = get_player(secondPlayerIdx);
-            if (player_exists(otherPlayer) && otherPlayer->victory_state == VicS_Undecided)
-            {
-                struct Thing* heartng = get_player_soul_container(secondPlayerIdx);
-                if (heartng->active_state != ObSt_BeingDestroyed)
-                {
-                    LivingOpponent = true;
-                    break;
-                }
-            }
-        }
-        if (LivingOpponent == false)
-        {
-            set_player_as_won_level(curPlayer);
-            return;
-        }
-    }
-}
 
 static void check_players_lost(void)
 {
@@ -115,7 +80,7 @@ static void check_players_lost(void)
   {
       player = get_player(i);
       dungeon = get_players_dungeon(player);
-      if (player_exists(player) && (player->is_active == 1))
+      if (is_active_keeper(player))
       {
           struct Thing *heartng;
           heartng = get_player_soul_container(i);
@@ -132,9 +97,9 @@ static void check_players_lost(void)
             event_kill_all_players_events(i);
             set_player_as_lost_level(player);
             //this would easily prevent computer player activities on dead player, but it also makes dead player unable to use
-            //floating spirit, so it can't be done this way: player->is_active = 0;
+            //floating spirit, so defeated keepers must stay active keepers
             if (is_my_player_number(i)) {
-                LbPaletteSet(engine_palette);
+                RendererPaletteSet(engine_palette);
             }
           }
       }
@@ -278,7 +243,7 @@ static void process_payday(void)
         }
         struct PlayerInfo *player;
         player = get_player(plyr_idx);
-        if (player_exists(player) && (player->is_active == 1))
+        if (is_active_keeper(player))
         {
             compute_and_update_player_payday_total(plyr_idx);
             compute_and_update_player_backpay_total(plyr_idx);
@@ -289,8 +254,7 @@ static void process_payday(void)
     {
         if (game.conf.rules[plyr_idx].gameplay.pay_day_gap <= game.pay_day_progress[plyr_idx])
         {
-            if (is_my_player_number(plyr_idx))
-                output_message(SMsg_Payday, 0);
+            output_player_message(plyr_idx, SMsg_Payday, 0);
             game.pay_day_progress[plyr_idx] = 0;
             player_paid_creatures_count = set_players_creatures_to_get_paid(plyr_idx);
             if (player_paid_creatures_count > 0)
@@ -305,8 +269,9 @@ static void process_payday(void)
 static void process_dungeons(void)
 {
   SYNCDBG(7,"Starting");
-  check_players_won();
   check_players_lost();
+  resolve_placeholders();
+  hand_waiting_placeholders_to_ai();
   process_dungeon_power_magic();
   process_dungeon_devastation_effects();
   process_entrance_generation();
@@ -356,8 +321,7 @@ static void update_near_creatures_for_footsteps(int32_t *near_creatures, const s
                 ndist = get_chessboard_distance(srcpos, &thing->mappos);
                 if (ndist < near_distance[0])
                 {
-                    if (((cctrl->distance_to_destination != 0) && ((int)thing->floor_height >= (int)thing->mappos.z.val))
-                      || ((thing->movement_flags & TMvF_Flying) != 0))
+                    if (((cctrl->distance_to_destination != 0) && thing_touching_floor(thing)) || ((thing->movement_flags & TMvF_Flying) != 0))
                     {
                         // Insert the new item to our list
                         int n;
@@ -508,11 +472,11 @@ static void update_global_lighting()
 
 void update(void)
 {
-    struct PlayerInfo *player;
+    KFX_ZONE_COLOR("update", KFX_COLOR_SIMULATION);
     SYNCDBG(4,"Starting for turn %ld",(long)get_gameturn());
 
-    update_local_cameras();
     process_packets();
+    update_local_cameras();
     api_update_server();
 
     if (quit_game || exit_keeper) {
@@ -523,19 +487,19 @@ void update(void)
         game.map_changed_for_navigation = 0;
         return;
     }
-    player = get_my_player();
 
     if (!flag_is_set(game.operation_flags,GOF_Paused))
     {
-        if (flag_is_set(player->additional_flags,PlaAF_LightningPaletteIsActive))
+        for (int i = 1; i < EVENTS_COUNT; i++) {
+            game.event[i].flags &= ~EvF_BtnFalling;
+        }
+        if (local_state.lightning_palette_active)
         {
-            PaletteSetPlayerPalette(player, engine_palette);
-            clear_flag(player->additional_flags, PlaAF_LightningPaletteIsActive);
+            PaletteSetUserPalette(get_local_user(), engine_palette);
+            local_state.lightning_palette_active = false;
         }
         clear_active_dungeons_stats();
         update_creature_pool_state();
-        if ((get_gameturn() & 0x01) != 0)
-            update_animating_texture_maps();
         update_things();
         process_rooms();
         process_dungeons();
@@ -550,14 +514,13 @@ void update(void)
             process_computer_players2();
         process_players();
         process_action_points();
-        player = get_my_player();
-        if (player->view_mode == PVM_CreatureView)
+        if ((get_user_view_type(get_my_user()) == PVT_CreatureContrl) || (get_user_view_type(get_my_user()) == PVT_CreaturePasngr))
         {
-            struct Thing *thing = thing_get(player->controlled_thing_idx);
+            struct Thing *thing = thing_get(get_user_state(get_displayed_user())->controlled_thing_idx);
             update_first_person_object_ambience(thing);
         }
-        update_footsteps_nearest_camera(get_player_active_camera(player));
-        PaletteFadePlayer(player);
+        update_footsteps_nearest_camera(get_local_active_camera());
+        PaletteFadePlayer(get_displayed_player());
         process_armageddon();
         update_global_lighting();
 #if (BFDEBUG_LEVEL > 9)
@@ -566,12 +529,14 @@ void update(void)
         creature_stats_debug_dump();
 #endif
         game.play_gameturn++;
-        if (game.turns_packetoff == game.play_gameturn)
+        if (replay.turns_packetoff == game.play_gameturn)
             exit_keeper = 1;
     }
+    update_local_possession();
+    update_local_first_person_view();
 
     message_update();
-    update_all_players_cameras();
+    update_camera_shake();
     update_player_sounds();
     SYNCDBG(6,"Finished");
 }

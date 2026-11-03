@@ -39,7 +39,9 @@
 #include "bflib_planar.h"
 #include "bflib_video.h"
 #include "front_input.h"
-#include <SDL2/SDL.h>
+#include "kfx/platform/WindowSystemSDL.h"
+#include "kfx/renderer/RendererManager.h"
+#include <SDL3/SDL.h>
 #include "post_inc.h"
 
 #ifdef __cplusplus
@@ -122,7 +124,7 @@ struct TouchFinger {
     TbBool active;
     long x, y;             /**< Current position in game screen pixels. */
     long start_x, start_y;
-    Uint32 down_ticks;
+    Uint64 down_ticks;
     TbBool moved;
 };
 
@@ -217,9 +219,9 @@ static long touch_camera_prev_cx = 0, touch_camera_prev_cy = 0;
 
 /* Deferred click, so the game always observes the press before it is released. */
 static TbBool touch_click_pending = false;
-static Uint32 touch_click_press_ticks = 0;
+static Uint64 touch_click_press_ticks = 0;
 static TbBool touch_right_click_pending = false;
-static Uint32 touch_right_click_ticks = 0;
+static Uint64 touch_right_click_ticks = 0;
 static TbBool touch_button_down_left = false;
 static TbBool touch_button_down_right = false;
 
@@ -227,6 +229,17 @@ static TbBool touch_button_down_right = false;
 static int touch_max_fingers_this_contact = 0;
 
 /******************************************************************************/
+
+void touch_set_sticky_right_click(TbBool on)
+{
+    touch_sticky_rmb = on;
+    SYNCLOG("Sticky right click %s", on ? "on" : "off");
+}
+
+TbBool touch_sticky_right_click(void)
+{
+    return touch_sticky_rmb;
+}
 
 /**
  * Adjusts one of the gesture constants at run time.
@@ -239,17 +252,6 @@ static int touch_max_fingers_this_contact = 0;
  *
  * @return true when the name was recognised.
  */
-void touch_set_sticky_right_click(TbBool on)
-{
-    touch_sticky_rmb = on;
-    SYNCLOG("Sticky right click %s", on ? "on" : "off");
-}
-
-TbBool touch_sticky_right_click(void)
-{
-    return touch_sticky_rmb;
-}
-
 TbBool touch_tune(const char *name, float value)
 {
     static const struct { const char *name; float *target; float min; float max; } tunables[] = {
@@ -303,11 +305,6 @@ TbBool touch_parse_control_mode(const char *text, unsigned char *mode)
         return true;
     }
     return false;
-}
-
-TbBool touch_device_seen(void)
-{
-    return touch_seen_device;
 }
 
 TbBool touch_controls_active(void)
@@ -391,7 +388,7 @@ void init_touch_input(void)
     touch_initialised = true;
     if (touch_control_mode != TCMode_PointerKeys)
     {
-        // Native handling of SDL_FINGER* events; no synthetic mouse behind our back.
+        // Native handling of SDL_EVENT_FINGER_* events; no synthetic mouse behind our back.
         SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
         SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
         SYNCLOG("Native touch input enabled (mode %d)", (int)touch_control_mode);
@@ -472,8 +469,6 @@ static void touch_press_right(void)
  * the click was ever observed. That is why a tap did nothing while a drag,
  * which holds the button across many frames, worked.
  */
-static void touch_queue_right_click(void);
-
 static void touch_queue_click(void)
 {
     touch_press_left();
@@ -618,6 +613,42 @@ static void touch_update_camera_gesture(void)
 /******************************************************************************/
 
 /**
+ * Maps a position given as a fraction of the window onto the game surface.
+ *
+ * The renderers only fill the rectangle GetPresentRect() fits into the window,
+ * so the same rectangle has to come out of the finger position again - without
+ * this, a letterboxed frame shifts every touch by the width of the bars.
+ */
+static void touch_normalized_to_game(float nx, float ny, long *x, long *y)
+{
+    const long game_w = RendererPhysicalWidth();
+    const long game_h = RendererPhysicalHeight();
+    const WindowSystemSDL *window = GetSDLWindowSystem();
+    int drawable_w = 0;
+    int drawable_h = 0;
+    int rect_x = 0;
+    int rect_y = 0;
+    int rect_w = 0;
+    int rect_h = 0;
+    window->GetDrawableSize(&drawable_w, &drawable_h);
+    window->GetPresentRect(&rect_x, &rect_y, &rect_w, &rect_h);
+    *x = 0;
+    *y = 0;
+    if ((rect_w <= 0) || (rect_h <= 0) || (game_w <= 0) || (game_h <= 0))
+        return;
+    *x = ((long)(nx * (float)drawable_w) - rect_x) * game_w / rect_w;
+    *y = ((long)(ny * (float)drawable_h) - rect_y) * game_h / rect_h;
+    if (*x < 0)
+        *x = 0;
+    if (*x >= game_w)
+        *x = game_w - 1;
+    if (*y < 0)
+        *y = 0;
+    if (*y >= game_h)
+        *y = game_h - 1;
+}
+
+/**
  * Handles one SDL touch event. Declared in bflib_inputctrl.cpp the same way
  * JEvent() is, to keep SDL types out of the shared headers.
  */
@@ -632,18 +663,18 @@ void TEvent(const SDL_Event *ev)
 
     switch (ev->type)
     {
-    case SDL_FINGERDOWN:
+    case SDL_EVENT_FINGER_DOWN:
     {
         // Touching the screen catches a rolling map, as it does everywhere.
         touch_flick_vx = touch_flick_vy = 0.0f;
-        struct TouchFinger *finger = touch_alloc(ev->tfinger.fingerId);
+        struct TouchFinger *finger = touch_alloc(ev->tfinger.fingerID);
         if (finger == NULL)
             break;
-        // Through the swap's fit rectangle, not a plain multiplication: while
-        // the draw surface is being scaled into the window, the picture only
-        // covers part of it, and the finger has to land on the pixel it was
-        // actually over.
-        LbScreenNormalizedToDraw(ev->tfinger.x, ev->tfinger.y, &finger->x, &finger->y);
+        // Through the present rectangle, not a plain multiplication: while the
+        // game frame is being fitted into the window, the picture only covers
+        // part of it, and the finger has to land on the pixel it was actually
+        // over.
+        touch_normalized_to_game(ev->tfinger.x, ev->tfinger.y, &finger->x, &finger->y);
         finger->start_x = finger->x;
         finger->start_y = finger->y;
         finger->down_ticks = SDL_GetTicks();
@@ -674,15 +705,15 @@ void TEvent(const SDL_Event *ev)
         break;
     }
 
-    case SDL_FINGERMOTION:
+    case SDL_EVENT_FINGER_MOTION:
     {
-        struct TouchFinger *finger = touch_find(ev->tfinger.fingerId);
+        struct TouchFinger *finger = touch_find(ev->tfinger.fingerID);
         if (finger == NULL)
             break;
-        LbScreenNormalizedToDraw(ev->tfinger.x, ev->tfinger.y, &finger->x, &finger->y);
+        touch_normalized_to_game(ev->tfinger.x, ev->tfinger.y, &finger->x, &finger->y);
         const long travel_x = finger->x - finger->start_x;
         const long travel_y = finger->y - finger->start_y;
-        long threshold = LbScreenWidth() / TOUCH_DRAG_THRESHOLD_DIVISOR;
+        long threshold = RendererPhysicalWidth() / TOUCH_DRAG_THRESHOLD_DIVISOR;
         if (threshold < (long)touch_drag_threshold_min_px)
             threshold = (long)touch_drag_threshold_min_px;
         if ((labs(travel_x) >= threshold) || (labs(travel_y) >= threshold))
@@ -711,13 +742,16 @@ void TEvent(const SDL_Event *ev)
         break;
     }
 
-    case SDL_FINGERUP:
+    case SDL_EVENT_FINGER_UP:
+    case SDL_EVENT_FINGER_CANCELED:
     {
-        struct TouchFinger *finger = touch_find(ev->tfinger.fingerId);
+        struct TouchFinger *finger = touch_find(ev->tfinger.fingerID);
         if (finger == NULL)
             break;
-        const Uint32 held_ms = SDL_GetTicks() - finger->down_ticks;
-        const TbBool was_moved = finger->moved;
+        const Uint64 held_ms = SDL_GetTicks() - finger->down_ticks;
+        // A contact the system took away ends the gesture like a lifted finger
+        // does, but nobody meant it as a tap, so it counts as a drag.
+        const TbBool was_moved = finger->moved || (ev->type == SDL_EVENT_FINGER_CANCELED);
         const long up_x = finger->x;
         const long up_y = finger->y;
         finger->active = false;
@@ -920,14 +954,6 @@ void update_touch_inputs(void)
 }
 
 /**
- * Turns the finger travel collected since the last frame into pan axis values.
- *
- * get_movement_inputs() squares the axis before using it, which suits a
- * controller stick that gets pushed to its limit but would reduce a typical
- * pan to a hundredth of its intended speed. Taking the square root here undoes
- * that, so the camera follows the finger at the speed it actually moved.
- */
-/**
  * Turns the pinch and twist collected since the last frame into axis values.
  *
  * The deadzone is subtracted from the total rather than gating on it, so a slow
@@ -956,6 +982,14 @@ static void touch_apply_camera_accumulators(void)
     touch_pinch_accum = touch_twist_accum = 0.0f;
 }
 
+/**
+ * Turns the finger travel collected since the last frame into pan axis values.
+ *
+ * get_movement_inputs() squares the axis before using it, which suits a
+ * controller stick that gets pushed to its limit but would reduce a typical
+ * pan to a hundredth of its intended speed. Taking the square root here undoes
+ * that, so the camera follows the finger at the speed it actually moved.
+ */
 static void touch_apply_pan_accumulator(void)
 {
     touch_axis_pan_left = touch_axis_pan_right = 0.0f;

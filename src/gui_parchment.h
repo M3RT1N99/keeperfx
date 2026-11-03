@@ -21,6 +21,7 @@
 
 #include "globals.h"
 #include "bflib_basics.h"
+#include "net_main.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,6 +53,10 @@ TbBool point_to_overhead_map(const struct Camera *camera, const long screen_x, c
 
 void zoom_from_parchment_map(void);
 void zoom_to_parchment_map(void);
+
+void start_local_map_fade(unsigned char view_type);
+float local_map_fade_progress(void);
+unsigned char get_local_map_fade(void);
 /******************************************************************************/
 #ifdef __cplusplus
 }

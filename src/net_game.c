@@ -24,27 +24,34 @@
 #include "bflib_basics.h"
 #include "bflib_coroutine.h"
 #include "bflib_datetm.h"
+#include "bflib_enet.h"
 #include "net_exchange_common.h"
 #include "net_lobby.h"
 #include "net_main.h"
 #include "net_resync.h"
 
 #include "player_data.h"
+#include "player_instances.h"
 #include "front_landview.h"
 #include "player_utils.h"
+#include "light_data.h"
 #include "packets.h"
 #include "frontend.h"
 #include "front_network.h"
 #include "config_settings.h"
 #include "config_keeperfx.h"
 #include "config_strings.h"
+#include "config_campaigns.h"
 #include "custom_sprites.h"
 #include "dungeon_data.h"
+#include "engine_camera.h"
 #include "game_legacy.h"
 #include "gui_msgs.h"
+#include "map_events.h"
 #include "net_exchange_gameplay.h"
 #include "net_input_lag.h"
 #include "net_checksums.h"
+#include "net_spectator.h"
 #include "keeperfx.hpp"
 #include "post_inc.h"
 
@@ -52,22 +59,20 @@
 extern "C" {
 #endif
 /******************************************************************************/
-struct TbNetworkPlayerInfo net_player_info[MAX_NET_USERS];
+struct TbNetworkUserInfo net_user_info[MAX_NET_USERS];
 extern int32_t multiplayer_speed_adjustment_ns;
 /******************************************************************************/
 
 #pragma pack(1)
 struct StartupSyncPacket {
     uint8_t startup_sync_packet_valid;
-    int32_t video_rotate_mode;
     TbBigChecksum map_checksums[NETWORK_STARTUP_MAP_FILE_COUNT];
     TbBigChecksum required_sprite_zip_checksums[REQUIRED_SPRITE_ZIP_COUNT];
-    uint16_t initial_tendencies;
-    uint32_t isometric_view_zoom_level;
-    uint32_t frontview_zoom_level;
-    uint32_t zoom_distance_setting;
-    uint32_t frontview_zoom_distance_setting;
+    UserPreferences user_prefs;
     uint8_t initial_input_lag_turns;
+    uint32_t initial_action_seed;
+    char frontend_alliances;
+    int8_t player_slots[MAX_NET_USERS];
 };
 #pragma pack()
 
@@ -75,13 +80,13 @@ short setup_network_service(enum FrontendNetService service)
 {
   struct ServiceInitData *init_data = NULL;
   SYNCMSG("Initializing 4-players type %d network", service);
-  memset(net_player_info, 0, sizeof(net_player_info));
+  memset(net_user_info, 0, sizeof(net_user_info));
   network_lobby_ping = 0;
   if (service != FrontendNetSvc_Online && service != FrontendNetSvc_LAN) {
     process_network_error(-800);
     return 0;
   }
-  if ( LbNetwork_Init(NS_ENET_UDP, MAX_NET_USERS, &net_player_info[0], init_data) )
+  if ( LbNetwork_Init(NS_ENET_UDP, MAX_NET_USERS, &net_user_info[0], init_data) )
   {
     process_network_error(-800);
     return 0;
@@ -98,57 +103,195 @@ short setup_network_service(enum FrontendNetService service)
   return 1;
 }
 
-unsigned long get_host_player_id(void) {
-    return 0;
-}
-
 int setup_old_network_service(void)
 {
     return setup_network_service(net_service_index_selected);
 }
 
+TbBool network_is_host(void)
+{
+    return netstate.my_id == SERVER_ID;
+}
+
+// user->player map received with the spectator bootstrap, applied once the level is set up
+static PlayerNumber spectator_user_player_number[MAX_NET_USERS];
+
+PlayerNumber get_net_user_player_number(NetUserId user)
+{
+    if ((user < 0) || (user >= MAX_NET_USERS)) {
+        return PLAYER_NONE;
+    }
+    return game.user_states[user].player_id;
+}
+
+// user exists to the game layer (even if their connection has dropped,
+// the game needs to hear about it through the proper channel first to avoid
+// nondeterminism.)
+TbBool user_present(NetUserId user)
+{
+    return get_net_user_player_number(user) >= 0;
+}
+
+void set_net_user_player_number(NetUserId user, PlayerNumber plyr_idx)
+{
+    if ((user < 0) || (user >= MAX_NET_USERS)) {
+        return;
+    }
+    game.user_states[user].player_id = plyr_idx;
+}
+
+static const unsigned char user_preference_flags[UPref_Count] = {
+    [UPref_FrontView]             = 0,
+    [UPref_Wibble]                = UPF_ApplyOnLoad,
+    [UPref_Cheats]                = UPF_ApplyOnLoad | UPF_ApplyOnTakeover,
+    [UPref_SkipHeartZoom]         = UPF_ApplyOnLoad,
+    [UPref_StartingHighlightMode] = 0,
+    [UPref_StartingIsometricTilt] = UPF_ApplyOnLoad,
+    [UPref_MaxZoomIso]            = UPF_ApplyOnLoad,
+    [UPref_MaxZoomFrontview]      = UPF_ApplyOnLoad,
+    [UPref_Censorship]            = UPF_ApplyOnLoad | UPF_ApplyOnTakeover,
+    [UPref_WallHeight]            = UPF_ApplyOnLoad,
+    [UPref_MapFade]               = UPF_ApplyOnLoad | UPF_ApplyOnTakeover,
+    [UPref_StartingIsometricZoom] = 0,
+    [UPref_StartingFrontviewZoom] = 0,
+    [UPref_StartingTendencies]    = 0,
+    [UPref_MinimapZoom]           = UPF_ApplyOnLoad,
+    [UPref_StartingComputerAssistantKind] = UPF_ApplyOnLoad,
+    [UPref_ComputerAssistantDisabled] = UPF_ApplyOnLoad | UPF_ApplyOnTakeover,
+};
+
+void build_local_user_preferences(UserPreferences prefs)
+{
+    memset(prefs, 0, sizeof(UserPreferences));
+    TbBool front_view = false;
+    TbBool wibble = true;
+    rotate_mode_to_dungeon_view(settings.video_rotate_mode, &front_view, &wibble);
+    prefs[UPref_FrontView] = front_view;
+    prefs[UPref_Wibble] = wibble;
+    prefs[UPref_Cheats] = start_params.easter_egg;
+    if (network_is_active() && network_is_host()) {
+        prefs[UPref_Cheats] = net_config_info.cheats_enabled;
+        prefs[UPref_ComputerAssistantDisabled] = !net_config_info.computer_assistant;
+    }
+    prefs[UPref_SkipHeartZoom] = get_skip_heart_zoom_feature();
+    prefs[UPref_StartingHighlightMode] = get_starting_highlight_mode();
+    prefs[UPref_StartingIsometricTilt] = settings.isometric_tilt;
+    prefs[UPref_MaxZoomIso] = zoom_distance_setting;
+    prefs[UPref_MaxZoomFrontview] = frontview_zoom_distance_setting;
+    prefs[UPref_Censorship] = local_censorship_enabled();
+    prefs[UPref_WallHeight] = settings.video_cluedo_mode;
+    prefs[UPref_MapFade] = min(get_parchment_map_fade_turns(), PARCHMENT_MAP_FADE_MAX_TURNS);
+    prefs[UPref_StartingIsometricZoom] = settings.isometric_view_zoom_level;
+    prefs[UPref_StartingFrontviewZoom] = settings.frontview_zoom_level;
+    if (IMPRISON_BUTTON_DEFAULT)
+        prefs[UPref_StartingTendencies] |= CrTend_Imprison;
+    if (FLEE_BUTTON_DEFAULT)
+        prefs[UPref_StartingTendencies] |= CrTend_Flee;
+    prefs[UPref_MinimapZoom] = settings.minimap_zoom;
+    prefs[UPref_StartingComputerAssistantKind] = settings.computer_assistant_kind;
+}
+
+static void apply_user_starting_preferences(struct UserState *ustate, unsigned char flags)
+{
+    const uint32_t *prefs = ustate->prefs;
+    if (flags != UPF_ApplyOnTakeover)
+        ustate->dungeon_camera.pitch = clamp((int32_t)prefs[UPref_StartingIsometricTilt], CAMERA_TILT_MIN, CAMERA_TILT_MAX);
+    if (flags != UPF_NewGame)
+        return;
+    ustate->dungeon_camera.zoom[false] = (prefs[UPref_StartingIsometricZoom] != 0) ? (int32_t)prefs[UPref_StartingIsometricZoom] : CAMERA_ZOOM_MAX;
+    ustate->dungeon_camera.zoom[true] = (prefs[UPref_StartingFrontviewZoom] != 0) ? (int32_t)prefs[UPref_StartingFrontviewZoom] : FRONTVIEW_CAMERA_ZOOM_MAX;
+}
+
+void apply_user_preferences(NetUserId user, const UserPreferences prefs, unsigned char flags)
+{
+    struct UserState *ustate = get_user_state(user);
+    if (user_state_invalid(ustate))
+        return;
+    for (int pref = 0; pref < UPref_Count; pref++)
+    {
+        if ((flags == UPF_NewGame) || ((user_preference_flags[pref] & flags) != 0))
+            ustate->prefs[pref] = prefs[pref];
+    }
+    apply_user_starting_preferences(ustate, flags);
+}
+
+void apply_local_user_preferences(NetUserId user, unsigned char flags)
+{
+    UserPreferences prefs;
+    build_local_user_preferences(prefs);
+    apply_user_preferences(user, prefs, flags);
+}
+
+void apply_user_start_tendencies(NetUserId user)
+{
+    const struct UserState *ustate = get_user_state(user);
+    if (user_state_invalid(ustate))
+        return;
+    struct PlayerInfo *player = get_user_player(user);
+    TbBool imprison = (ustate->prefs[UPref_StartingTendencies] & CrTend_Imprison) != 0;
+    TbBool flee = (ustate->prefs[UPref_StartingTendencies] & CrTend_Flee) != 0;
+    set_creature_tendencies(player, CrTend_Imprison, imprison);
+    set_creature_tendencies(player, CrTend_Flee, flee);
+    if (player->id_number == my_player_number) {
+        game.creatures_tend_imprison = imprison;
+        game.creatures_tend_flee = flee;
+    }
+}
+
+TbBool user_cheats_allowed(NetUserId user)
+{
+    if (get_user_state(SERVER_ID)->prefs[UPref_Cheats] == 0)
+        return false;
+    if ((game.game_kind == GKind_MultiGame) || !user_present(user))
+        return true;
+    return get_user_state(user)->prefs[UPref_Cheats] != 0;
+}
+
+TbBool computer_assistant_allowed(void)
+{
+    if (game.game_kind != GKind_MultiGame)
+        return true;
+    return get_user_state(SERVER_ID)->prefs[UPref_ComputerAssistantDisabled] == 0;
+}
+
+TbBool game_censorship_enabled(void)
+{
+    for (NetUserId user = 0; user < MAX_NET_USERS; user++)
+    {
+        if (user_present(user) && (get_user_state(user)->prefs[UPref_Censorship] != 0))
+            return true;
+    }
+    return false;
+}
 
 static void setup_players_from_startup_packets(const struct StartupSyncPacket startup_sync_packets[MAX_NET_USERS])
 {
-    int k = 0;
-    for (int i = 0; i < MAX_NET_USERS; i++) {
+    for (NetUserId i = 0; i < MAX_NET_USERS; i++) {
         const struct StartupSyncPacket *sync = &startup_sync_packets[i];
-        if (!net_player_info[i].network_user_active) {
+        if (!net_user_info[i].network_user_active) {
+            continue;
+        }
+        int k = get_net_user_player_number(i);
+        if (k < 0) {
             continue;
         }
         struct PlayerInfo *player = get_player(k);
         player->id_number = k;
-        player->packet_num = i;
-        player->allocflags |= PlaF_Allocated;
-        switch (sync->video_rotate_mode) {
-            case 0: player->view_mode_restore = PVM_IsoWibbleView; break;
-            case 1: player->view_mode_restore = PVM_IsoStraightView; break;
-            case 2: player->view_mode_restore = PVM_FrontView; break;
-            default: player->view_mode_restore = PVM_IsoWibbleView; break;
-        }
-        player->is_active = 1;
+        player->allocflags |= PlaF_Allocated | PlaF_Seat;
+        init_user_state(i, k);
+        apply_user_preferences(i, sync->user_prefs, UPF_NewGame);
         init_player(player, 0);
-        player->isometric_view_zoom_level = sync->isometric_view_zoom_level;
-        player->frontview_zoom_level = sync->frontview_zoom_level;
-        TbBool imprison = (sync->initial_tendencies & CrTend_Imprison) != 0;
-        TbBool flee = (sync->initial_tendencies & CrTend_Flee) != 0;
-        set_creature_tendencies(player, CrTend_Imprison, imprison);
-        set_creature_tendencies(player, CrTend_Flee, flee);
-        if (player->id_number == my_player_number) {
-            game.creatures_tend_imprison = imprison;
-            game.creatures_tend_flee = flee;
-        }
-        snprintf(player->player_name, sizeof(struct TbNetworkPlayerName), "%s", net_player[i].name);
-        k++;
+        apply_user_start_tendencies(i);
+        snprintf(player->player_name, sizeof(struct TbNetworkPlayerName), "%s", network_user_name(i));
     }
 }
 
 static TbBool verify_map_checksums(const struct StartupSyncPacket startup_sync_packets[MAX_NET_USERS])
 {
-    const TbBigChecksum *host = startup_sync_packets[get_host_player_id()].map_checksums;
+    const TbBigChecksum *host = startup_sync_packets[SERVER_ID].map_checksums;
     for (int i = 0; i < MAX_NET_USERS; i++) {
         const TbBigChecksum *client = startup_sync_packets[i].map_checksums;
-        if (!net_player_info[i].network_user_active) {
+        if (!net_user_info[i].network_user_active) {
             continue;
         }
         int diff_count = 0;
@@ -172,11 +315,11 @@ static TbBool verify_map_checksums(const struct StartupSyncPacket startup_sync_p
 
 static TbBool verify_startup_sprite_zip_checksums(const struct StartupSyncPacket startup_sync_packets[MAX_NET_USERS])
 {
-    int host_player_id = get_host_player_id();
-    const struct StartupSyncPacket *host_sync = &startup_sync_packets[host_player_id];
+    NetUserId host_user_id = SERVER_ID;
+    const struct StartupSyncPacket *host_sync = &startup_sync_packets[host_user_id];
     TbBool verified = true;
-    for (int i = 0; i < MAX_NET_USERS; i++) {
-        if (!net_player_info[i].network_user_active || i == host_player_id) {
+    for (NetUserId i = 0; i < MAX_NET_USERS; i++) {
+        if (!net_user_info[i].network_user_active || i == host_user_id) {
             continue;
         }
         const struct StartupSyncPacket *client_sync = &startup_sync_packets[i];
@@ -184,8 +327,8 @@ static TbBool verify_startup_sprite_zip_checksums(const struct StartupSyncPacket
             if (client_sync->required_sprite_zip_checksums[zip_idx] == host_sync->required_sprite_zip_checksums[zip_idx]) {
                 continue;
             }
-            WARNLOG("Custom sprite zip differs between %s and %s: %s", network_player_name(host_player_id), network_player_name(i), required_sprite_zips[zip_idx]);
-            message_add_fmt(MsgType_Blank, 0, "/fxdata/%.30s differs for %.12s", required_sprite_zips[zip_idx], network_player_name(i));
+            WARNLOG("Custom sprite zip differs between %s and %s: %s", network_user_name(host_user_id), network_user_name(i), required_sprite_zips[zip_idx]);
+            message_add_fmt(MsgType_Blank, 0, "/fxdata/%.30s differs for %.12s", required_sprite_zips[zip_idx], network_user_name(i));
             verified = false;
         }
     }
@@ -194,13 +337,53 @@ static TbBool verify_startup_sprite_zip_checksums(const struct StartupSyncPacket
 
 static struct StartupSyncPacket s_local_startup_sync;
 static struct StartupSyncPacket s_startup_sync_packets[MAX_NET_USERS];
-static TbBool network_disconnect_victory_enabled;
+
+static TbBool reject_network_startup(enum NetJoinRejection reason)
+{
+    netstate.leave_reason = reason;
+    create_frontend_error_box(net_join_error_text(reason));
+    return false;
+}
+
+static TbBool startup_peers_accepted(void)
+{
+    for (NetUserId i = 0; i < MAX_NET_USERS; i++) {
+        if (netstate.users_leave_reason[i] != NetJoin_Accepted) {
+            return reject_network_startup(netstate.users_leave_reason[i]);
+        }
+    }
+    return true;
+}
+
+static enum NetJoinRejection spectator_startup_rejection(void)
+{
+    TbBigChecksum checksums[NETWORK_STARTUP_MAP_FILE_COUNT];
+    calculate_network_startup_map_checksums(checksums);
+    if (memcmp(checksums, s_startup_sync_packets[SERVER_ID].map_checksums, sizeof(checksums)) != 0) {
+        return NetJoin_MapMismatch;
+    }
+    if (memcmp(required_sprite_zip_checksums, s_startup_sync_packets[SERVER_ID].required_sprite_zip_checksums, sizeof(required_sprite_zip_checksums)) != 0) {
+        return NetJoin_FxdataMismatch;
+    }
+    return NetJoin_Accepted;
+}
+
+// the preferences a user sent in the startup sync, for network games
+TbBool get_startup_user_preferences(NetUserId user, UserPreferences prefs)
+{
+    if (!network_is_active() || (user < 0) || (user >= MAX_NET_USERS) || !s_startup_sync_packets[user].startup_sync_packet_valid)
+        return false;
+    memcpy(prefs, s_startup_sync_packets[user].user_prefs, sizeof(UserPreferences));
+    return true;
+}
+
+
 
 static uint8_t calculate_initial_input_lag(void)
 {
     int32_t player_count = 0;
     for (int32_t i = 0; i < MAX_NET_USERS; i++) {
-        if (net_player_info[i].network_user_active) {
+        if (net_user_info[i].network_user_active) {
             player_count++;
         }
     }
@@ -213,126 +396,148 @@ static uint8_t calculate_initial_input_lag(void)
         input_lag_turns = (ping * turns_per_second + 999) / 1000;
     }
     uint64_t uncapped_input_lag_turns = input_lag_turns;
+    if (input_lag_turns > 0) {
+        input_lag_turns -= 1;
+    }
     if (input_lag_turns > MAXIMUM_INPUT_LAG_TURNS) {
         input_lag_turns = MAXIMUM_INPUT_LAG_TURNS;
     }
-    JUSTLOG("Initial input lag: (%llu ms * %d turns/s + 999) / 1000 = %llu turns, capped to %llu", (unsigned long long)ping, turns_per_second, (unsigned long long)uncapped_input_lag_turns, (unsigned long long)input_lag_turns);
+    JUSTLOG("Initial input lag: (%llu ms * %d turns/s + 999) / 1000 = %llu turns, adjusted to %llu", (unsigned long long)ping, turns_per_second, (unsigned long long)uncapped_input_lag_turns, (unsigned long long)input_lag_turns);
     return input_lag_turns;
+}
+
+static void resolve_startup_player_slots(struct StartupSyncPacket *sync)
+{
+    PlayerNumber slots_count = MAX_NET_USERS;
+    struct LevelInformation *level = get_level_info(get_loaded_level_number());
+    if (level) {
+        slots_count = min(max(level->players, 2), slots_count);
+    }
+    net_resolve_player_colours(slots_count, sync->player_slots, &sync->frontend_alliances);
 }
 
 static void build_local_startup_sync(void)
 {
     memset(&s_local_startup_sync, 0, sizeof(s_local_startup_sync));
     s_local_startup_sync.startup_sync_packet_valid = 1;
-    s_local_startup_sync.video_rotate_mode = settings.video_rotate_mode;
     calculate_network_startup_map_checksums(s_local_startup_sync.map_checksums);
     memcpy(s_local_startup_sync.required_sprite_zip_checksums, required_sprite_zip_checksums, sizeof(s_local_startup_sync.required_sprite_zip_checksums));
-    uint16_t initial_tendencies = 0;
-    if (IMPRISON_BUTTON_DEFAULT) {initial_tendencies |= CrTend_Imprison;}
-    if (FLEE_BUTTON_DEFAULT) {initial_tendencies |= CrTend_Flee;}
-    s_local_startup_sync.initial_tendencies = initial_tendencies;
-    s_local_startup_sync.isometric_view_zoom_level = settings.isometric_view_zoom_level;
-    s_local_startup_sync.frontview_zoom_level = settings.frontview_zoom_level;
-    s_local_startup_sync.zoom_distance_setting = zoom_distance_setting;
-    s_local_startup_sync.frontview_zoom_distance_setting = frontview_zoom_distance_setting;
+    build_local_user_preferences(s_local_startup_sync.user_prefs);
     s_local_startup_sync.initial_input_lag_turns = calculate_initial_input_lag();
+    s_local_startup_sync.initial_action_seed = (uint32_t)initial_replay_seed;
+    resolve_startup_player_slots(&s_local_startup_sync);
+}
+
+static TbBool setup_network_player_numbers(const int8_t player_slots[MAX_NET_USERS])
+{
+    SYNCDBG(6, "Starting");
+    for (NetUserId i = 0; i < MAX_NET_USERS; i++) {
+        set_net_user_player_number(i, PLAYER_NONE);
+        if (!net_user_info[i].network_user_active) {
+            continue;
+        }
+        if (player_slots[i] < PLAYER_NONE || player_slots[i] >= MAX_NET_USERS) {
+            ERRORLOG("Network user %d has invalid player slot %d", (int)i, (int)player_slots[i]);
+            return false;
+        }
+        set_net_user_player_number(i, player_slots[i]);
+        netstate.users[i].spectator_conversion_requested = (player_slots[i] == PLAYER_NONE);
+    }
+    my_player_number = PLAYER_NEUTRAL;
+    if (user_present(netstate.my_id)) {
+        my_player_number = get_net_user_player_number(netstate.my_id);
+    }
+    return true;
 }
 
 static TbBool net_startup_sync_exchange_and_apply(void)
 {
     memset(s_startup_sync_packets, 0, sizeof(s_startup_sync_packets));
-    if (exchange_frame_block(NETMSG_STARTUP_SYNC, &s_local_startup_sync, s_startup_sync_packets, sizeof(struct StartupSyncPacket)) != Lb_OK) {
+    TbError exchange_result = exchange_frame_block(NETMSG_STARTUP_SYNC, &s_local_startup_sync, s_startup_sync_packets, sizeof(struct StartupSyncPacket));
+    if (!startup_peers_accepted()) {
+        return false;
+    }
+    if (exchange_result != Lb_OK) {
         ERRORLOG("Startup sync exchange failed");
         return false;
     }
 
     for (int i = 0; i < MAX_NET_USERS; i++) {
-        if (net_player_info[i].network_user_active && !s_startup_sync_packets[i].startup_sync_packet_valid) {
+        if (net_user_info[i].network_user_active && !s_startup_sync_packets[i].startup_sync_packet_valid) {
             ERRORLOG("Startup sync exchange missed one or more peers");
             return false;
         }
     }
     if (!verify_map_checksums(s_startup_sync_packets)) {
-        create_frontend_error_box(5000, get_string(GUIStr_NetUnsyncedMap));
-        return false;
+        return reject_network_startup(NetJoin_MapMismatch);
     }
 
     if (!verify_startup_sprite_zip_checksums(s_startup_sync_packets)) {
-        create_frontend_error_box(5000, get_string(GUIStr_NetVerifyFxdataSame));
-        return false;
+        return reject_network_startup(NetJoin_FxdataMismatch);
     }
-    const struct StartupSyncPacket *host_sync = &s_startup_sync_packets[get_host_player_id()];
+    const struct StartupSyncPacket *host_sync = &s_startup_sync_packets[SERVER_ID];
     game.input_lag_turns = host_sync->initial_input_lag_turns;
     input_lag_reset();
     game.skip_initial_input_turns = calculate_skip_input();
     NETLOG("Startup input lag: %d", game.input_lag_turns);
-    zoom_distance_setting = host_sync->zoom_distance_setting;
-    frontview_zoom_distance_setting = host_sync->frontview_zoom_distance_setting;
+    if (host_sync->initial_action_seed != (uint32_t)initial_replay_seed)
+    {
+        ERRORLOG("Initial action seed %u differs from host's %u", (unsigned)initial_replay_seed, (unsigned)host_sync->initial_action_seed);
+        initial_replay_seed = host_sync->initial_action_seed;
+    }
+    frontend_alliances = host_sync->frontend_alliances;
+    if (!setup_network_player_numbers(host_sync->player_slots)) {
+        return false;
+    }
     setup_players_from_startup_packets(s_startup_sync_packets);
     return true;
-}
-
-static void setup_network_player_numbers(void)
-{
-    TbBool is_set = false;
-    int k = 0;
-    SYNCDBG(6, "Starting");
-    for (int i = 0; i < MAX_NET_USERS; i++)
-    {
-        struct PlayerInfo* player = get_player(i);
-        if (net_player_info[i].network_user_active)
-        {
-            player->packet_num = i;
-            if ((!is_set) && (my_player_number == i))
-            {
-                is_set = true;
-                my_player_number = k;
-            }
-            k++;
-        }
-    }
-    if (!is_set) {
-        ERRORLOG("Local player number %d not found among active network players", my_player_number);
-    }
 }
 
 void setup_count_players(void)
 {
   if (game.game_kind == GKind_LocalGame)
   {
-    game.active_players_count = 1;
+    game.human_players_count = 1;
   } else
   {
-    game.active_players_count = 0;
+    game.human_players_count = 0;
     for (int i = 0; i < MAX_NET_USERS; i++)
     {
-      if (net_player_info[i].network_user_active)
-        game.active_players_count++;
+      if (user_present(i))
+        game.human_players_count++;
     }
   }
 }
 
 TbBool init_players_network_game(void)
 {
+    if (net_join_role == NetRole_Spectator) {
+        enum NetJoinRejection rejection = spectator_startup_rejection();
+        if (rejection != NetJoin_Accepted) {
+            reject_network_startup(rejection);
+            LbNetwork_Stop();
+            return false;
+        }
+        for (NetUserId user = 0; user < MAX_NET_USERS; user++) {
+            set_net_user_player_number(user, spectator_user_player_number[user]);
+        }
+        setup_players_from_startup_packets(s_startup_sync_packets);
+        return true;
+    }
     SYNCDBG(4,"Starting");
     TbBool initialized = true;
-    setup_network_player_numbers();
     for (int zip_idx = 0; zip_idx < REQUIRED_SPRITE_ZIP_COUNT; zip_idx++) {
         if (required_sprite_zip_checksums[zip_idx] != 0) {
             continue;
         }
         WARNLOG("Required custom sprite zip missing: %s", required_sprite_zips[zip_idx]);
         message_add_fmt(MsgType_Blank, 0, "/fxdata/%.30s missing", required_sprite_zips[zip_idx]);
-        create_frontend_error_box(5000, get_string(GUIStr_NetVerifyFxdataSame));
-        initialized = false;
+        initialized = reject_network_startup(NetJoin_FxdataMismatch);
         break;
-    }
-    if (netstate.my_id == SERVER_ID && frontnet_service_selected(FrontendNetSvc_Online)) {
-        matchmaking_close_lobby();
     }
     if (initialized) {
         build_local_startup_sync();
-        initialized = net_startup_sync_exchange_and_apply();
+        initialized = net_startup_sync_exchange_and_apply() && network_spectator_convert_seatless_users();
     }
     if (!initialized) {
         LbNetwork_Stop();
@@ -340,70 +545,47 @@ TbBool init_players_network_game(void)
     return initialized;
 }
 
-void are_disconnect_victories_allowed(void)
+void network_game_started(void)
 {
-    struct PlayerInfo *myplyr = get_my_player();
-    network_disconnect_victory_enabled = false;
-    for (int player_index = 0; player_index < game.active_players_count; player_index++) {
-        struct PlayerInfo *player = get_player(player_index);
-        if (player_exists(player) && !is_my_player(player) && players_are_enemies(myplyr->id_number, player->id_number)) {
-            network_disconnect_victory_enabled = true;
-            return;
+    net_lobby_set_phase(NetPhase_InGame);
+    if (netstate.my_id == SERVER_ID && frontnet_service_selected(FrontendNetSvc_Online)) {
+        LevelNumber map_number = get_level_number();
+        struct LevelInformation *level_info = get_level_info(map_number);
+        const char *map_name = "";
+        if (level_info) {
+            map_name = level_info->name;
+            if (level_info->name_stridx > 0) {
+                map_name = get_string(level_info->name_stridx);
+            }
         }
+        matchmaking_start_game((int)map_number, map_name);
     }
 }
 
-/** Check whether a network player is active.
+/** Check whether a network user is active.
  *
- * @param plyr_idx
+ * @param user
  * @return
  */
-TbBool network_player_active(int plyr_idx)
+TbBool network_user_active(NetUserId user)
 {
-    if ((plyr_idx < 0) || (plyr_idx >= MAX_NET_USERS))
+    if ((user < 0) || (user >= MAX_NET_USERS))
         return false;
-    return (net_player_info[plyr_idx].network_user_active != 0);
+    return (net_user_info[user].network_user_active != 0);
 }
 
-const char *network_player_name(int plyr_idx)
+const char *network_user_name(NetUserId user)
 {
-    if ((plyr_idx < 0) || (plyr_idx >= MAX_NET_USERS))
+    if ((user < 0) || (user >= MAX_NET_USERS))
         return NULL;
-    return net_player_info[plyr_idx].name;
-}
-
-static void resolve_network_quit_outcome(struct PlayerInfo *player)
-{
-    if (player->victory_state != VicS_Undecided) {
-        return;
-    }
-    if (player_cannot_win(player->id_number)) {
-        set_player_as_lost_level(player);
-        return;
-    }
-    set_player_as_won_level(player);
-}
-
-static TbBool network_has_remote_enemies_remaining(void)
-{
-    struct PlayerInfo *myplyr = get_my_player();
-    for (int i = 0; i < PLAYERS_COUNT; i++) {
-        struct PlayerInfo *player = get_player(i);
-        TbBool is_active_enemy = player_exists(player) && !is_my_player(player) && player->is_active == 1 && !player_cannot_win(player->id_number) && players_are_enemies(myplyr->id_number, player->id_number);
-        TbBool is_connected_network_player = (player->allocflags & PlaF_CompCtrl) == 0 && network_player_active(player->packet_num);
-        TbBool is_initial_computer_player = (player->allocflags & PlaF_CompCtrl) != 0 && i >= game.active_players_count;
-        if (is_active_enemy && (is_connected_network_player || is_initial_computer_player)) {
-            return true;
-        }
-    }
-    return false;
+    return net_user_info[user].name;
 }
 
 TbBool network_human_contenders_remain(void)
 {
     for (PlayerNumber player_idx = 0; player_idx < PLAYERS_COUNT; player_idx++) {
         struct PlayerInfo *player = get_player(player_idx);
-        if (player_exists(player) && (player->is_active == 1) && ((player->allocflags & PlaF_CompCtrl) == 0) && !player_cannot_win(player_idx)) {
+        if (is_active_keeper(player) && ((player->allocflags & PlaF_CompCtrl) == 0) && !player_cannot_win(player_idx)) {
             return true;
         }
     }
@@ -412,8 +594,33 @@ TbBool network_human_contenders_remain(void)
 
 static TbBool network_has_remote_users_remaining(void)
 {
-    for (NetUserId user_id = 0; user_id < (NetUserId)netstate.max_players; user_id += 1) {
-        if (user_id != netstate.my_id && netstate.users[user_id].progress != USER_UNUSED) {
+    for (NetUserId user_id = 0; user_id < MAX_NET_USERS; user_id += 1) {
+        if (user_id == netstate.my_id) {
+            continue;
+        }
+        if ((user_id < (NetUserId)netstate.max_users) && (netstate.users[user_id].progress != USER_UNUSED)) {
+            return true;
+        }
+        if (user_present(user_id)) {
+            const struct PlayerInfo *player = get_player(get_net_user_player_number(user_id));
+            if (player_exists(player) && ((player->allocflags & PlaF_CompCtrl) == 0)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static TbBool replay_has_remote_humans(void)
+{
+    const NetUserId local_user = replay.head.recording_user;
+    for (NetUserId user_id = 0; user_id < MAX_NET_USERS; user_id++) {
+        const PlayerNumber plyr_idx = get_net_user_player_number(user_id);
+        if ((user_id == local_user) || (plyr_idx < 0)) {
+            continue;
+        }
+        const struct PlayerInfo *player = get_player(plyr_idx);
+        if (player_exists(player) && ((player->allocflags & PlaF_CompCtrl) == 0)) {
             return true;
         }
     }
@@ -422,18 +629,66 @@ static TbBool network_has_remote_users_remaining(void)
 
 static void replace_network_player_with_ai(struct PlayerInfo *player)
 {
-    player->allocflags |= PlaF_CompCtrl;
+    player->allocflags |= PlaF_CompCtrl | PlaF_Placeholder;
+    // seat_network_user undoes this when a spectator takes the seat
+    setup_a_computer_player(player->id_number, get_random_skirmish_computer_model());
     toggle_computer_player(player->id_number);
     message_add(MsgType_Player, player->id_number, get_string(GUIStr_NetAiTookOver));
     JUSTLOG("p:%d computer took over", player->id_number);
 }
 
+// used when ending a netplay game or recording.
+// local single-player must have the local user in slot 0.
+static void forget_user(NetUserId user)
+{
+    struct UserState *ustate = get_user_state(user);
+    if (user_state_invalid(ustate)) {
+        return;
+    }
+    delete_power_hand(user);
+    if (ustate->cursor_light_idx != 0) {
+        light_delete_light(ustate->cursor_light_idx);
+    }
+    for (PlayerNumber plyr_idx = 0; plyr_idx < PLAYERS_COUNT; plyr_idx++) {
+        struct PlayerInfo *player = get_player(plyr_idx);
+        if (player->roomspace.is_active && player->roomspace.user == user) {
+            player->roomspace.is_active = false;
+        }
+    }
+    PlayerNumber reconnect_player_id = ustate->player_id;
+    memset(ustate, 0, sizeof(*ustate));
+    ustate->player_id = PLAYER_NONE;
+    ustate->reconnect_player_id = reconnect_player_id;
+}
+
+void remap_user_to_solo(struct PlayerInfo *myplyr, NetUserId old_user)
+{
+    for (NetUserId user = 0; user < MAX_NET_USERS; user++) {
+        if (user != old_user) {
+            forget_user(user);
+        }
+    }
+    struct UserState *old_state = get_user_state(old_user);
+    if ((old_user != SOLO_HUMAN_ID) && !user_state_invalid(old_state)) {
+        *get_user_state(SOLO_HUMAN_ID) = *old_state;
+        memset(old_state, 0, sizeof(*old_state));
+        old_state->player_id = PLAYER_NONE;
+    }
+    set_net_user_player_number(SOLO_HUMAN_ID, myplyr->id_number);
+    if (myplyr->roomspace.is_active && (myplyr->roomspace.user == old_user)) {
+        myplyr->roomspace.user = SOLO_HUMAN_ID;
+    }
+}
+
 static void stop_network_game_state(void)
 {
-    memset(net_player_info, 0, sizeof(net_player_info));
-    clear_flag(game.system_flags, GSF_NetworkActive);
-    clear_flag(game.system_flags, GSF_NetGameNoSync);
-    clear_flag(game.system_flags, GSF_NetSeedNoSync);
+    const NetUserId local_user = get_local_user();
+    LbNetwork_Stop();
+    network_spectator_clear_roles();
+    memset(net_user_info, 0, sizeof(net_user_info));
+    remap_user_to_solo(get_my_player(), local_user);
+    clear_flag(local_system_flags, GSF_NetGameNoSync);
+    clear_flag(local_system_flags, GSF_NetSeedNoSync);
     fe_network_active = 0;
     game.game_kind = GKind_LocalGame;
     game.input_lag_turns = 0;
@@ -445,16 +700,29 @@ static void stop_network_game_state(void)
 
 static void stop_network_game_and_quit_to_main_menu(void)
 {
-    LbNetwork_Stop();
     stop_network_game_state();
     quit_game = 1;
 }
 
 static void stop_network_game_and_continue_locally(void)
 {
-    LbNetwork_Stop();
-    stop_network_game_state();
-    get_my_player()->display_objective_turn = get_gameturn() + 1;
+    struct PlayerInfo *survivor;
+    if (network_is_active()) {
+        stop_network_game_state();
+        survivor = get_my_player();
+    } else {
+        NetUserId survivor_user = replay.head.recording_user;
+        PlayerNumber plyr_idx = get_net_user_player_number(survivor_user);
+        if (plyr_idx < 0) {
+            survivor_user = get_local_user();
+            plyr_idx = my_player_number;
+        }
+        survivor = get_player(plyr_idx);
+        remap_user_to_solo(survivor, survivor_user);
+        game.game_kind = GKind_LocalGame;
+        setup_count_players();
+    }
+    survivor->display_objective_turn = get_gameturn() + 1;
 }
 
 static TbBool host_already_won_level(void)
@@ -464,7 +732,7 @@ static TbBool host_already_won_level(void)
         if ((GameTurn)offset > newest_turn) {
             break;
         }
-        const struct Packet *host_packet = get_history_packet(get_host_player_id(), newest_turn - offset);
+        const struct Packet *host_packet = get_history_packet(SERVER_ID, newest_turn - offset);
         if (host_packet != NULL && host_packet->action == PckA_FinishGame && host_packet->actn_par1 == VicS_WonLevel) {
             return true;
         }
@@ -472,108 +740,234 @@ static TbBool host_already_won_level(void)
     return false;
 }
 
-void process_player_leave_game_packet(struct PlayerInfo *player)
+// placeholders stay open for their human to return until their outcome
+// is settled, then they are deallocated
+void resolve_placeholders(void)
 {
-    if (player != get_my_player()) {
-        if (network_is_active()) {
-            OnDroppedUser(player->packet_num, NETDROP_MANUAL);
-            process_disconnected_network_players();
-            return;
-        }
-    } else if (network_is_active()) {
-        stop_network_game_and_quit_to_main_menu();
-    } else {
-        quit_game = 1;
-    }
-    player->allocflags &= ~PlaF_Allocated;
-}
-
-void process_disconnected_network_players(void)
-{
-    if (!network_is_active()) {
-        return;
-    }
-    struct PlayerInfo *myplyr = get_my_player();
-    TbBool host_disconnected = (netstate.my_id != SERVER_ID) && (netstate.users[SERVER_ID].progress == USER_UNUSED);
-    TbBool disconnected = host_disconnected;
-    TbBool enemy_disconnected = false;
-    TbBool winning_quit = false;
-    int32_t plyr_count = 0;
-    if (host_disconnected && host_already_won_level()) {
-        myplyr->additional_flags &= ~PlaAF_UnlockedLordTorture;
-        quit_game = 1;
-        return;
-    }
-    for (int player_index = 0; player_index < MAX_NET_USERS; player_index++) {
-        struct PlayerInfo *player = get_player(player_index);
-        if (!player_exists(player) || is_my_player(player) || (!host_disconnected && network_player_active(player->packet_num))) {
+    for (PlayerNumber plyr_idx = 0; plyr_idx < PLAYERS_COUNT; plyr_idx++) {
+        struct PlayerInfo *player = get_player(plyr_idx);
+        if (!player_exists(player) || !player_is_placeholder(player)) {
             continue;
         }
-        disconnected = true;
-        if (network_disconnect_victory_enabled && players_are_enemies(myplyr->id_number, player->id_number)) {
-            enemy_disconnected = true;
-            if (!winning_quit && winning_player_quitting(player, &plyr_count)) {
-                winning_quit = true;
-            }
-        }
-        if ((player->allocflags & PlaF_CompCtrl) == 0) {
-            input_lag_reset_intervals();
-            if (!host_disconnected && player->id_number != get_host_player_id() && player->player_name[0] != '\0') {
-                message_add_fmt(MsgType_Blank, 0, get_string(GUIStr_NetPlayerDisconnected), player->player_name);
-                JUSTLOG("p:%d player %s departed", player->id_number, player->player_name);
-            }
-            if (player->victory_state == VicS_Undecided) {
-                replace_network_player_with_ai(player);
-                continue;
-            }
-        }
-        if (player->victory_state != VicS_Undecided) {
+        if ((player->victory_state == VicS_WonLevel) || player_defeat_settled(plyr_idx)) {
             player->allocflags &= ~PlaF_Allocated;
         }
     }
+}
 
-    TbBool has_enemies_to_defeat = network_has_remote_enemies_remaining();
-    if (!disconnected || (!host_disconnected && has_enemies_to_defeat)) {
+void hand_waiting_placeholders_to_ai(void)
+{
+    for (PlayerNumber plyr_idx = 0; plyr_idx < PLAYERS_COUNT; plyr_idx++) {
+        struct PlayerInfo *player = get_player(plyr_idx);
+        if (!player_exists(player) || !player_is_placeholder(player)
+            || (player->victory_state != VicS_Undecided) || flag_is_set(player->allocflags, PlaF_CompCtrl)) {
+            continue;
+        }
+        replace_network_player_with_ai(player);
+    }
+}
+
+void seat_network_user(NetUserId user, PlayerNumber plyr_idx, const UserPreferences seat_prefs)
+{
+    struct PlayerInfo *player = get_player(plyr_idx);
+    JUSTLOG("p:%d user %d took over from the computer", (int)plyr_idx, (int)user);
+    player->allocflags &= ~(PlaF_CompCtrl | PlaF_Placeholder);
+    if ((get_players_dungeon(player)->computer_enabled & 0x01) != 0) {
+        toggle_computer_player(plyr_idx);
+    }
+    init_user_state(user, plyr_idx);
+    UserPreferences prefs;
+    if (!get_startup_user_preferences(user, prefs)) {
+        memcpy(prefs, seat_prefs, sizeof(UserPreferences));
+    }
+    apply_user_preferences(user, prefs, UPF_NewGame);
+    apply_user_preferences(user, seat_prefs, UPF_ApplyOnLoad);
+    init_user_controls(get_user_state(user));
+    reset_user_view_type(user, PVT_DungeonTop);
+    init_player_cameras(player);
+    snprintf(player->player_name, sizeof(player->player_name), "%s", network_user_name(user));
+    setup_count_players();
+}
+
+static TbBool abandon_network_player(struct PlayerInfo *player, const char *announce_fmt)
+{
+    if ((player->allocflags & PlaF_CompCtrl) == 0) {
+        if (network_is_active()) {
+            // re-negotiate input latency
+            network_lobby_ping = GetPlayersPing();
+            input_lag_reset_request(calculate_initial_input_lag());
+        }
+        if (announce_fmt != NULL && player->player_name[0] != '\0' && player->victory_state != VicS_LostLevel) {
+            message_add_fmt(MsgType_Blank, 0, announce_fmt, player->player_name);
+        }
+        JUSTLOG("p:%d player %s departed", player->id_number, player->player_name);
+        if (player->victory_state == VicS_Undecided) {
+            player->allocflags |= PlaF_Placeholder;
+        }
+    }
+    resolve_placeholders();
+    if (player->victory_state != VicS_Undecided) {
+        player->allocflags &= ~PlaF_Allocated;
+        return false;
+    }
+    return player_is_placeholder(player);
+}
+
+// Holds a departed player's seat for reconnect, or writes off a decided one.
+static TbBool remove_user_from_game(NetUserId user, const char *announce_fmt)
+{
+    struct UserState *ustate = get_user_state(user);
+    if (user_state_invalid(ustate) || (ustate->player_id == PLAYER_NONE)) {
+        return false;
+    }
+    struct PlayerInfo *player = get_player(ustate->player_id);
+    JUSTLOG("u:%d user left the game (player %d)", (int)user, (int)ustate->player_id);
+    forget_user(user);
+    // another user may still be driving this keeper
+    if (!player_exists(player) || get_player_primary_user(player) >= 0) {
+        return false;
+    }
+    return abandon_network_player(player, announce_fmt);
+}
+
+static void leave_network_if_alone(void)
+{
+    if (network_is_host() && (net_config_info.spectators_enabled || net_lobby_spectator_count() > 0 || network_spectator_seat_open(NULL))) {
         return;
     }
-    if (host_disconnected) {
-        message_add(MsgType_Blank, 0, get_string(GUIStr_NetHostConnectionLost));
-        if (has_enemies_to_defeat) {
-            stop_network_game_and_continue_locally();
-            return;
-        }
-    }
-    if (winning_quit) {
-        for (int i = 0; i < PLAYERS_COUNT; i++) {
-            struct PlayerInfo *swplyr = get_player(i);
-            if (player_exists(swplyr) && (swplyr->is_active == 1)) {
-                resolve_network_quit_outcome(swplyr);
-            }
-        }
-    }
-    if (enemy_disconnected) {
-        resolve_network_quit_outcome(myplyr);
-    }
-    if (winning_quit && (plyr_count > 1)) {
-        if (game.conf.rules[myplyr->id_number].gameplay.winner_tortures_loser) {
-            myplyr->additional_flags |= PlaAF_UnlockedLordTorture;
-        } else {
-            myplyr->additional_flags &= ~PlaAF_UnlockedLordTorture;
-        }
-    }
-    if (!host_disconnected && network_has_remote_users_remaining()) {
-        return;
-    }
-    if (enemy_disconnected && myplyr->victory_state == VicS_Undecided) {
-        stop_network_game_and_quit_to_main_menu();
-    } else {
+    if (!network_has_remote_users_remaining()) {
         stop_network_game_and_continue_locally();
     }
 }
 
-long network_session_join(void)
+void process_user_leave_game_packet(NetUserId user)
+{
+    if (network_is_active() && network_user_is_spectator(netstate.my_id) && user == SERVER_ID) {
+        stop_network_game_and_quit_to_main_menu();
+        return;
+    }
+    if (user == get_local_user()) {
+        if (network_is_active()) {
+            stop_network_game_and_quit_to_main_menu();
+        } else {
+            quit_game = 1;
+        }
+        get_my_player()->allocflags &= ~PlaF_Allocated;
+        return;
+    }
+    if (game.game_kind != GKind_MultiGame) {
+        // the user's keeper simply vanishes
+        struct PlayerInfo *player = get_player(get_net_user_player_number(user));
+        forget_user(user);
+        if (player_exists(player) && get_player_primary_user(player) < 0) {
+            player->allocflags &= ~(PlaF_Allocated | PlaF_Seat);
+        }
+        return;
+    }
+
+    // note: packet processed in sync with simulation, it's okay to do this.
+    // replays take this path too, so the departure is visible there.
+    if (network_is_active()) {
+        OnDroppedUser(user, NETDROP_MANUAL);
+    }
+    const TbBool timed_out = (get_packet(user)->actn_par1 == NET_LEAVE_TIMED_OUT);
+    const char *announce_fmt = get_string(GUIStr_NetPlayerLeftGame);
+    if (timed_out) {
+        announce_fmt = get_string(GUIStr_NetPlayerTimedOut);
+    }
+    if (remove_user_from_game(user, announce_fmt) && network_is_active() && (user != SERVER_ID)) {
+        if (timed_out) {
+            process_pause_packet(1, 0);
+        }
+        net_lobby_refresh_metadata();
+    }
+    if (network_is_active()) {
+        leave_network_if_alone();
+    } else if (replay.load_enable && !replay_has_remote_humans()) {
+        stop_network_game_and_continue_locally();
+    }
+}
+
+// (host-only) host sends packets for dropped users, indicating
+// the user has dropped.
+void host_spoof_dropped_user_packets(void)
+{
+    if (!network_is_active() || !network_is_host()) {
+        return;
+    }
+    GameTurn first_turn = get_gameturn();
+    if (first_turn > (GameTurn)game.input_lag_turns) {
+        first_turn -= game.input_lag_turns;
+    }
+    for (NetUserId user = 0; user < MAX_NET_USERS; user++) {
+        if ((user == netstate.my_id) || network_user_active(user) || !user_present(user)) {
+            continue;
+        }
+        struct Packet spoofed;
+        memset(&spoofed, 0, sizeof(spoofed));
+        int32_t leave_reason = 0;
+        if (netstate.users_timed_out[user]) {
+            leave_reason = NET_LEAVE_TIMED_OUT;
+        }
+        set_packet_action(&spoofed, PckA_ForceApplicationClose, leave_reason, 0, 0, 0);
+        // only the turns user_has_required_turn_packets expects
+        for (GameTurn turn = first_turn; turn < first_turn + 2; turn++) {
+            if (get_history_packet(user, turn) != NULL) {
+                continue;
+            }
+            spoofed.turn = turn;
+            store_packet_history(user, &spoofed);
+        }
+    }
+}
+
+static void remove_remote_users_after_host_lost(NetUserId local_user)
+{
+    remove_user_from_game(SERVER_ID, get_string(GUIStr_NetPlayerTimedOut));
+    for (NetUserId user = 0; user < MAX_NET_USERS; user++) {
+        if (user != local_user) {
+            remove_user_from_game(user, NULL);
+        }
+    }
+}
+
+void process_disconnected_network_players(void)
+{
+    if (!network_is_active() || network_is_host() || (netstate.users[SERVER_ID].progress != USER_UNUSED)) {
+        return;
+    }
+    struct UserState *ustate = get_local_user_state();
+    if (host_already_won_level()) {
+        ustate->additional_flags &= ~UsrAF_UnlockedLordTorture;
+        quit_game = 1;
+        return;
+    }
+    if (netstate.my_id >= MAX_NET_USERS) {
+        const char *error = net_join_error_text(net_join_rejection);
+        if (error != NULL) {
+            queue_frontend_error_box(error);
+        }
+        stop_network_game_and_quit_to_main_menu();
+        return;
+    }
+    remove_remote_users_after_host_lost(netstate.my_id);
+    replay_record_network_stopped();
+    stop_network_game_and_continue_locally();
+}
+
+void apply_recorded_network_stop(void)
+{
+    remove_remote_users_after_host_lost(replay.head.recording_user);
+    stop_network_game_and_continue_locally();
+}
+
+static char spectator_join_error[TEXT_BUFFER_LENGTH];
+
+int32_t network_session_join(void)
 {
     int32_t plyr_num;
+    net_join_rejection = NetJoin_Accepted;
+    spectator_join_error[0] = '\0';
     reset_attempting_to_join_cancel();
     display_attempting_to_join_message(-1);
     if (attempting_to_join_cancel_requested())
@@ -588,24 +982,103 @@ long network_session_join(void)
             net_session_index_active_id = -1;
             matchmaking_request_list();
         }
-        process_network_error(-802);
+        const char *error = net_join_error_text(net_join_rejection);
+        if (spectator_join_error[0] != '\0') {
+            error = spectator_join_error;
+        }
+        if (error) {
+            create_frontend_error_box(error);
+        } else {
+            process_network_error(-802);
+        }
     }
     return -1;
 }
 
 void sync_initial_network_seed(void)
 {
+   if (net_join_role == NetRole_Spectator) {
+       game.action_random_seed = s_startup_sync_packets[SERVER_ID].initial_action_seed;
+       game.ai_random_seed = game.action_random_seed * 9377 + 9391;
+       game.player_random_seed = game.action_random_seed * 9473 + 9479;
+       initial_replay_seed = game.action_random_seed;
+       return;
+   }
    if (!network_is_active()) {
       return;
    }
-   if (!LbNetwork_Resync(&game.action_random_seed, sizeof(game.action_random_seed))) {
+   struct { uint32_t action_seed; int32_t timestamp_tz; int64_t timestamp; } initial = { game.action_random_seed, game.timestamp_tz, game.timestamp };
+   if (!LbNetwork_Resync(&initial, sizeof(initial))) {
       ERRORLOG("Initial sync failed");
       return;
    }
+   game.action_random_seed = initial.action_seed;
+   game.timestamp = initial.timestamp;
+   game.timestamp_tz = initial.timestamp_tz;
    game.ai_random_seed = game.action_random_seed * 9377 + 9391;
    game.player_random_seed = game.action_random_seed * 9473 + 9479;
+   initial_replay_seed = game.action_random_seed;
    NETLOG("Initial network seed synced: action_seed=%u", game.action_random_seed);
 }
+void network_spectator_send_bootstrap(NetUserId user_id)
+{
+    char *write_pos = begin_net_message(NETMSG_SPECTATOR_BOOTSTRAP);
+    int32_t level = get_loaded_level_number();
+    memcpy(write_pos, &level, sizeof(level));
+    write_pos += sizeof(level);
+    snprintf(write_pos, DISKPATH_SIZE, "%s", campaign.fname);
+    write_pos += strlen(write_pos) + 1;
+    PlayerNumber user_player_number[MAX_NET_USERS];
+    for (NetUserId user = 0; user < MAX_NET_USERS; user++) {
+        user_player_number[user] = get_net_user_player_number(user);
+    }
+    memcpy(write_pos, user_player_number, sizeof(user_player_number));
+    write_pos += sizeof(user_player_number);
+    memcpy(write_pos, s_startup_sync_packets, sizeof(s_startup_sync_packets));
+    write_pos += sizeof(s_startup_sync_packets);
+    send_message_buffer(user_id, write_pos);
+}
+
+TbError process_network_spectator_bootstrap(NetUserId source, const char *buffer, size_t size)
+{
+    if (source != SERVER_ID || net_join_role != NetRole_Spectator || size < sizeof(int32_t) + 1 + sizeof(spectator_user_player_number) + sizeof(s_startup_sync_packets)) {
+        return Lb_FAIL;
+    }
+    int32_t level;
+    memcpy(&level, buffer, sizeof(level));
+    buffer += sizeof(level);
+    size -= sizeof(level);
+    size_t name_length = strnlen(buffer, min(size, (size_t)DISKPATH_SIZE));
+    if (name_length == 0 || name_length >= DISKPATH_SIZE || name_length + 1 + sizeof(spectator_user_player_number) + sizeof(s_startup_sync_packets) != size || strchr(buffer, '/') || strchr(buffer, '\\') || strstr(buffer, "..")) {
+        return Lb_FAIL;
+    }
+    char campaign_file[DISKPATH_SIZE];
+    uint8_t pack = prepare_campaign_file_name(buffer, campaign_file, sizeof(campaign_file));
+    if (pack == CampgnT_Default && is_campaign_in_list(campaign_file, &mp_mappacks_list)) {
+        pack = CampgnT_MultiplayerMappack;
+    }
+    if (!change_campaign(pack, campaign_file) || strcasecmp(campaign.fname, campaign_file) != 0) {
+        snprintf(spectator_join_error, sizeof(spectator_join_error), get_string(GUIStr_NetMissingMapPack), campaign_file);
+        return Lb_FAIL;
+    }
+    if (level <= 0 || get_level_info(level) == NULL) {
+        snprintf(spectator_join_error, sizeof(spectator_join_error), get_string(GUIStr_NetMapPackMissingLevel), campaign_file, level);
+        return Lb_FAIL;
+    }
+    buffer += name_length + 1;
+    memcpy(spectator_user_player_number, buffer, sizeof(spectator_user_player_number));
+    buffer += sizeof(spectator_user_player_number);
+    memcpy(s_startup_sync_packets, buffer, sizeof(s_startup_sync_packets));
+    for (NetUserId id = 0; id < MAX_NET_USERS; id++) {
+        if (spectator_user_player_number[id] < PLAYER_NONE || spectator_user_player_number[id] >= PLAYERS_COUNT) {
+            return Lb_FAIL;
+        }
+    }
+    set_selected_level_number(level);
+    netstate.phase = NetPhase_InGame;
+    return Lb_OK;
+}
+
 /******************************************************************************/
 #ifdef __cplusplus
 }

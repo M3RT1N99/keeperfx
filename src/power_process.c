@@ -17,6 +17,7 @@
  */
 /******************************************************************************/
 #include "pre_inc.h"
+#include "kfx/renderer/RendererManager.h"
 #include "power_process.h"
 
 #include "globals.h"
@@ -45,6 +46,7 @@
 #include "power_hand.h"
 #include "player_instances.h"
 #include "local_camera.h"
+#include "observer.h"
 
 #include "keeperfx.hpp"
 #include "post_inc.h"
@@ -53,7 +55,7 @@
 extern "C" {
 #endif
 /******************************************************************************/
-static unsigned char backup_explored[26][26];
+static unsigned char backup_explored[PLAYERS_COUNT][2*MAX_SOE_RADIUS][2*MAX_SOE_RADIUS];
 /******************************************************************************/
 #ifdef __cplusplus
 }
@@ -85,22 +87,19 @@ void set_chosen_power_none(void)
     game.chosen_spell_tooltip = 0;
 }
 
-unsigned char general_expand_check(void)
+unsigned char general_expand_check(NetUserId user)
 {
-    struct PlayerInfo* player = get_my_player();
-    return (player->cast_expand_level != 0);
+    return get_user_state(user)->cast_expand_level != 0;
 }
 
-unsigned char sight_of_evil_expand_check(void)
+unsigned char sight_of_evil_expand_check(NetUserId user)
 {
-    struct PlayerInfo* myplyr = get_my_player();
-    return (myplyr->cast_expand_level != 0) && (!player_uses_power_sight(myplyr->id_number));
+    return get_user_state(user)->cast_expand_level != 0 && !player_uses_power_sight(get_user_player(user)->id_number);
 }
 
-unsigned char call_to_arms_expand_check(void)
+unsigned char call_to_arms_expand_check(NetUserId user)
 {
-    struct PlayerInfo* myplyr = get_my_player();
-    return (myplyr->cast_expand_level != 0) && (!player_uses_power_call_to_arms(myplyr->id_number));
+    return get_user_state(user)->cast_expand_level != 0 && !player_uses_power_call_to_arms(get_user_player(user)->id_number);
 }
 
 void process_armageddon(void)
@@ -126,7 +125,7 @@ void process_armageddon(void)
             player = get_player(i);
             if (player_exists(player))
             {
-              if (player->is_active == 1)
+              if (is_active_keeper(player))
                 reveal_whole_map(player);
             }
         }
@@ -136,7 +135,7 @@ void process_armageddon(void)
         for (i=0; i < PLAYERS_COUNT; i++)
         {
             player = get_player(i);
-            if ( (player_exists(player)) && (player->is_active == 1) )
+            if (is_active_keeper(player))
             {
                 struct Dungeon* dungeon = get_dungeon(player->id_number);
                 if ((player->victory_state == VicS_Undecided) && (dungeon->num_active_creatrs == 0))
@@ -144,7 +143,7 @@ void process_armageddon(void)
                     event_kill_all_players_events(i);
                     set_player_as_lost_level(player);
                     if (is_my_player_number(i))
-                        LbPaletteSet(engine_palette);
+                        RendererPaletteSet(engine_palette);
                     struct Thing* heartng = get_player_soul_container(player->id_number);
                     if (thing_exists(heartng)) {
                         heartng->health = -1;
@@ -178,6 +177,22 @@ void process_armageddon_influencing_creature(struct Thing *creatng)
     }
 }
 
+TbBool players_disease_can_infect_target_players_creatures(PlayerNumber source_player, PlayerNumber target_player)
+{
+    if (source_player == target_player)
+        return false;
+    if (source_player == game.neutral_player_num)
+        return false;
+    if (players_are_enemies(source_player, target_player))
+        return true;
+
+    struct PlayerInfo* player = get_player(source_player);
+    if (game.conf.rules[source_player].gameplay.allies_share_disease)
+        return (player_allied_with(player, target_player) == false);
+
+    return source_player != target_player;
+}
+
 void process_disease(struct Thing *creatng)
 {
     SYNCDBG(18, "Starting");
@@ -208,10 +223,9 @@ void process_disease(struct Thing *creatng)
                 tngcctrl = creature_control_get_from_thing(thing);
                 if (thing_is_creature(thing)
                 && !creature_is_for_dungeon_diggers_list(thing)
-                && (thing->owner != cctrl->disease_caster_plyridx)
+                && players_disease_can_infect_target_players_creatures(cctrl->disease_caster_plyridx,thing->owner)
                 && !creature_under_spell_effect(thing, CSAfF_Disease)
-                && !creature_is_immune_to_spell_effect(thing, CSAfF_Disease)
-                && (cctrl->disease_caster_plyridx != game.neutral_player_num))
+                && !creature_is_immune_to_spell_effect(thing, CSAfF_Disease))
                 { // Apply the spell kind stored in 'active_disease_spell'.
                     apply_spell_effect_to_thing(thing, cctrl->active_disease_spell, cctrl->exp_level, creatng->owner);
                     tngcctrl->disease_caster_plyridx = cctrl->disease_caster_plyridx;
@@ -235,13 +249,12 @@ void process_disease(struct Thing *creatng)
 
 void lightning_modify_palette(struct Thing *thing)
 {
-    struct PlayerInfo* myplyr = get_my_player();
-    struct Camera* camera = get_player_active_camera(myplyr);
+    struct Camera* camera = get_local_active_camera();
 
     if (thing->health == 0)
     {
-      PaletteSetPlayerPalette(myplyr, engine_palette);
-      myplyr->additional_flags &= ~PlaAF_LightningPaletteIsActive;
+      PaletteSetUserPalette(get_local_user(), engine_palette);
+      local_state.lightning_palette_active = false;
       return;
     }
     if (camera == NULL)
@@ -251,24 +264,24 @@ void lightning_modify_palette(struct Thing *thing)
     }
     if (((thing->health % 8) != 7) && (thing->health != 1) && (UNSYNC_RANDOM(4) != 0))
     {
-        if ((myplyr->additional_flags & PlaAF_LightningPaletteIsActive) != 0)
+        if (local_state.lightning_palette_active)
         {
             if (get_chessboard_distance(&camera->mappos, &thing->mappos) < 11520)
             {
-                PaletteSetPlayerPalette(myplyr, engine_palette);
-                myplyr->additional_flags &= ~PlaAF_LightningPaletteIsActive;
+                PaletteSetUserPalette(get_local_user(), engine_palette);
+                local_state.lightning_palette_active = false;
             }
         }
         return;
     }
-    if ((myplyr->view_mode != PVM_ParchFadeIn) && (myplyr->view_mode != PVM_ParchFadeOut) && (myplyr->view_mode != PVM_ParchmentView))
+    if (get_local_view_type() != PVT_MapScreen)
     {
-        if ((myplyr->additional_flags & PlaAF_LightningPaletteIsActive) == 0)
+        if (!local_state.lightning_palette_active)
         {
                         if (get_chessboard_distance(&camera->mappos, &thing->mappos) < 11520)
             {
-              PaletteSetPlayerPalette(myplyr, lightning_palette);
-              myplyr->additional_flags |= PlaAF_LightningPaletteIsActive;
+              PaletteSetUserPalette(get_local_user(), lightning_palette);
+              local_state.lightning_palette_active = true;
             }
         }
     }
@@ -371,8 +384,7 @@ void god_lightning_choose_next_creature(struct Thing *shotng)
 
 void draw_god_lightning(struct Thing *shotng)
 {
-    struct PlayerInfo* player = get_player(shotng->owner);
-    const struct Camera* cam = get_local_camera(get_player_active_camera(player));
+    const struct Camera* cam = get_local_active_camera();
     if (cam == NULL) {
         return;
     }
@@ -445,12 +457,12 @@ void store_backup_explored_flags_for_power_sight(struct PlayerInfo *player, stru
                 struct Map* mapblk = get_map_block_at(stl_x, stl_y);
                 if (!map_block_invalid(mapblk))
                 {
-                    if (map_block_revealed(mapblk, player->id_number))
-                        backup_explored[soe_y][soe_x] |= 0x01;
+                    if (map_block_revealed_to_players(mapblk, to_flag(player->id_number)))
+                        backup_explored[player->id_number][soe_y][soe_x] |= 0x01;
                     if ((mapblk->flags & SlbAtFlg_Unexplored) != 0)
-                        backup_explored[soe_y][soe_x] |= 0x02;
+                        backup_explored[player->id_number][soe_y][soe_x] |= 0x02;
                     if ((mapblk->flags & SlbAtFlg_TaggedValuable) != 0)
-                        backup_explored[soe_y][soe_x] |= 0x04;
+                        backup_explored[player->id_number][soe_y][soe_x] |= 0x04;
                 }
             }
         }
@@ -614,7 +626,7 @@ void update_explored_flags_for_power_sight(struct PlayerInfo *player)
 {
     SYNCDBG(9,"Starting");
     struct Dungeon* dungeon = get_players_dungeon(player);
-    memset(backup_explored, 0, sizeof(backup_explored));
+    memset(backup_explored[player->id_number], 0, sizeof(backup_explored[0]));
     if (dungeon->sight_casted_thing_idx == 0) {
         return;
     }
@@ -655,7 +667,7 @@ void remove_explored_flags_for_power_sight(struct PlayerInfo *player)
                 struct Map* mapblk = get_map_block_at(stl_x, stl_y);
                 if (!map_block_invalid(mapblk))
                 {
-                    backup_flags = backup_explored[soe_y][soe_x];
+                    backup_flags = backup_explored[player->id_number][soe_y][soe_x];
                     conceal_map_block(mapblk, player->id_number);
                     if ((backup_flags & 1) != 0)
                         reveal_map_block(mapblk, player->id_number);
@@ -665,6 +677,40 @@ void remove_explored_flags_for_power_sight(struct PlayerInfo *player)
                         mapblk->flags |= SlbAtFlg_TaggedValuable;
                 }
             }
+        }
+    }
+}
+
+static TbBool viewing_all_seats(void)
+{
+    return local_observer_rendering && is_observer_camera_active();
+}
+
+void update_explored_flags_for_viewed_power_sights(struct PlayerInfo *viewer)
+{
+    if (!viewing_all_seats()) {
+        update_explored_flags_for_power_sight(viewer);
+        return;
+    }
+    for (PlayerNumber i = 0; i < PLAYERS_COUNT; i++) {
+        struct PlayerInfo *player = get_player(i);
+        if (player_exists(player) && player_is_seat(player)) {
+            update_explored_flags_for_power_sight(player);
+        }
+    }
+}
+
+// reverse order, so overlapping sights restore the tag flags correctly
+void remove_explored_flags_for_viewed_power_sights(struct PlayerInfo *viewer)
+{
+    if (!viewing_all_seats()) {
+        remove_explored_flags_for_power_sight(viewer);
+        return;
+    }
+    for (PlayerNumber i = PLAYERS_COUNT - 1; i >= 0; i--) {
+        struct PlayerInfo *player = get_player(i);
+        if (player_exists(player) && player_is_seat(player)) {
+            remove_explored_flags_for_power_sight(player);
         }
     }
 }

@@ -78,9 +78,6 @@ void init_touch_input(void);
 /** True when the native touch scheme should currently drive the game. */
 TbBool touch_controls_active(void);
 
-/** True when a touch screen has produced at least one event this session. */
-TbBool touch_device_seen(void);
-
 /** Per frame update - long press detection and gesture decay. Called from poll_inputs(). */
 void update_touch_inputs(void);
 

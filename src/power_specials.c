@@ -18,6 +18,7 @@
 /******************************************************************************/
 #include "pre_inc.h"
 #include "power_specials.h"
+#include "api.h"
 
 #include "globals.h"
 #include "bflib_basics.h"
@@ -527,6 +528,22 @@ void activate_dungeon_special(struct Thing *cratetng, struct PlayerInfo *player)
     TbBool no_speech = false;
     if (thing_exists(cratetng) && thing_is_special_box(cratetng))
     {
+        
+    struct ApiEventData event_data[] = {
+        { .name = "player", .type = API_EVENT_DATA_INT32, .value.int32_value = player->id_number },
+        { .name = "special", .type = API_EVENT_DATA_INT32, .value.int32_value = spkindidx },
+        { .name = "special_name", .type = API_EVENT_DATA_STRING, .value.string_value = specst->code_name },
+        { .name = "special_value", .type = API_EVENT_DATA_INT32, .value.int32_value = specst->value },
+        { .name = "thing", .type = API_EVENT_DATA_INT32, .value.int32_value = cratetng->index },
+        { .name = "model", .type = API_EVENT_DATA_INT32, .value.int32_value = cratetng->model },
+        { .name = "x", .type = API_EVENT_DATA_INT32, .value.int32_value = cratetng->mappos.x.val >> 8},
+        { .name = "y", .type = API_EVENT_DATA_INT32, .value.int32_value = cratetng->mappos.y.val >> 8 },
+        { .name = "z", .type = API_EVENT_DATA_INT32, .value.int32_value = cratetng->mappos.z.val >> 8 },
+        { .name = "level_number", .type = API_EVENT_DATA_INT32, .value.int32_value = get_loaded_level_number() },
+        { .name = "game_turn", .type = API_EVENT_DATA_UINT64, .value.uint64_value = (uint64_t)get_gameturn() },
+    };
+    api_event_with_data("SPECIAL_ACTIVATED", event_data, sizeof(event_data) / sizeof(event_data[0]));
+
     switch (spkindidx)
     {
         case SpcKind_RevealMap:
@@ -637,8 +654,7 @@ void activate_dungeon_special(struct Thing *cratetng, struct PlayerInfo *player)
         }
         if ( used )
         {
-            if (is_my_player(player) && !no_speech)
-            {
+            if (is_my_player_number(player->id_number) && !no_speech) {
                 play_speech_ref(&specst->speech, 0);
             }
             create_used_effect_or_element(&pos, specst->effect_id, player->id_number, cratetng->index);
@@ -661,8 +677,7 @@ void resurrect_creature(struct Thing *boxtng, PlayerNumber owner, ThingModel crm
     if (!thing_is_invalid(creatng))
     {
         init_creature_level(creatng, exp_level);
-        if (is_my_player_number(owner))
-          output_message(SMsg_CommonAcknowledge, 0);
+        output_player_message(owner, SMsg_CommonAcknowledge, 0);
     }
     struct SpecialConfigStats* specst = get_special_model_stats(SpcKind_Resurrect);
     create_used_effect_or_element(&boxtng->mappos, specst->effect_id, owner, boxtng->index);
@@ -712,8 +727,7 @@ void transfer_creature(struct Thing *boxtng, struct Thing *transftng, unsigned c
         force_any_creature_dragging_owned_thing_to_drop_it(boxtng);
         delete_thing_structure(boxtng, 0);
     }
-    if (is_my_player_number(plyr_idx))
-      output_message(SMsg_CommonAcknowledge, 0);
+    output_player_message(plyr_idx, SMsg_CommonAcknowledge, 0);
 }
 
 void start_transfer_creature(struct PlayerInfo *player, struct Thing *thing)
@@ -721,15 +735,14 @@ void start_transfer_creature(struct PlayerInfo *player, struct Thing *thing)
     struct Dungeon* dungeon = get_dungeon(player->id_number);
     if (dungeon->num_active_creatrs != 0)
     {
-        if (is_my_player(player))
-        {
+        output_player_message(player->id_number, SMsg_SpecTransfer, MESSAGE_DURATION_SPECIAL);
+        if (is_my_player(player)) {
             dungeon_special_selected = thing->index;
             transfer_creature_scroll_offset = 0;
-            output_message(SMsg_SpecTransfer, MESSAGE_DURATION_SPECIAL);
             turn_off_menu(GMnu_DUNGEON_SPECIAL);
             turn_on_menu(GMnu_TRANSFER_CREATURE);
         }
-  }
+    }
 }
 
 void start_resurrect_creature(struct PlayerInfo *player, struct Thing *thing)
@@ -737,11 +750,10 @@ void start_resurrect_creature(struct PlayerInfo *player, struct Thing *thing)
     struct Dungeon* dungeon = get_dungeon(player->id_number);
     if (dungeon->dead_creatures_count != 0)
     {
-        if (is_my_player(player))
-        {
+        output_player_message(player->id_number, SMsg_SpecResurrect, MESSAGE_DURATION_SPECIAL);
+        if (is_my_player(player)) {
           dungeon_special_selected = thing->index;
           resurrect_creature_scroll_offset = 0;
-          output_message(SMsg_SpecResurrect, MESSAGE_DURATION_SPECIAL);
           turn_off_menu(GMnu_DUNGEON_SPECIAL);
           turn_on_menu(GMnu_RESURRECT_CREATURE);
         }

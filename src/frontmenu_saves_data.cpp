@@ -30,6 +30,7 @@
 #include "gui_draw.h"
 #include "frontend.h"
 #include "frontmenu_saves.h"
+#include "gui_vscroll.h"
 #include "config_settings.h"
 #include "frontmenu_options.h"
 #include "game_legacy.h"
@@ -49,20 +50,22 @@ struct GuiButtonInit load_menu_buttons[] = {
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 1, gui_load_game,      NULL,        NULL,               5, 999, 218, 999, 218,300, 32, draw_load_button,                  1, GUIStr_Empty,  0,{.str = input_string[5]}, 0, gui_load_game_maintain },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 1, gui_load_game,      NULL,        NULL,               6, 999, 250, 999, 250,300, 32, draw_load_button,                  1, GUIStr_Empty,  0,{.str = input_string[6]}, 0, gui_load_game_maintain },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 1, gui_load_game,      NULL,        NULL,               7, 999, 282, 999, 282,300, 32, draw_load_button,                  1, GUIStr_Empty,  0,{.str = input_string[7]}, 0, gui_load_game_maintain },
+  { LbBtnT_HoldableBtn,BID_DEFAULT, 0, 0, gui_vscroll_input,  NULL,        NULL,               0, 368,  58, 368,  58, 33,254, gui_vscroll_draw,                  0, GUIStr_Empty,  0,{0},                      0, gui_vscroll_maintain },
   {-1,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,               0,   0,   0,   0,   0,  0,  0, NULL,                              0,   0,           0,       {0},               0, NULL },
 };
 
 struct GuiButtonInit save_menu_buttons[] = {
-  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,               0, 999,  10, 999,  10,155, 32, gui_area_text,                     1, GUIStr_MnuSave,0,       {0},               0, NULL },
-  { 5, -2,-1, 1, gui_save_game,      NULL,        NULL,               0, 999,  58, 999,  58,300, 32, gui_area_text,                     1, GUIStr_Empty,  0,{.str = input_string[0]},SAVE_TEXTNAME_LEN, NULL },
-  { 5, -2,-1, 1, gui_save_game,      NULL,        NULL,               1, 999,  90, 999,  90,300, 32, gui_area_text,                     1, GUIStr_Empty,  0,{.str = input_string[1]},SAVE_TEXTNAME_LEN, NULL },
-  { 5, -2,-1, 1, gui_save_game,      NULL,        NULL,               2, 999, 122, 999, 122,300, 32, gui_area_text,                     1, GUIStr_Empty,  0,{.str = input_string[2]},SAVE_TEXTNAME_LEN, NULL },
-  { 5, -2,-1, 1, gui_save_game,      NULL,        NULL,               3, 999, 154, 999, 154,300, 32, gui_area_text,                     1, GUIStr_Empty,  0,{.str = input_string[3]},SAVE_TEXTNAME_LEN, NULL },
-  { 5, -2,-1, 1, gui_save_game,      NULL,        NULL,               4, 999, 186, 999, 186,300, 32, gui_area_text,                     1, GUIStr_Empty,  0,{.str = input_string[4]},SAVE_TEXTNAME_LEN, NULL },
-  { 5, -2,-1, 1, gui_save_game,      NULL,        NULL,               5, 999, 218, 999, 218,300, 32, gui_area_text,                     1, GUIStr_Empty,  0,{.str = input_string[5]},SAVE_TEXTNAME_LEN, NULL },
-  { 5, -2,-1, 1, gui_save_game,      NULL,        NULL,               6, 999, 250, 999, 250,300, 32, gui_area_text,                     1, GUIStr_Empty,  0,{.str = input_string[6]},SAVE_TEXTNAME_LEN, NULL },
-  { 5, -2,-1, 1, gui_save_game,      NULL,        NULL,               7, 999, 282, 999, 282,300, 32, gui_area_text,                     1, GUIStr_Empty,  0,{.str = input_string[7]},SAVE_TEXTNAME_LEN, NULL },
-  {-1,  0, 0, 0, NULL,               NULL,        NULL,               0,   0,   0,   0,   0,  0,  0, NULL,                              0,   0,           0,       {0},               0, NULL },
+  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,              NULL, NULL,  0, 999,  10, 999,  10,155, 32, gui_area_text,    1, GUIStr_MnuSave,0,       {0},               0, NULL },
+  { 5,                 -2,         -1, 3, gui_save_game,     NULL, NULL,  0, 999,  58, 999,  58,300, 32, gui_area_text,    1, GUIStr_Empty,  0,{.str = input_string[0]},SAVE_TEXTNAME_LEN, NULL },
+  { 5,                 -2,         -1, 3, gui_save_game,     NULL, NULL,  1, 999,  90, 999,  90,300, 32, gui_area_text,    1, GUIStr_Empty,  0,{.str = input_string[1]},SAVE_TEXTNAME_LEN, NULL },
+  { 5,                 -2,         -1, 3, gui_save_game,     NULL, NULL,  2, 999, 122, 999, 122,300, 32, gui_area_text,    1, GUIStr_Empty,  0,{.str = input_string[2]},SAVE_TEXTNAME_LEN, NULL },
+  { 5,                 -2,         -1, 3, gui_save_game,     NULL, NULL,  3, 999, 154, 999, 154,300, 32, gui_area_text,    1, GUIStr_Empty,  0,{.str = input_string[3]},SAVE_TEXTNAME_LEN, NULL },
+  { 5,                 -2,         -1, 3, gui_save_game,     NULL, NULL,  4, 999, 186, 999, 186,300, 32, gui_area_text,    1, GUIStr_Empty,  0,{.str = input_string[4]},SAVE_TEXTNAME_LEN, NULL },
+  { 5,                 -2,         -1, 3, gui_save_game,     NULL, NULL,  5, 999, 218, 999, 218,300, 32, gui_area_text,    1, GUIStr_Empty,  0,{.str = input_string[5]},SAVE_TEXTNAME_LEN, NULL },
+  { 5,                 -2,         -1, 3, gui_save_game,     NULL, NULL,  6, 999, 250, 999, 250,300, 32, gui_area_text,    1, GUIStr_Empty,  0,{.str = input_string[6]},SAVE_TEXTNAME_LEN, NULL },
+  { 5,                 -2,         -1, 3, gui_save_game,     NULL, NULL,  7, 999, 282, 999, 282,300, 32, gui_area_text,    1, GUIStr_Empty,  0,{.str = input_string[7]},SAVE_TEXTNAME_LEN, NULL },
+  { LbBtnT_HoldableBtn,BID_DEFAULT, 0, 0, gui_vscroll_input, NULL, NULL,  0, 368,  58, 368,  58, 33,254, gui_vscroll_draw, 0, GUIStr_Empty,  0,{0},                     0,                 gui_vscroll_maintain },
+  {-1,                 0,           0, 0, NULL,              NULL, NULL,  0,   0,   0,   0,   0,  0,  0, NULL,             0, 0,             0,{0},                     0,                 NULL },
 };
 
 struct GuiButtonInit frontend_load_menu_buttons[] = {
@@ -71,7 +74,7 @@ struct GuiButtonInit frontend_load_menu_buttons[] = {
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,               0,  82, 150,  82, 150,450,182, frontend_draw_scroll_box,          0, GUIStr_Empty,  0,      {26},            0, NULL },
   { LbBtnT_HoldableBtn,BID_DEFAULT, 0, 0, frontend_load_game_up,NULL,frontend_over_button,     0, 532, 149, 532, 149, 26, 14, frontend_draw_slider_button,       0, GUIStr_Empty,  0,      {17},            0, frontend_load_game_up_maintain },
   { LbBtnT_HoldableBtn,BID_DEFAULT, 0, 0, frontend_load_game_down,NULL,frontend_over_button,   0, 532, 317, 532, 317, 26, 14, frontend_draw_slider_button,       0, GUIStr_Empty,  0,      {18},            0, frontend_load_game_down_maintain },
-  { LbBtnT_HoldableBtn,BID_DEFAULT, 0, 0, frontend_load_game_scroll,NULL,  NULL,               0, 536, 163, 534, 163, 20,154, frontend_draw_games_scroll_tab,    0, GUIStr_Empty,  0,      {40},            0, NULL },
+  { LbBtnT_DraggableBtn,BID_DEFAULT, 0, 0, frontend_load_game_scroll,NULL,  NULL,               0, 536, 163, 534, 163, 20,154, frontend_draw_games_scroll_tab,    0, GUIStr_Empty,  0,      {40},            0, NULL },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,        NULL,               0, 102, 125, 102, 125,220, 26, frontend_draw_text,                0, GUIStr_Empty,  0,      {30},            0, NULL },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontend_load_game,NULL,frontend_over_button,        0,  95, 157,  95, 157,424, 22, frontend_draw_load_game_button,    0, GUIStr_Empty,  0,      {45},            0, frontend_load_game_maintain },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontend_load_game,NULL,frontend_over_button,        0,  95, 185,  95, 185,424, 22, frontend_draw_load_game_button,    0, GUIStr_Empty,  0,      {46},            0, frontend_load_game_maintain },

@@ -51,9 +51,9 @@ extern "C" {
 struct Thing *create_creature_at_entrance(struct Room * room, ThingModel crkind)
 {
     struct Coord3d pos;
-    pos.x.val = room->central_stl_x;
-    pos.y.val = room->central_stl_y;
-    pos.z.val = subtile_coord(1,0);
+    pos.x.val = subtile_coord_center(room->central_stl_x);
+    pos.y.val = subtile_coord_center(room->central_stl_y);
+    pos.z.val = get_floor_height_at(&pos);
     struct Thing* creatng = create_creature(&pos, crkind, room->owner);
     if (thing_is_invalid(creatng)) {
         ERRORLOG("Cannot create creature %s for player %d entrance",creature_code_name(crkind),(int)room->owner);
@@ -68,12 +68,6 @@ struct Thing *create_creature_at_entrance(struct Room * room, ThingModel crkind)
         }
     }
     mark_creature_joined_dungeon(creatng);
-    if (!find_random_valid_position_for_thing_in_room(creatng, room, &pos)) {
-        ERRORLOG("Cannot find a valid place in player %d entrance to create creature %s",(int)room->owner,creature_code_name(crkind));
-        delete_thing_structure(creatng, 0);
-        return INVALID_THING;
-    }
-    move_thing_in_map(creatng, &pos);
     if (room->owner != game.neutral_player_num)
     {
         dungeon->lvstats.creatures_attracted++;
@@ -345,9 +339,7 @@ void generate_creature_for_dungeon(struct Dungeon * dungeon)
         if ((long)crconf->pay > dungeon->total_money_owned)
         {
             SYNCDBG(8,"The %s will not come as player %d has less than %d gold",creature_code_name(crmodel),(int)dungeon->owner,(int)crconf->pay);
-            if (is_my_player_number(dungeon->owner)) {
-                output_message(SMsg_GoldLow, MESSAGE_DURATION_TREASURY);
-            }
+            output_player_message(dungeon->owner, SMsg_GoldLow, MESSAGE_DURATION_TREASURY);
         }
         else if (lair_space >= 0)
         {
@@ -401,7 +393,7 @@ void process_entrance_generation(void)
             if (generation_due_for_dungeon(dungeon))
             {
                 due = true;
-                if ((plyr->is_active) && (plyr->victory_state != VicS_LostLevel) )
+                if (is_active_keeper(plyr) && (plyr->victory_state != VicS_LostLevel) )
                 {
                     if (generation_available_to_dungeon(dungeon)) {
                         generate_creature_for_dungeon(dungeon);

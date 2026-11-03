@@ -30,13 +30,16 @@
 #include "map_utils.h"
 #include "engine_camera.h"
 #include "local_camera.h"
+#include "local_possession.h"
 #include "gui_soundmsgs.h"
+#include "player_data.h"
 #include "gui_topmsg.h"
 #include "front_landview.h"
 #include "frontmenu_ingame_evnt.h"
 #include "thing_data.h"
 #include "thing_list.h"
 #include "thing_navigate.h"
+#include "thing_physics.h"
 #include "config_creature.h"
 #include "config_terrain.h"
 #include "config_keeperfx.h"
@@ -111,6 +114,14 @@ void thing_play_sample(struct Thing *thing, SoundSmplTblID smptbl_idx, SoundPitc
     }
 }
 
+void play_player_sample(PlayerNumber plyr_idx, SoundSmplTblID smptbl_idx)
+{
+    if (!is_my_player_number(plyr_idx)) {
+        return;
+    }
+    play_non_3d_sample(smptbl_idx);
+}
+
 void play_sound_if_close_to_receiver(struct Coord3d *soundpos, SoundSmplTblID smptbl_idx)
 {
     if (SoundDisabled)
@@ -127,11 +138,35 @@ void play_sound_if_close_to_receiver(struct Coord3d *soundpos, SoundSmplTblID sm
     }
 }
 
+void play_creature_footstep(struct Thing *thing, SoundVolume loudness)
+{
+    struct CreatureSound* crsound = get_creature_sound(thing, CrSnd_Foot);
+    if ((crsound->index == 0) || flag_is_set(get_creature_model_flags(thing), CMF_IsSpectator)) {
+        return;
+    }
+    struct CreatureControl* cctrl = creature_control_get_from_thing(thing);
+    const int smpl_variant = foot_down_sound_sample_variant[4 * cctrl->footstep_variant + cctrl->footstep_counter];
+    SoundSmplTblID smpl_idx;
+    if (flag_is_set(thing->movement_flags, TMvF_IsOnSnow)) {
+        smpl_idx = snd_foot_snow + smpl_variant;
+    } else {
+        smpl_idx = creature_sound_unified_id(crsound, smpl_variant);
+    }
+    cctrl->footstep_counter++;
+    if (cctrl->footstep_counter >= 4) {
+        cctrl->footstep_variant = UNSYNC_RANDOM(4);
+        cctrl->footstep_counter = 0;
+    }
+    const struct CreatureModelConfig* crconf = creature_stats_get(thing->model);
+    thing_play_sample(thing, smpl_idx, crconf->footstep_pitch, 0, 3, 3, 1, loudness);
+    if (flag_is_set(thing->movement_flags, TMvF_IsOnWater)) {
+        thing_play_sample(thing, snd_foot_wet + SOUND_RANDOM(snd_foot_wet_count), 90 + SOUND_RANDOM(20), 0, 3, 3, 1, FULL_LOUDNESS);
+    }
+}
+
 void play_thing_walking(struct Thing *thing)
 {
-    struct PlayerInfo* myplyr = get_my_player();
-    struct Camera* cam = get_local_camera(get_player_active_camera(myplyr));
-    struct CreatureModelConfig* crconf;
+    struct Camera* cam = get_local_active_camera();
     { // Skip the thing if its distance to camera is too big
         MapSubtlDelta dist_x = coord_subtile(abs(cam->mappos.x.val - (MapCoordDelta)thing->mappos.x.val));
         MapSubtlDelta dist_y = coord_subtile(abs(cam->mappos.y.val - (MapCoordDelta)thing->mappos.y.val));
@@ -145,8 +180,8 @@ void play_thing_walking(struct Thing *thing)
         // Spectators don't do sounds
         return;
     }
-    long loudness = (myplyr->view_mode == PVM_CreatureView) ? (FULL_LOUDNESS) : (FULL_LOUDNESS / 5);
-    if (((thing->movement_flags & TMvF_Flying) != 0) && (thing->floor_height < (int)thing->mappos.z.val))
+    long loudness = ((get_user_view_type(get_my_user()) == PVT_CreatureContrl) || (get_user_view_type(get_my_user()) == PVT_CreaturePasngr)) ? (FULL_LOUDNESS) : (FULL_LOUDNESS / 5);
+    if (((thing->movement_flags & TMvF_Flying) != 0) && !thing_touching_floor(thing))
     {
         // Flying diptera has a buzzing noise sound
         if (get_creature_model_flags(thing) & CMF_IsDiptera)
@@ -163,27 +198,8 @@ void play_thing_walking(struct Thing *thing)
             S3DDeleteSampleFromEmitter(thing->snd_emitter_id, snd_insect_fly);
         }
         struct CreatureControl* cctrl = creature_control_get_from_thing(thing);
-        if ((cctrl->distance_to_destination) && get_foot_creature_has_down(thing))
-        {
-            int smpl_variant = foot_down_sound_sample_variant[4 * cctrl->footstep_variant + cctrl->footstep_counter];
-            long smpl_idx;
-            if ((thing->movement_flags & TMvF_IsOnSnow) != 0) {
-                smpl_idx = snd_foot_snow + smpl_variant;
-            } else {
-                struct CreatureSound* crsound = get_creature_sound(thing, CrSnd_Foot);
-                smpl_idx = (long)creature_sound_unified_id(crsound, smpl_variant);
-            }
-            cctrl->footstep_counter++;
-            if (cctrl->footstep_counter >= 4)
-            {
-                cctrl->footstep_variant = UNSYNC_RANDOM(4);
-                cctrl->footstep_counter = 0;
-            }
-            crconf = creature_stats_get(thing->model);
-            thing_play_sample(thing, smpl_idx, crconf->footstep_pitch, 0, 3, 3, 1, loudness);
-            if ((thing->movement_flags & TMvF_IsOnWater) != 0) {
-                thing_play_sample(thing, snd_foot_wet + SOUND_RANDOM(snd_foot_wet_count), 90 + SOUND_RANDOM(20), 0, 3, 3, 1, FULL_LOUDNESS);
-            }
+        if (thing_touching_floor(thing) && (cctrl->distance_to_destination != 0) && (get_foot_creature_has_down(thing, cctrl) != 0) && !local_possession_sounded_footstep(thing)) {
+            play_creature_footstep(thing, loudness);
         }
     }
 }
@@ -235,7 +251,7 @@ void find_nearest_rooms_for_ambient_sound(void)
     if ((SoundDisabled) || (GetCurrentSoundMasterVolume() <= 0))
         return;
     struct PlayerInfo* player = get_my_player();
-    struct Camera* cam = get_local_camera(get_player_active_camera(player));
+    struct Camera* cam = get_local_active_camera();
     if (cam == NULL || LbIsFrozenOrPaused())
     {
         if (cam == NULL)
@@ -277,7 +293,7 @@ void find_nearest_rooms_for_ambient_sound(void)
 TbBool update_3d_sound_receiver(struct PlayerInfo* player)
 {
     SYNCDBG(7, "Starting");
-    struct Camera* cam = get_local_camera(get_player_active_camera(player));
+    struct Camera* cam = get_local_active_camera();
     if (cam == NULL)
         return false;
     S3DSetSoundReceiverPosition(cam->mappos.x.val, cam->mappos.y.val, cam->mappos.z.val);
@@ -385,7 +401,7 @@ void update_player_sounds(void)
 
     // Music and sound control
     if ( !SoundDisabled ) {
-        if ( (game.turns_fastforward == 0) && (!game.packet_loading_in_progress) ) {
+        if ( (replay.turns_fastforward == 0) && (!replay.loading_in_progress) ) {
             MonitorStreamedSoundTrack();
         }
     }

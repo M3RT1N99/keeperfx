@@ -23,7 +23,7 @@
 #include "bflib_sound.h"
 #include "globals.h"
 
-#include <SDL2/SDL_mixer.h>
+#include <SDL3_mixer/SDL_mixer.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,7 +31,6 @@ extern "C" {
 
 #define FULL_LOUDNESS 256
 #define NORMAL_PITCH 100
-#define MIX_SPEECH_CHANNEL 0
 
 /******************************************************************************/
 #pragma pack(1)
@@ -75,8 +74,10 @@ void update_player_sounds(void);
 void process_3d_sounds(void);
 
 void thing_play_sample(struct Thing *, SoundSmplTblID, SoundPitch, char repeats, unsigned char ctype, unsigned char flags, long priority, SoundVolume);
+void play_player_sample(PlayerNumber plyr_idx, SoundSmplTblID smptbl_idx);
 void play_sound_if_close_to_receiver(struct Coord3d*, SoundSmplTblID);
 void stop_thing_playing_sample(struct Thing *, SoundSmplTblID smpl_idx);
+void play_creature_footstep(struct Thing *thing, SoundVolume loudness);
 void play_thing_walking(struct Thing *thing);
 
 TbBool ambient_sound_prepare(void);
@@ -92,6 +93,7 @@ void ShutDownSDLAudio();
 TbBool play_streamed_sample(const char * fname, SoundVolume);
 void set_streamed_sample_volume(SoundVolume);
 void stop_streamed_samples();
+TbBool is_streamed_sample_playing(void);
 /******************************************************************************/
 #ifdef __cplusplus
 }

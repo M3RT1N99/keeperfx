@@ -26,6 +26,11 @@
 extern "C" {
 #endif
 /******************************************************************************/
+// These structs hold pointers in static tables, which must stay aligned on arm64.
+#ifndef __ANDROID__
+#pragma pack(1)
+#endif
+
 struct TbLoadFiles;
 
 typedef const char * ModifyDataLoadFnameFunc(const char *);
@@ -49,7 +54,9 @@ struct TbLoadFilesV2 {
     LoadFilesGetSizeFunc GetSizeFunc;
     LoadFilesUnpackFunc UnpackFunc;
 };
-/*****************************************************************************/
+
+#pragma pack()
+/******************************************************************************/
 const char * defaultModifyDataLoadFilename(const char *);
 ModifyDataLoadFnameFunc *LbDataLoadSetModifyFilenameFunction(ModifyDataLoadFnameFunc *newfunc);
 extern ModifyDataLoadFnameFunc *modify_data_load_filename_function;

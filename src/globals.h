@@ -31,7 +31,7 @@
 #include <time.h>
 #include <assert.h>
 
-#if (defined(unix) || defined(__unix__) || defined(__APPLE__) || defined(__ANDROID__)) && !defined(GO32)
+#if (defined(unix) || defined(__ANDROID__)) && !defined(GO32)
 #include <unistd.h>
 #include <signal.h>
 #include <strings.h>
@@ -65,12 +65,13 @@
 #include <algorithm>
 using std::min;
 using std::max;
+using std::clamp;
 extern "C" {
 #endif
 
 // Basic Definitions
 
-#if (defined(unix) || defined(__unix__) || defined(__APPLE__)) && !defined (GO32)
+#if defined(unix) && !defined (GO32)
 #define SEPARATOR "/"
 #else
 #define SEPARATOR "\\"
@@ -338,15 +339,15 @@ struct Coord2d {
     union { // x position
       int32_t val; /**< x.val - coord x position (relative to whole map) */
       struct { // subtile
-        uint8_t pos; /**< x.stl.pos - coord x position (relative to subtile) */
-        uint16_t num; /**< x.stl.num - subtile x position (relative to whole map) */
+        uint32_t pos : 8; /**< x.stl.pos - coord x position (relative to subtile) */
+        uint32_t num : 24; /**< x.stl.num - subtile x position (relative to whole map) */
         } stl;
     } x;
     union { // y position
       int32_t val; /**< y.val - coord y position (relative to whole map) */
       struct { // subtile
-        uint8_t pos; /**< y.stl.pos - coord y position (relative to subtile) */
-        uint16_t num; /**< y.stl.num - subtile y position (relative to whole map) */
+        uint32_t pos : 8; /**< y.stl.pos - coord y position (relative to subtile) */
+        uint32_t num : 24; /**< y.stl.num - subtile y position (relative to whole map) */
         } stl;
     } y;
 };
@@ -363,22 +364,22 @@ struct Coord3d {
     union { // x position
       int32_t val; /**< x.val - coord x position (relative to whole map) */
       struct { // subtile
-        uint8_t pos; /**< x.stl.pos - coord x position (relative to subtile) */
-        uint16_t num; /**< x.stl.num - subtile x position (relative to whole map) */
+        uint32_t pos : 8; /**< x.stl.pos - coord x position (relative to subtile) */
+        uint32_t num : 24; /**< x.stl.num - subtile x position (relative to whole map) */
         } stl;
     } x;
     union { // y position
       int32_t val; /**< y.val - coord y position (relative to whole map) */
       struct { // subtile
-        uint8_t pos; // y.stl.pos - coord y position (relative to subtile) */
-        uint16_t num; // y.stl.num - subtile y position (relative to whole map) */
+        uint32_t pos : 8; // y.stl.pos - coord y position (relative to subtile) */
+        uint32_t num : 24; // y.stl.num - subtile y position (relative to whole map) */
         } stl;
     } y;
     union { // z position
       int32_t val; /**< z.val - coord z position (relative to whole map) */
       struct { // subtile
-        uint8_t pos; /**< z.stl.pos - coord z position (relative to subtile) */
-        uint16_t num; /**< z.stl.num - subtile z position (relative to whole map) */
+        uint32_t pos : 8; /**< z.stl.pos - coord z position (relative to subtile) */
+        uint32_t num : 24; /**< z.stl.num - subtile z position (relative to whole map) */
         } stl;
     } z;
 };
@@ -387,22 +388,22 @@ struct CoordDelta3d {
     union {
       int32_t val;
       struct {
-        uint8_t pos;
-        int16_t num;
+        uint32_t pos : 8;
+        int32_t num : 24;
         } stl;
     } x;
     union {
       int32_t val;
       struct {
-        uint8_t pos;
-        int16_t num;
+        uint32_t pos : 8;
+        int32_t num : 24;
         } stl;
     } y;
     union {
       int32_t val;
       struct {
-        uint8_t pos;
-        int16_t num;
+        uint32_t pos : 8;
+        int32_t num : 24;
         } stl;
     } z;
 };

@@ -100,6 +100,7 @@ enum WlbType {
     WlbT_Lava   = 1,
     WlbT_Water  = 2,
     WlbT_Bridge = 3,
+    WlbT_Abyss  = 4,
 };
 
 /******************************************************************************/
@@ -131,6 +132,7 @@ struct SlabObj {
   ThingClass class_id;
   ThingModel model; //for lights this is intencity
   unsigned char range; //radius for lights / range for effect generators
+  short orientation;
 };
 
 #pragma pack()
@@ -171,6 +173,7 @@ TbBool can_build_room_at_slab(PlayerNumber plyr_idx, RoomKind rkind,
 
 TbBool can_build_room_at_slab_fast(PlayerNumber plyr_idx, RoomKind rkind,
     MapSlabCoord slb_x, MapSlabCoord slb_y);
+TbBool room_can_build_on_bridge_slab(RoomKind rkind, SlabKind slbkind);
 
 int check_room_at_slab_loose(PlayerNumber plyr_idx, RoomKind rkind,
     MapSlabCoord slb_x, MapSlabCoord slb_y, int looseness);
@@ -188,7 +191,7 @@ void do_unprettying(PlayerNumber plyr_idx, MapSlabCoord slb_x, MapSlabCoord slb_
 
 TbBool slab_kind_has_no_ownership(SlabKind slbkind);
 
-TbBool players_land_by_slab_kind(PlayerNumber plyr_idx, MapSlabCoord slb_x, MapSlabCoord slb_y,SlabKind slbkind);
+TbBool players_land_by_bridgeable_slab(PlayerNumber plyr_idx, MapSlabCoord slb_x, MapSlabCoord slb_y);
 TbBool slab_by_players_land(PlayerNumber plyr_idx, MapSlabCoord slb_x, MapSlabCoord slb_y);
 TbBool player_can_claim_slab(PlayerNumber plyr_idx, MapSlabCoord slb_x, MapSlabCoord slb_y);
 SlabKind choose_rock_type(PlayerNumber plyr_idx, MapSlabCoord slb_x, MapSlabCoord slb_y);

@@ -17,70 +17,49 @@
  */
 /******************************************************************************/
 #include "pre_inc.h"
+#include "kfx/renderer/RendererManager.h"
 #include "scrcapt.h"
 #include "bflib_basics.h"
+#include "bflib_datetm.h"
 #include "bflib_fileio.h"
 #include "bflib_dernc.h"
 #include "bflib_fmvids.h"
 #include "bflib_video.h"
 #include "bflib_sprite.h"
 #include "bflib_sprfnt.h"
-#include "bflib_vidsurface.h"
 #include "globals.h"
 
 #include "gui_topmsg.h"
 #include "game_legacy.h"
 #include "frontend.h"
 #include "config.h"
+#include "config_strings.h"
 
 #include <string.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
 #include <ctype.h>
 #include "post_inc.h"
 /******************************************************************************/
 
 unsigned char screenshot_format = 1;
 unsigned char cap_palette[768];
+static TbClockMSec movie_record_started_at;
 
 /******************************************************************************/
 TbBool take_screenshot(char *fname)
 {
-    TbBool lock_mem = LbScreenIsLocked();
-    if (!lock_mem)
+    TbBool frame_open = RendererIsFrameOpen();
+    if (!frame_open)
     {
-        if (LbScreenLock() != Lb_SUCCESS)
+        if (!RendererBeginFrame())
         {
             ERRORLOG("Can't lock canvas");
             return false;
         }
     }
-    TbBool success;
-    switch (screenshot_format)
+    TbBool success = RendererScheduleScreenshot(fname, screenshot_format);
+    if (!frame_open)
     {
-        case 1:
-        {
-            success = (IMG_SavePNG(lbDrawSurface, fname) == 0);
-            break;
-        }
-        case 2:
-        {
-            success = (SDL_SaveBMP(lbDrawSurface, fname) == 0);
-            break;
-        }
-        default:
-        {
-            success = false;
-            break;
-        }
-    }
-    if (!success)
-    {
-        ERRORLOG("Unable to save to file %s: %s", fname, SDL_GetError());
-    }
-    if (!lock_mem)
-    {
-        LbScreenUnlock();
+        RendererEndFrame();
     }
     return success;
 }
@@ -124,35 +103,83 @@ TbBool cumulative_screen_shot(void)
     return ret;
 }
 
+static int movie_message_scale(void)
+{
+    if (dbc_initialized && dbc_enabled)
+        return scale_value_by_horizontal_resolution((MyScreenWidth >= 640) ? 16 : 32);
+    return scale_ui_value_lofi(16);
+}
+
+static void show_movie_onscreen_msg(TextStringId stridx)
+{
+    // The message timer only advances while gameplay is drawing.
+    if ((game.game_kind != GKind_LocalGame) && (game.game_kind != GKind_MultiGame))
+        return;
+    const char *text = get_string(stridx);
+    if ((text == NULL) || (text[0] == '\0'))
+        return;
+    show_onscreen_msg(2 * turns_per_second, "%s", text);
+}
+
+static void draw_movie_recording_indicator(void)
+{
+    if ((local_system_flags & GSF_CaptureMovie) == 0)
+        return;
+    if (!RendererIsFrameOpen())
+        return;
+    const char *text = get_string(GUIStr_RecMovie);
+    if ((text == NULL) || (text[0] == '\0'))
+        return;
+    TbClockMSec elapsed_ms = LbTimerClock() - movie_record_started_at;
+    long secs = (long)(elapsed_ms / 1000);
+    if (secs < 0)
+        secs = 0;
+    char line[255];
+    snprintf(line, sizeof(line), "%s  %ld:%02ld", text, secs / 60, secs % 60);
+    LbTextSetFont(winfont);
+    LbTextSetWindow(0, 0, MyScreenWidth, MyScreenHeight);
+    RendererSetDrawFlags(Lb_TEXT_HALIGN_LEFT);
+    LbTextDrawResized(scale_value_by_horizontal_resolution(160), 0, movie_message_scale(), line);
+}
+
 TbBool movie_record_start(void)
 {
   if ( anim_record() )
   {
-      set_flag(game.system_flags, GSF_CaptureMovie);
+      set_flag(local_system_flags, GSF_CaptureMovie);
+      movie_record_started_at = LbTimerClock();
+      show_movie_onscreen_msg(GUIStr_RecMovie);
       return true;
   }
+  show_movie_onscreen_msg(GUIStr_RecMovieFail);
   return false;
 }
 
 TbBool movie_record_stop(void)
 {
-    clear_flag(game.system_flags, GSF_CaptureMovie);
+    clear_flag(local_system_flags, GSF_CaptureMovie);
     anim_stop();
+    show_movie_onscreen_msg(GUIStr_RecMovieDone);
     return true;
 }
 
 TbBool movie_record_frame(void)
 {
-    short lock_mem = LbScreenIsLocked();
-    if (!lock_mem)
+    TbBool frame_open = RendererIsFrameOpen();
+    if (!frame_open)
     {
-        if (LbScreenLock() != Lb_SUCCESS)
+        if (!RendererBeginFrame())
             return false;
   }
-  LbPaletteGet(cap_palette);
-  short result = anim_record_frame(lbDisplay.WScreen, cap_palette);
-  if (!lock_mem)
-    LbScreenUnlock();
+  RendererPaletteGet(cap_palette);
+  // anim_record_frame() reads raw pixels straight from lbDisplay.WScreen --
+  // only ever valid for backends without a GPU render path (RendererBeginFrame()
+  // only locks the CPU framebuffer for those). GL genuinely has no CPU
+  // surface to read back here yet (needs its own glReadPixels()-based
+  // capture path, not yet built).
+  short result = (lbDisplay.WScreen != NULL) ? anim_record_frame(lbDisplay.WScreen, cap_palette) : false;
+  if (!frame_open)
+    RendererEndFrame();
   return result;
 }
 
@@ -163,21 +190,17 @@ TbBool movie_record_frame(void)
 TbBool perform_any_screen_capturing(void)
 {
     TbBool captured=0;
-    if ((game.system_flags & GSF_CaptureSShot) != 0)
+    if ((local_system_flags & GSF_CaptureSShot) != 0)
     {
       captured |= cumulative_screen_shot();
-      clear_flag(game.system_flags, GSF_CaptureSShot);
+      clear_flag(local_system_flags, GSF_CaptureSShot);
     }
-    if ((game.system_flags & GSF_CaptureMovie) != 0)
+    if ((local_system_flags & GSF_CaptureMovie) != 0)
     {
       captured |= movie_record_frame();
     }
-    // Draw a text with bitmap font
-    if (captured) {
-        //Set font; if winfont isn't loaded, it should be NULL, so text will just be invisible
-        LbTextSetFont(winfont);
-        LbTextDraw(600*units_per_pixel/16, 4*units_per_pixel/16, "REC");
-    }
+    // Drawn after the frame is stored, so the warning stays on screen and out of the movie.
+    draw_movie_recording_indicator();
     return captured;
 }
 

@@ -469,11 +469,59 @@ enum GUIStrings {
     GUIStr_NetCustomSpriteMismatch,
     GUIStr_NetAiTookOver,
     GUIStr_NetPlayerLeftGame,
-    GUIStr_NetPlayerDisconnected,
-    GUIStr_NetUnused,
-    GUIStr_NetHostConnectionLost,
+    GUIStr_NetUnused1,
+    GUIStr_NetUnused2,
+    GUIStr_NetUnused3,
     GUIStr_FxdataZipNotLoaded,
     GUIStr_FxdataZipInstallAsMod,
+    GUIStr_NetLobbyConnectionLost,
+    GUIStr_NetOutOfSync,
+    GUIStr_MnuCampaign,
+    GUIStr_MnuContinueCampaign,
+    GUIStr_NetState,
+    GUIStr_NetVersion,
+    GUIStr_NetUnknown,
+    GUIStr_NetInLobby,
+    GUIStr_NetInGame,
+    GUIStr_NetInLandview,
+    GUIStr_NetPlayerListUnavailable,
+    GUIStr_NetMaximumPlayers,
+    GUIStr_NetOpenToSpectators,
+    GUIStr_NetSettings,
+    GUIStr_NetConfirm,
+    GUIStr_NetGameStarted,
+    GUIStr_NetJoiningLocked,
+    GUIStr_NetLobbyFull,
+    GUIStr_NetDifferentVersion,
+    GUIStr_NetLobbyName,
+    GUIStr_FastForward,
+    GUIStr_FastForwardNormal,
+    GUIStr_NetLoading,
+    GUIStr_NetShowSpectatorChat,
+    GUIStr_NetSpectatorGameNotRunning,
+    GUIStr_NetSpectatorsDisabled,
+    GUIStr_NetSpectatorsFull,
+    GUIStr_NetSpectatorChatDisabled,
+    GUIStr_NetYouAreSpectating,
+    GUIStr_NetSpectatorJoined,
+    GUIStr_NetSpectatorLeft,
+    GUIStr_NetMissingMapPack,
+    GUIStr_NetMapPackMissingLevel,
+    GUIStr_SaveIncompatible,
+    GUIStr_SaveDamaged,
+    GUIStr_SaveLoadFailed,
+    GUIStr_NetSpectatorDesynced,
+    GUIStr_NetPlayerTimedOut,
+    GUIStr_NetPlayerBecameSpectator,
+    GUIStr_NetTeam,
+    GUIStr_NetPing,
+    GUIStr_NetFillEmptySlots,
+    GUIStr_NetAllowCheats,
+    GUIStr_NetAllowAssistant,
+    GUIStr_NetSpectatorBecamePlayer,
+    GUIStr_ClickToUnpause,
+    GUIStr_NetWaitingOnUser,
+    GUIStr_NetConnectionUnstable,
     GuiStrEnd
 };
 
@@ -536,10 +584,12 @@ TbBool setup_gui_strings_data(void);
 TbBool free_gui_strings_data(void);
 TbBool reset_strings(char **strings, int max);
 const char * get_string(TextStringId stridx);
+const char * get_on_off_string(TbBool value);
 TbBool setup_campaign_strings_data(struct GameCampaign *campgn);
 TbBool fill_strings_list(char **strings,char *strings_data,char *strings_data_end, int max);
 unsigned long count_strings(char *strings, int size);
 const char * cmpgn_string(unsigned int index);
+TbBool string_idx_is_empty(TextStringId stridx);
 /******************************************************************************/
 #ifdef __cplusplus
 }

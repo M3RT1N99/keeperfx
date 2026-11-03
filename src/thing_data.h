@@ -61,12 +61,14 @@ enum ThingFlags1 {
     TF1_PushOnce       = 0x08,
     TF1_DoFootsteps    = 0x10,
     TF1_Teleported     = 0x20,
+    TF1_FallingIntoAbyss = 0x40,
 };
 
 enum ThingFlags2 {
     TF2_CreatureIsMoving              = 0x01,
     TF2_Spectator           = 0x02,
     TF2_SummonedCreature    = 0x04,
+    TF2_CreatureOutOfPlay   = 0x08,
 };
 
 enum ThingRenderingFlags {
@@ -83,7 +85,6 @@ enum ThingRenderingFlags {
     TRF_Transpar_Flags = 0x30,
 
     TRF_AnimateOnce    = 0x40,
-    TRF_BeingHit       = 0x80,    // Being hit (draw red sometimes)
 };
 
  /**
@@ -136,7 +137,7 @@ struct Thing {
       } valuable;
       struct {
         short life_remaining;
-        char freshness_state;
+        int8_t freshness_state;
         unsigned char possession_startup_timer;
         TbBool some_chicken_was_sacrificed;
         unsigned short angle;
@@ -266,6 +267,7 @@ struct Thing {
     unsigned char class_id;
     unsigned char fall_acceleration;
     unsigned char bounce_angle;
+    unsigned char abyss_fall_sound_delay;
     short inertia_floor;
     short inertia_air;
     unsigned short movement_flags;
@@ -280,7 +282,7 @@ struct Thing {
     unsigned short sprite_size;
     unsigned char current_frame;
     unsigned char max_frames;
-    char transformation_speed;
+    int8_t transformation_speed;
     unsigned short sprite_size_min;
     unsigned short sprite_size_max;
     unsigned char rendering_flags;
@@ -301,7 +303,10 @@ struct Thing {
     short next_of_class;
     short prev_of_class;
     uint32_t flags; //ThingAddFlags
-    int32_t last_turn_drawn;
+    GameTurn last_turn_drawn;
+    GameTurn last_turn_damaged;
+    GameTurn last_turn_pushed;
+    PlayerNumber pushed_by_player;
     unsigned short previous_floor_height;
     struct Coord3d previous_mappos;
     uint32_t random_seed;
@@ -341,6 +346,7 @@ TbBool thing_is_dragged_or_pulled(const struct Thing *thing);
 struct PlayerInfo *get_player_thing_is_controlled_by(const struct Thing *thing);
 
 void set_thing_animation(struct Thing *thing, long animation_index, long speed);
+void advance_thing_animation(struct Thing *thing);
 void set_thing_draw(struct Thing *thing, long anim, long speed, long scale, char animate_once, char start_frame, unsigned char draw_class);
 
 void query_thing(struct Thing *thing);

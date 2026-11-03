@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #define COMMANDDESC_ARGS_COUNT    8
+#define SCRIPT_VAR_ENUM_COUNT    92
 
 enum TbScriptCommands {
     Cmd_NONE                               =  0,
@@ -129,7 +130,7 @@ enum TbScriptCommands {
     Cmd_MAKE_SAFE                          = 117,
     Cmd_LOCATE_HIDDEN_WORLD                = 118,
     Cmd_USE_SPECIAL_TRANSFER_CREATURE      = 119,
-    Cmd_CHANGE_CREATURES_ANNOYANCE         = 120,
+    Cmd_USE_SPECIAL_STEAL_HERO             = 120,
     Cmd_COMPUTER_DIG_TO_LOCATION           = 121,
     Cmd_DELETE_FROM_PARTY                  = 122,
     Cmd_SET_SACRIFICE_RECIPE               = 123,
@@ -206,6 +207,10 @@ enum TbScriptCommands {
     Cmd_QUICK_PLAYER_OBJECTIVE_WITH_POS    = 194,
     Cmd_QUICK_PLAYER_INFORMATION_WITH_POS  = 195,
     Cmd_COPY_CREATURE_TYPE                 = 196,
+    Cmd_TRIGGER_ACTION_POINT               = 197,
+    Cmd_SET_LEVEL_ENSIGN                   = 198,
+    Cmd_DISPLAY_VARIABLE_WITH_LABEL        = 199,
+    Cmd_CHANGE_CREATURES_ANNOYANCE         = 200,
 };
 
 struct ScriptLine {
@@ -310,9 +315,9 @@ enum ScriptVariables {
   SVar_PLAYER_SCORE                    = 89,
   SVar_MANAGE_SCORE                    = 90,
   SVar_CONTROLLED_THING                = 91,
+  SVar_BATTLES_LOST_VS                 = 92,
+  SVar_BATTLES_WON_VS                  = 93,
  };
-
-
 
 extern const struct NamedCommand player_desc[];
 extern const struct NamedCommand controls_variable_desc[];
@@ -352,7 +357,9 @@ long parse_criteria(const char *criteria);
 #define get_players_range_single(plr_range_id) get_players_range_single_f(plr_range_id, __func__, text_line_number)
 long get_players_range_single_f(long plr_range_id, const char *func_name, long ln_num);
 TbBool parse_get_varib(const char *varib_name, int32_t *varib_id, int32_t *varib_type, long level_file_version);
-void get_chat_icon_from_value(const char* txt, char* id, char* type);
+void get_chat_icon_from_value(const char* txt, short* id, char* type);
+short get_chat_icon_sprite_idx_from_id(short id, char type);
+short get_chat_icon_sprite_idx(const char* txt);
 #define get_player_id(plrname, plr_range_id) get_player_id_f(plrname, plr_range_id, __func__, text_line_number)
 TbBool get_player_id_f(const char *plrname, int32_t *plr_range_id, const char *func_name, long ln_num);
 PlayerNumber get_objective_id_with_potential_target(const char* locname, PlayerNumber* target);

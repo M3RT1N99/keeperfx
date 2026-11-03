@@ -284,7 +284,7 @@ static int SDLCALL background_audio_watch(void *userdata, SDL_Event *event)
 /**
  * Collects frame times and logs one summary line per minute, so a stutter
  * report arrives with numbers in the engine log instead of an impression.
- * Called from LbScreenSwap() once per presented frame.
+ * Called from RendererPresentFrame() once per presented frame.
  *
  * A summary rather than a line per slow frame, learned the hard way: the log
  * is flushed to flash per line, that write can cost tens of milliseconds, and
