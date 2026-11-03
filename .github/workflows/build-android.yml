@@ -96,7 +96,7 @@ jobs:
         unzip -o -q "$APK" 'lib/arm64-v8a/*' -d apk-check
         file apk-check/lib/arm64-v8a/libkeeperfx.so
         file apk-check/lib/arm64-v8a/libkeeperfx.so | grep -q 'ARM aarch64'
-        for lib in libSDL2.so libSDL2_image.so libSDL2_mixer.so libSDL2_net.so libopenal.so libc++_shared.so; do
+        for lib in libSDL3.so libSDL3_image.so libSDL3_mixer.so libopenal.so libc++_shared.so; do
           test -f "apk-check/lib/arm64-v8a/$lib" || { echo "missing $lib in APK"; exit 1; }
         done
         ARTIFACT_NAME="keeperfx-android-arm64-${GIT_REVISION}"
@@ -257,6 +257,9 @@ jobs:
       run: |
         set -eux
         sudo apt update
+        # Upstream's list from build-prototype.yml. SDL3 is not in Ubuntu 24.04 apt,
+        # so Dependencies.cmake builds it from source; the libx11/gl/audio and
+        # decoder packages are SDL3's build dependencies.
         sudo apt install -y \
           build-essential \
           cmake \
@@ -271,11 +274,31 @@ jobs:
           libminizip-dev \
           libnatpmp-dev \
           libspng-dev \
-          libsdl2-dev \
-          libsdl2-image-dev \
-          libsdl2-mixer-dev \
-          libsdl2-net-dev \
           libswresample-dev \
+          libx11-dev \
+          libxext-dev \
+          libxrandr-dev \
+          libxcursor-dev \
+          libxi-dev \
+          libxfixes-dev \
+          libxss-dev \
+          libxtst-dev \
+          libxkbcommon-dev \
+          libgl1-mesa-dev \
+          libegl1-mesa-dev \
+          libdrm-dev \
+          libgbm-dev \
+          libasound2-dev \
+          libpulse-dev \
+          libdbus-1-dev \
+          libudev-dev \
+          libpng-dev \
+          libjpeg-dev \
+          libogg-dev \
+          libvorbis-dev \
+          libflac-dev \
+          libmpg123-dev \
+          libopusfile-dev \
           libminiupnpc-dev \
           libssl-dev \
           libzstd-dev \

@@ -2,13 +2,15 @@
 // Free implementation of Bullfrog's Dungeon Keeper strategy game.
 /******************************************************************************/
 /** @file android.cpp
- *     Android platform layer.
+ *     Android entry point.
  * @par Purpose:
- *     Provides the platform specific entry point and helpers for the native
- *     Android port, mirroring what linux.cpp does for the Linux port.
+ *     Everything that has to happen before the engine starts on Android, plus
+ *     the two lifecycle helpers that have no counterpart on the desktop. The
+ *     OS services the engine asks for at run time are in
+ *     kfx/platform/PlatformAndroid.h.
  * @par Comment:
  *     The whole file is compiled out on every other platform, so it can sit in
- *     src/ next to linux.cpp and windows.cpp without affecting those builds.
+ *     src/ without affecting those builds.
  *
  *     The game itself resolves all of its data relative to the working
  *     directory. The launcher hands us the directory it imported the game data
@@ -25,185 +27,20 @@
 /******************************************************************************/
 #ifdef __ANDROID__
 
+#include "pre_inc.h"
 #include "platform.h"
-#include "steam_api.hpp"
 #include "bflib_basics.h"
-#include "bflib_crash.h"
-#include "bflib_fileio.h"
-#include "cdrom.h"
-#include <algorithm>
-#include <ctype.h>
-#include <string.h>
+#include "globals.h"
 #include <string>
-#include <memory>
-#include <utility>
 #include <vector>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <dirent.h>
 #include <unistd.h>
-#include <fnmatch.h>
 #include <android/log.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_mixer.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 #include <AL/al.h>
+#include "post_inc.h"
 
 #define KFX_ANDROID_LOG_TAG "KeeperFX"
-
-extern "C" const char * get_os_version()
-{
-    return "Android";
-}
-
-extern "C" const void * get_image_base()
-{
-    return nullptr;
-}
-
-extern "C" const char * get_wine_version()
-{
-    return nullptr; // we're running native
-}
-
-extern "C" const char * get_wine_host()
-{
-    return nullptr; // we're running native
-}
-
-extern "C" void install_exception_handler()
-{
-    LbErrorParachuteInstall();
-}
-
-extern "C" int steam_api_init()
-{
-    // Steam not supported on Android
-    return 0;
-}
-
-extern "C" void steam_api_shutdown()
-{
-    // Steam not supported on Android
-}
-
-extern "C" void SetRedbookVolume(SoundVolume)
-{
-    // No CD audio on Android
-}
-
-extern "C" TbBool PlayRedbookTrack(int)
-{
-    // No CD audio on Android
-    return false;
-}
-
-extern "C" void PauseRedbookTrack()
-{
-}
-
-extern "C" void ResumeRedbookTrack()
-{
-}
-
-extern "C" void StopRedbookTrack()
-{
-}
-
-/******************************************************************************/
-/* Directory scanning - identical to the Linux port, bionic provides all of it. */
-
-struct TbFileFind {
-    std::vector<std::pair<std::string, std::string>> names;
-    size_t index = 0;
-};
-
-static bool filespec_is_pattern(const char * filespec) {
-    return strchr(filespec, '*') != nullptr;
-}
-
-static std::string directory_from_filespec(const char * filespec) {
-    const auto sep = strrchr(filespec, '/');
-    if (sep && sep != filespec) {
-        return std::string(filespec, sep - filespec);
-    } else {
-        return ".";
-    }
-}
-
-extern "C" TbFileFind * LbFileFindFirst(const char * filespec, TbFileEntry * fe)
-{
-    try {
-        auto ff = std::make_unique<TbFileFind>();
-        bool is_pattern = filespec_is_pattern(filespec);
-        std::string path;
-        if (is_pattern) {
-            path = directory_from_filespec(filespec);
-        } else {
-            path = filespec;
-        }
-        DIR *handle = opendir(path.c_str());
-        if (handle) {
-            while (true) {
-                auto de = readdir(handle);
-                if (!de) {
-                    break;
-                }
-                if (strcmp(de->d_name, ".") == 0) {
-                    continue;
-                }
-                if (strcmp(de->d_name, "..") == 0) {
-                    continue;
-                }
-                const std::string file_path = path + "/" + de->d_name;
-                if (is_pattern) {
-                    if (fnmatch(filespec, file_path.c_str(), FNM_FILE_NAME | FNM_CASEFOLD) != 0) {
-                        continue;
-                    }
-                }
-                struct stat sb;
-                if (stat(file_path.c_str(), &sb) < 0) {
-                    continue;
-                }
-                if (!S_ISREG(sb.st_mode)) {
-                    continue;
-                }
-                std::string key = de->d_name;
-                for (size_t i = 0; i < key.size(); i++) {
-                    key[i] = (char)tolower((unsigned char)key[i]);
-                }
-                ff->names.emplace_back(key, de->d_name);
-            }
-            closedir(handle);
-        }
-        if (!ff->names.empty()) {
-            std::sort(ff->names.begin(), ff->names.end());
-            fe->Filename = ff->names[0].second.c_str();
-            return ff.release();
-        }
-    } catch (...) {}
-    return nullptr;
-}
-
-extern "C" int32_t LbFileFindNext(TbFileFind * ff, TbFileEntry * fe)
-{
-    try {
-        if (ff) {
-            ff->index++;
-            if (ff->index < ff->names.size()) {
-                fe->Filename = ff->names[ff->index].second.c_str();
-                return 1;
-            }
-        }
-    } catch (...) {}
-    return -1;
-}
-
-extern "C" void LbFileFindEnd(TbFileFind * ff)
-{
-    delete ff;
-}
-
-/******************************************************************************/
 
 /**
  * Consumes "-datadir <path>" from the argument vector and makes it the working
@@ -246,12 +83,15 @@ static bool apply_data_directory(std::vector<char *> & args)
 }
 
 /**
- * Silences the game while it is in the background, and brings it back after.
+ * Silences OpenAL while the game is in the background, and brings it back after.
  *
  * The engine itself stops when the activity pauses - that is what
- * SDL_HINT_ANDROID_BLOCK_ON_PAUSE arranges - but the audio threads do not.
- * SDL_mixer keeps feeding the device and OpenAL keeps mixing whatever was
- * playing, so music carried on after the phone was locked.
+ * SDL_HINT_ANDROID_BLOCK_ON_PAUSE arranges - and SDL pauses its own audio
+ * devices along with it, which covers the music and everything else SDL_mixer
+ * plays. Pausing the mixer's tracks here as well would only add a way to wake a
+ * track the game had paused itself. OpenAL has its own output and keeps mixing
+ * whatever was playing, so the sound effects and the speech carried on after the
+ * phone was locked.
  *
  * This has to be an event watch rather than a case in the normal event loop.
  * SDL queues the background events and then blocks the main thread inside
@@ -259,26 +99,21 @@ static bool apply_data_directory(std::vector<char *> & args)
  * was already back in the foreground. A watch is called synchronously from
  * SDL_SendAppEvent, before the block.
  */
-static int SDLCALL background_audio_watch(void *userdata, SDL_Event *event)
+static bool SDLCALL background_audio_watch(void *userdata, SDL_Event *event)
 {
     (void)userdata;
     switch (event->type)
     {
-    case SDL_APP_WILLENTERBACKGROUND:
-        Mix_PauseMusic();
-        Mix_Pause(-1);
-        // Sound effects go through OpenAL, which SDL knows nothing about.
+    case SDL_EVENT_WILL_ENTER_BACKGROUND:
         alListenerf(AL_GAIN, 0.0f);
         break;
-    case SDL_APP_DIDENTERFOREGROUND:
+    case SDL_EVENT_DID_ENTER_FOREGROUND:
         alListenerf(AL_GAIN, 1.0f);
-        Mix_Resume(-1);
-        Mix_ResumeMusic();
         break;
     default:
         break;
     }
-    return 1; // Leave the event in the queue for whoever else wants it
+    return true; // Leave the event in the queue for whoever else wants it
 }
 
 /**
@@ -295,19 +130,19 @@ static int SDLCALL background_audio_watch(void *userdata, SDL_Event *event)
  */
 extern "C" void android_frame_watch(void)
 {
-    static Uint32 prev_ticks = 0;
-    static Uint32 window_start = 0;
+    static Uint64 prev_ticks = 0;
+    static Uint64 window_start = 0;
     static Uint32 frames = 0;
     static Uint32 slow = 0;
-    static Uint32 worst = 0;
+    static Uint64 worst = 0;
     static float avg_ms = 0.0f;
-    const Uint32 now = SDL_GetTicks();
+    const Uint64 now = SDL_GetTicks();
     if (prev_ticks == 0) {
         prev_ticks = now;
         window_start = now;
         return;
     }
-    const Uint32 delta = now - prev_ticks;
+    const Uint64 delta = now - prev_ticks;
     prev_ticks = now;
     // Coming back from the background, a level load: not a frame at all.
     if (delta > 2000) {
@@ -341,8 +176,8 @@ extern "C" void android_frame_watch(void)
 }
 
 /**
- * Entry point. SDL renames this to SDL_main and calls it from
- * SDLActivity.nativeRunMain() on the SDL thread.
+ * Entry point. SDL_main.h renames this to SDL_main and exports it, and
+ * SDLActivity.nativeRunMain() calls it on the SDL thread.
  */
 extern "C" int main(int argc, char *argv[])
 {
@@ -353,8 +188,8 @@ extern "C" int main(int argc, char *argv[])
     // SDL's built-in translation would collapse multi touch into a fake mouse.
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
-    // Keep the engine running while the activity is in the background rather
-    // than tearing down the GL context on every notification shade pull.
+    // Stop the engine while the activity is in the background. SDL pauses its
+    // audio devices along with it, which background_audio_watch() relies on.
     SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1");
     // Left alone, the back button closes the activity, which drops the player
     // out of the game entirely. Trapped, it arrives as SDLK_AC_BACK and the
@@ -366,7 +201,7 @@ extern "C" int main(int argc, char *argv[])
     // Samsung firmwares are a known SDL issue and the usual cure is exactly
     // this: the older OpenSL ES backend, which trades a little latency for
     // output that does not tear. Nothing here is latency sensitive.
-    SDL_SetHint(SDL_HINT_AUDIODRIVER, "openslES");
+    SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "openslES");
 
     SDL_AddEventWatch(background_audio_watch, nullptr);
 

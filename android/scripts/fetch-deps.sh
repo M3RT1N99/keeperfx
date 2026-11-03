@@ -28,10 +28,10 @@ DEPS_DIR="${ANDROID_DIR}/.deps"
 mkdir -p "${DEPS_DIR}"
 
 # --- Pinned versions -------------------------------------------------------
-SDL2_VERSION=2.32.10
-SDL2_IMAGE_VERSION=2.8.12
-SDL2_MIXER_VERSION=2.8.2
-SDL2_NET_VERSION=2.4.0
+# The versions build/cmake/modules/Dependencies.cmake pins for the desktop ports.
+SDL3_VERSION=3.4.18
+SDL3_IMAGE_VERSION=3.4.6
+SDL3_MIXER_VERSION=3.2.4
 
 ZLIB_TAG=v1.3.1
 SPNG_TAG=v0.7.4
@@ -110,21 +110,17 @@ fetch_git() {
     touch "${target}/.stamp"
 }
 
-fetch_tarball SDL2 \
-    "https://github.com/libsdl-org/SDL/releases/download/release-${SDL2_VERSION}/SDL2-${SDL2_VERSION}.tar.gz" \
-    "SDL2-${SDL2_VERSION}"
+fetch_tarball SDL3 \
+    "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/SDL3-${SDL3_VERSION}.tar.gz" \
+    "SDL3-${SDL3_VERSION}"
 
-fetch_tarball SDL2_image \
-    "https://github.com/libsdl-org/SDL_image/releases/download/release-${SDL2_IMAGE_VERSION}/SDL2_image-${SDL2_IMAGE_VERSION}.tar.gz" \
-    "SDL2_image-${SDL2_IMAGE_VERSION}"
+fetch_tarball SDL3_image \
+    "https://github.com/libsdl-org/SDL_image/releases/download/release-${SDL3_IMAGE_VERSION}/SDL3_image-${SDL3_IMAGE_VERSION}.tar.gz" \
+    "SDL3_image-${SDL3_IMAGE_VERSION}"
 
-fetch_tarball SDL2_mixer \
-    "https://github.com/libsdl-org/SDL_mixer/releases/download/release-${SDL2_MIXER_VERSION}/SDL2_mixer-${SDL2_MIXER_VERSION}.tar.gz" \
-    "SDL2_mixer-${SDL2_MIXER_VERSION}"
-
-fetch_tarball SDL2_net \
-    "https://github.com/libsdl-org/SDL_net/releases/download/release-${SDL2_NET_VERSION}/SDL2_net-${SDL2_NET_VERSION}.tar.gz" \
-    "SDL2_net-${SDL2_NET_VERSION}"
+fetch_tarball SDL3_mixer \
+    "https://github.com/libsdl-org/SDL_mixer/releases/download/release-${SDL3_MIXER_VERSION}/SDL3_mixer-${SDL3_MIXER_VERSION}.tar.gz" \
+    "SDL3_mixer-${SDL3_MIXER_VERSION}"
 
 fetch_tarball mbedtls \
     "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${MBEDTLS_VERSION}/mbedtls-${MBEDTLS_VERSION}.tar.bz2" \

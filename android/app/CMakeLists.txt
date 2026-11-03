@@ -8,7 +8,7 @@
 #      Android NDK toolchain. Sources are pulled by android/scripts/fetch-deps.sh
 #      beforehand, so this file never touches the network.
 #  @par Comment:
-#      This is additive: neither Makefile nor linux.mk nor the root CMakeLists
+#      This is additive: neither the Makefile nor the root CMakeLists
 #      are involved, so the Windows and Linux builds are untouched.
 #  @author   KeeperFX Team
 #  @date     04 Aug 2026
@@ -32,7 +32,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 get_filename_component(KFX_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 get_filename_component(KFX_DEPS "${CMAKE_CURRENT_SOURCE_DIR}/../.deps" ABSOLUTE)
 
-if(NOT EXISTS "${KFX_DEPS}/SDL2/CMakeLists.txt")
+if(NOT EXISTS "${KFX_DEPS}/SDL3/CMakeLists.txt")
     message(FATAL_ERROR
         "Dependencies are missing. Run android/scripts/fetch-deps.sh first.")
 endif()
@@ -48,17 +48,6 @@ foreach(field VER_MAJOR VER_MINOR VER_RELEASE VER_BUILD)
     string(REGEX MATCH "${field}=([0-9]+)" _match "${KFX_VERSION_MK}")
     set(${field} "${CMAKE_MATCH_1}")
 endforeach()
-# VER_BUILD is deliberately left at version.mk's value, which is 0.
-#
-# It is what goes on the wire: net_current_version carries it and
-# net_versions_match() requires all four numbers to be equal. Every official
-# build puts 0 there, because ver_defs.h.in substitutes ${VER_BUILD} and the
-# root CMakeLists only ever derives BUILD_NUMBER *from* it, never the reverse -
-# so -DBUILD_NUMBER= does not reach the binary. Overriding it here is what made
-# this port announce a version no official client could match.
-#
-# The build the engine actually is stays visible in the version string below
-# and in the package suffix, which is where that information belongs.
 
 # version.mk carries the suffix that marks this fork's builds as unofficial;
 # Android adds its own name so a report says which build it came from. Gradle
@@ -74,23 +63,16 @@ endif()
 if(NOT DEFINED GIT_REVISION OR GIT_REVISION STREQUAL "")
     set(GIT_REVISION "unknown")
 endif()
-# The engine reports the KeeperFX build it actually is, which is the merge base
-# with upstream rather than this fork's commit count. That is the same counter
-# an alpha patch is numbered with, so a log says straight away whether engine
-# and data belong together.
-if(NOT DEFINED KFX_ENGINE_BUILD OR KFX_ENGINE_BUILD STREQUAL "")
-    set(KFX_ENGINE_BUILD "${VER_BUILD}")
+# The KeeperFX build this engine is: the merge base with upstream, not this
+# fork's commit count. ver_defs.h.in turns it into VER_BUILD, which goes on the
+# wire and which net_versions_match() compares, so it has to be the number an
+# official client built from the same source announces. That is also the counter
+# an alpha patch is numbered with, so a log says straight away whether engine and
+# data belong together.
+if(NOT DEFINED BUILD_NUMBER OR BUILD_NUMBER STREQUAL "")
+    set(BUILD_NUMBER "${VER_BUILD}")
 endif()
-set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${KFX_ENGINE_BUILD} ${PACKAGE_SUFFIX}")
-
-# VER_BUILD is what net_versions_match() compares, and it has to stay 0 to meet
-# an official CMake-built client. It has been overridden here twice by accident,
-# so fail the build rather than ship something that can play with nobody.
-if(NOT VER_BUILD EQUAL 0)
-    message(FATAL_ERROR
-        "VER_BUILD is ${VER_BUILD}, not 0. That is the number the multiplayer "
-        "handshake sends, and no official build sends anything else.")
-endif()
+set(VER_STRING "${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${BUILD_NUMBER} ${PACKAGE_SUFFIX}")
 
 set(KFX_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${KFX_GENERATED_DIR}")
@@ -98,69 +80,44 @@ file(MAKE_DIRECTORY "${KFX_GENERATED_DIR}")
 configure_file("${KFX_ROOT}/ver_defs.h.in" "${KFX_GENERATED_DIR}/ver_defs.h")
 
 #******************************************************************************
-# SDL2 and satellites
+# SDL3 and satellites
 #******************************************************************************
-set(SDL_SHARED ON  CACHE BOOL "" FORCE)
-set(SDL_STATIC OFF CACHE BOOL "" FORCE)
-set(SDL_TEST   OFF CACHE BOOL "" FORCE)
-set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
-set(SDL2_DISABLE_UNINSTALL ON CACHE BOOL "" FORCE)
-add_subdirectory("${KFX_DEPS}/SDL2" "${CMAKE_CURRENT_BINARY_DIR}/SDL2" EXCLUDE_FROM_ALL)
+set(SDL_SHARED       ON  CACHE BOOL "" FORCE)
+set(SDL_STATIC       OFF CACHE BOOL "" FORCE)
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+add_subdirectory("${KFX_DEPS}/SDL3" "${CMAKE_CURRENT_BINARY_DIR}/SDL3" EXCLUDE_FROM_ALL)
 
 set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
 
-set(SDL2IMAGE_INSTALL     OFF CACHE BOOL "" FORCE)
-set(SDL2IMAGE_SAMPLES     OFF CACHE BOOL "" FORCE)
-set(SDL2IMAGE_VENDORED    OFF CACHE BOOL "" FORCE)
-set(SDL2IMAGE_DEPS_SHARED OFF CACHE BOOL "" FORCE)
-set(SDL2IMAGE_BACKEND_STB ON  CACHE BOOL "" FORCE)
-set(SDL2IMAGE_AVIF        OFF CACHE BOOL "" FORCE)
-set(SDL2IMAGE_JXL         OFF CACHE BOOL "" FORCE)
-set(SDL2IMAGE_TIF         OFF CACHE BOOL "" FORCE)
-set(SDL2IMAGE_WEBP        OFF CACHE BOOL "" FORCE)
-add_subdirectory("${KFX_DEPS}/SDL2_image" "${CMAKE_CURRENT_BINARY_DIR}/SDL2_image" EXCLUDE_FROM_ALL)
+set(SDLIMAGE_SAMPLES     OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_VENDORED    OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_DEPS_SHARED OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_BACKEND_STB ON  CACHE BOOL "" FORCE)
+set(SDLIMAGE_PNG_LIBPNG  OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_AVIF        OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_JXL         OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_TIF         OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_WEBP        OFF CACHE BOOL "" FORCE)
+add_subdirectory("${KFX_DEPS}/SDL3_image" "${CMAKE_CURRENT_BINARY_DIR}/SDL3_image" EXCLUDE_FROM_ALL)
 
-set(SDL2MIXER_INSTALL     OFF    CACHE BOOL   "" FORCE)
-set(SDL2MIXER_SAMPLES     OFF    CACHE BOOL   "" FORCE)
-set(SDL2MIXER_VENDORED    OFF    CACHE BOOL   "" FORCE)
-set(SDL2MIXER_DEPS_SHARED OFF    CACHE BOOL   "" FORCE)
-# stb_vorbis is built into SDL2_mixer, so Ogg music needs no external libraries.
-set(SDL2MIXER_VORBIS      "STB"  CACHE STRING "" FORCE)
+set(SDLMIXER_VENDORED    OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_DEPS_SHARED OFF CACHE BOOL "" FORCE)
 # The engine accepts .wav, .mp3, .flac and .ogg for sounds and speech
-# (config_sounds.c), so switching FLAC off made a whole declared format
-# silently inaudible. drflac is built into SDL2_mixer and pulls in nothing.
-set(SDL2MIXER_FLAC        ON     CACHE BOOL   "" FORCE)
-set(SDL2MIXER_FLAC_DRFLAC ON     CACHE BOOL   "" FORCE)
-set(SDL2MIXER_FLAC_LIBFLAC OFF   CACHE BOOL   "" FORCE)
-set(SDL2MIXER_MOD         OFF    CACHE BOOL   "" FORCE)
-# Campaign speech ships as MP3 - 40 files per language in the official release -
-# so this cannot be off. minimp3 is built into SDL2_mixer and pulls in nothing.
-# (SDL2MIXER_MP3_DRMP3 was set here before and does not exist in 2.8.2, so it
-# did nothing; the backend option is called MINIMP3.)
-set(SDL2MIXER_MP3         ON     CACHE BOOL   "" FORCE)
-set(SDL2MIXER_MP3_MINIMP3 ON     CACHE BOOL   "" FORCE)
-set(SDL2MIXER_MP3_MPG123  OFF    CACHE BOOL   "" FORCE)
-set(SDL2MIXER_MIDI        OFF    CACHE BOOL   "" FORCE)
-set(SDL2MIXER_OPUS        OFF    CACHE BOOL   "" FORCE)
-set(SDL2MIXER_WAVPACK     OFF    CACHE BOOL   "" FORCE)
-set(SDL2MIXER_GME         OFF    CACHE BOOL   "" FORCE)
-add_subdirectory("${KFX_DEPS}/SDL2_mixer" "${CMAKE_CURRENT_BINARY_DIR}/SDL2_mixer" EXCLUDE_FROM_ALL)
-
-set(SDL2NET_INSTALL OFF CACHE BOOL "" FORCE)
-set(SDL2NET_SAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory("${KFX_DEPS}/SDL2_net" "${CMAKE_CURRENT_BINARY_DIR}/SDL2_net" EXCLUDE_FROM_ALL)
-
-# The engine includes the satellite libraries as <SDL2/SDL_mixer.h> and friends,
-# matching how the desktop packages install them. Built from source they sit in
-# include/SDL_mixer.h instead, so stage them under the expected prefix.
-set(KFX_SDL2_COMPAT_INC "${CMAKE_CURRENT_BINARY_DIR}/sdl2-compat-include")
-file(MAKE_DIRECTORY "${KFX_SDL2_COMPAT_INC}/SDL2")
-configure_file("${KFX_DEPS}/SDL2_image/include/SDL_image.h"
-               "${KFX_SDL2_COMPAT_INC}/SDL2/SDL_image.h" COPYONLY)
-configure_file("${KFX_DEPS}/SDL2_mixer/include/SDL_mixer.h"
-               "${KFX_SDL2_COMPAT_INC}/SDL2/SDL_mixer.h" COPYONLY)
-configure_file("${KFX_DEPS}/SDL2_net/include/SDL_net.h"
-               "${KFX_SDL2_COMPAT_INC}/SDL2/SDL_net.h" COPYONLY)
+# (config_sounds.c), and music is Ogg while campaign speech is MP3, 40 files per
+# language in the official release. All three decoders are built into SDL3_mixer
+# and pull in nothing; everything that would need an external library goes off.
+set(SDLMIXER_VORBIS_STB        ON  CACHE BOOL "" FORCE)
+set(SDLMIXER_VORBIS_VORBISFILE OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_FLAC_DRFLAC       ON  CACHE BOOL "" FORCE)
+set(SDLMIXER_FLAC_LIBFLAC      OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_MP3_DRMP3         ON  CACHE BOOL "" FORCE)
+set(SDLMIXER_MP3_MPG123        OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_MOD               OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_MIDI              OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_OPUS              OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_WAVPACK           OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_GME               OFF CACHE BOOL "" FORCE)
+add_subdirectory("${KFX_DEPS}/SDL3_mixer" "${CMAKE_CURRENT_BINARY_DIR}/SDL3_mixer" EXCLUDE_FROM_ALL)
 
 # Everything from here on is linked straight into libkeeperfx.so.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -372,9 +329,8 @@ set(UPNPC_NO_INSTALL   ON  CACHE BOOL "" FORCE)
 add_subdirectory("${KFX_DEPS}/miniupnp/miniupnpc" "${CMAKE_CURRENT_BINARY_DIR}/miniupnpc" EXCLUDE_FROM_ALL)
 add_subdirectory("${KFX_DEPS}/libnatpmp" "${CMAKE_CURRENT_BINARY_DIR}/libnatpmp" EXCLUDE_FROM_ALL)
 
-# Same situation as the SDL satellites: the engine includes
-# <miniupnpc/miniupnpc.h>, which is where the headers land when miniupnpc is
-# installed, but in the source tree they sit flat in include/.
+# The engine includes <miniupnpc/miniupnpc.h>, which is where the headers land
+# when miniupnpc is installed, but in the source tree they sit flat in include/.
 set(KFX_UPNP_COMPAT_INC "${CMAKE_CURRENT_BINARY_DIR}/miniupnpc-compat-include")
 file(MAKE_DIRECTORY "${KFX_UPNP_COMPAT_INC}/miniupnpc")
 file(GLOB KFX_UPNP_HEADERS "${KFX_DEPS}/miniupnp/miniupnpc/include/*.h")
@@ -474,25 +430,31 @@ target_include_directories(kfx_luajit INTERFACE "${LUAJIT_WORK}/src")
 #******************************************************************************
 # KeeperFX engine
 #******************************************************************************
-file(GLOB KFX_SOURCES_C   "${KFX_ROOT}/src/*.c")
-file(GLOB KFX_SOURCES_CXX "${KFX_ROOT}/src/*.cpp" "${KFX_ROOT}/src/kfx/lense/*.cpp")
+file(GLOB_RECURSE KFX_SOURCES_C   CONFIGURE_DEPENDS "${KFX_ROOT}/src/*.c")
+file(GLOB_RECURSE KFX_SOURCES_CXX CONFIGURE_DEPENDS "${KFX_ROOT}/src/*.cpp")
 
-# Platform files of the other ports. Nothing is stubbed any more: every library
-# the engine needs is built from source above.
-set(KFX_EXCLUDED
-    "${KFX_ROOT}/src/linux.cpp"
-    "${KFX_ROOT}/src/windows.cpp"
-    "${KFX_ROOT}/src/cdrom.cpp"
-    "${KFX_ROOT}/src/steam_api.cpp")
-list(REMOVE_ITEM KFX_SOURCES_C   ${KFX_EXCLUDED})
-list(REMOVE_ITEM KFX_SOURCES_CXX ${KFX_EXCLUDED})
+# The Windows platform files, and the OpenGL backend: it speaks desktop GL through
+# glad, Android only has GLES, and RendererResolveType() sends a request for it to
+# the software renderer. Every library the engine needs is built from source above.
+list(FILTER KFX_SOURCES_CXX EXCLUDE REGEX
+    "/PlatformWindows\\.cpp$|/WindowCompositorWin\\.cpp$|/RendererOpenGL\\.cpp$|/kfx/renderer/opengl/")
 
-add_library(keeperfx SHARED ${KFX_SOURCES_C} ${KFX_SOURCES_CXX})
+# WindowSystemSDL.cpp embeds the window icon on everything but Windows, which
+# takes it from its resource file. Same recipe as BuildTargets.cmake.
+set(KFX_ICON_PNG "${KFX_ROOT}/res/keeperfx_icon256-24bpp.png")
+file(READ "${KFX_ICON_PNG}" _icon_hex HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," _icon_bytes "${_icon_hex}")
+set(KFX_ICON_C "${KFX_GENERATED_DIR}/window_icon.c")
+file(WRITE "${KFX_ICON_C}.in"
+    "const unsigned char kfx_window_icon_png[] = {${_icon_bytes}};\n"
+    "const unsigned int kfx_window_icon_png_size = sizeof(kfx_window_icon_png);\n")
+configure_file("${KFX_ICON_C}.in" "${KFX_ICON_C}" COPYONLY)
+
+add_library(keeperfx SHARED ${KFX_SOURCES_C} ${KFX_SOURCES_CXX} "${KFX_ICON_C}")
 
 target_include_directories(keeperfx PRIVATE
     "${KFX_ROOT}/src"
     "${KFX_GENERATED_DIR}"
-    "${KFX_SDL2_COMPAT_INC}"
     "${KFX_UPNP_COMPAT_INC}"
     ${KFX_ZLIB_INCLUDES})
 
@@ -509,6 +471,10 @@ target_compile_options(keeperfx PRIVATE
     # stop working. Forcing signed char gives the same semantics the desktop
     # builds have always had, without touching any of those sites.
     -fsigned-char
+    # arm64 clang fuses a multiply and an add into one instruction by default and
+    # the x86 builds do not. The fused form rounds once instead of twice, which
+    # can change float results across architectures, and multiplayer is lockstep.
+    -ffp-contract=off
     -Wall -Wextra
     -Wno-unused-parameter
     -Wno-unknown-pragmas
@@ -518,10 +484,9 @@ target_compile_options(keeperfx PRIVATE
     -fno-strict-aliasing)
 
 target_link_libraries(keeperfx PRIVATE
-    SDL2::SDL2
-    SDL2_image::SDL2_image
-    SDL2_mixer::SDL2_mixer
-    SDL2_net::SDL2_net
+    SDL3::SDL3
+    SDL3_image::SDL3_image
+    SDL3_mixer::SDL3_mixer
     OpenAL::OpenAL
     kfx_spng
     kfx_minizip
@@ -540,8 +505,5 @@ target_link_libraries(keeperfx PRIVATE
     natpmp
     android
     log
-    GLESv1_CM
-    GLESv2
-    OpenSLES
     m
     dl)

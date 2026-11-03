@@ -271,10 +271,9 @@ public class GameActivity extends SDLActivity {
     protected String[] getLibraries() {
         return new String[] {
             "c++_shared",
-            "SDL2",
-            "SDL2_image",
-            "SDL2_mixer",
-            "SDL2_net",
+            "SDL3",
+            "SDL3_image",
+            "SDL3_mixer",
             "openal",
             "keeperfx",
         };

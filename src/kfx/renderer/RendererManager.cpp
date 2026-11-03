@@ -35,13 +35,25 @@ static IRenderer* create_renderer(RendererType type)
     switch (type)
     {
         case RENDERER_SOFTWARE: return new RendererSoftware();
+#if !defined(__ANDROID__) // not built there, see RendererResolveType()
         case RENDERER_OPENGL:   return new RendererOpenGL();
+#endif
         default:                return nullptr;
     }
 }
 
 RendererType RendererResolveType(RendererType requested)
 {
+#if defined(__ANDROID__)
+    // The backend speaks desktop GL through glad and Android only has GLES. This is
+    // the normal path, not a misconfiguration: the configuration the launcher lays
+    // over every installation is the desktop's, which asks for OPENGL.
+    if (requested == RENDERER_OPENGL)
+    {
+        SYNCLOG("The OpenGL renderer is not available on Android, using the software renderer");
+        return RENDERER_SOFTWARE;
+    }
+#endif
     return (requested == RENDERER_AUTO) ? RENDERER_SOFTWARE : requested;
 }
 

@@ -114,9 +114,11 @@ int  PlatformLinux::InitSteam() { return -1; }
 void PlatformLinux::ShutdownSteam() {}
 
 /******************************************************************************/
-// Process entry point.
+// Process entry point. Android starts from Java instead, see android.cpp.
 
+#ifndef __ANDROID__
 extern "C" int main(int argc, char *argv[])
 {
     return kfxmain(argc, argv);
 }
+#endif
