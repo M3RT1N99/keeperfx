@@ -696,12 +696,24 @@ int64_t get_named_field_value(const struct NamedField* named_field, const struct
     case dt_uint: {
         unsigned int v; memcpy(&v, field, sizeof(v)); return v;
     }
+#ifdef __ANDROID__
+    // On arm64 uint64_t is an unsigned long, so can_cast_flags, with flags up to bit
+    // 40, arrives here rather than at dt_ulonglong as on Windows. Reading only its
+    // low half would make a "CASTABILITY = X 1" toggle write the rest back as zero.
+    case dt_long: {
+        long v; memcpy(&v, field, sizeof(v)); return v;
+    }
+    case dt_ulong: {
+        unsigned long v; memcpy(&v, field, sizeof(v)); return (int64_t)v;
+    }
+#else
     case dt_long: {
         int32_t v; memcpy(&v, field, sizeof(v)); return v;
     }
     case dt_ulong: {
         uint32_t v; memcpy(&v, field, sizeof(v)); return v;
     }
+#endif
     case dt_longlong: {
         /* Use memcpy to avoid ARM LDRD strict-alignment fault. */
         int64_t v; memcpy(&v, field, sizeof(v)); return v;
