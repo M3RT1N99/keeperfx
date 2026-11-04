@@ -116,6 +116,8 @@ jobs:
         for lib in libSDL3.so libSDL3_image.so libSDL3_mixer.so libopenal.so libc++_shared.so; do
           test -f "apk-check/lib/arm64-v8a/$lib" || { echo "missing $lib in APK"; exit 1; }
         done
+        # zlib is linked statically. Its shared twin only ever got packaged by accident.
+        test ! -e apk-check/lib/arm64-v8a/libz.so
         ARTIFACT_NAME="keeperfx-android-arm64-${GIT_REVISION}"
         echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
         mkdir -p out

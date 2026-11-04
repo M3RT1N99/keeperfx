@@ -97,8 +97,6 @@ public final class DataImporter {
         final File destination = GameData.gameDirectory(context);
         try {
             FileUtil.ensureDirectory(destination);
-            // Stays in place unless the whole folder made it; the launcher's wipe of
-            // the install records takes it away after a success.
             GameData.markInstallInProgress(context);
 
             final String rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri);
@@ -119,6 +117,10 @@ public final class DataImporter {
             // its configuration back up with the engine in this APK.
             BundledConfig.install(context, true);
 
+            // A hand picked folder carries no version we can trust, and everything
+            // recorded about the previous installation - the alpha state, its
+            // backup, the manifests - now describes files this may have replaced.
+            ReleaseDownloader.wipeInstallState(context);
             finish(true, "Copied " + filesCopied + " files");
         } catch (Exception e) {
             Log.e(TAG, "Import failed", e);

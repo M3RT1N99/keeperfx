@@ -565,14 +565,6 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 postIfAlive(() -> {
                     runningImport = null;
                     setBusy(false);
-                    if (success && keeperfxRelease) {
-                        // A hand picked folder carries no version we can
-                        // trust, and everything recorded about the previous
-                        // installation - the alpha state, its backup, the
-                        // manifests - now describes files the import may have
-                        // replaced.
-                        ReleaseDownloader.wipeInstallState(LauncherActivity.this);
-                    }
                     refreshStatus();
                     if (!success) {
                         showMessage(R.string.import_failed, message);
