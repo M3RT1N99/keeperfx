@@ -337,6 +337,10 @@ static void process_event(const SDL_Event *ev)
             return;
         }
         if (ev->key.key == SDLK_AC_BACK) {
+            // Held, it repeats, and every repeat would open or shut a menu again.
+            if (ev->key.repeat) {
+                return;
+            }
             back_pressed_this_poll = true;
             lbKeyPressed[KC_ESCAPE] = 1;
         }
