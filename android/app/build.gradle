@@ -16,11 +16,22 @@ def verRelease = (versionProps.VER_RELEASE ?: "0") as int
 def buildNumber = (project.findProperty("keeperfx.buildNumber") ?: "0") as int
 
 // Version of the port itself: major from gradle.properties, minor counting up
-// from the baseline recorded there. See the comment next to those properties.
+// from the base commit recorded there. See the comment next to those properties.
 def portMajor = (project.findProperty("keeperfx.portMajor") ?: "1") as int
-def portBaseline = (project.findProperty("keeperfx.portBaseline") ?: "0") as int
-def portMinor = Math.max(0, buildNumber - portBaseline)
-def portVersion = "${portMajor}.${portMinor}"
+def portBaseCommit = project.property("keeperfx.portBaseCommit")
+def portBaseMinor = project.property("keeperfx.portBaseMinor") as int
+def commitsSinceBase = { ->
+    def git = ["git", "-C", "${rootDir}/..", "rev-list", "--count", "--first-parent",
+               "${portBaseCommit}..HEAD"].execute()
+    def count = git.text.trim()
+    return (git.waitFor() == 0) ? (count as int) : -1
+}.call()
+if (commitsSinceBase < 0) {
+    // A source drop without history. Only ever a local build: CI needs the
+    // history for the release notes and publishes nothing older than its last.
+    logger.warn("No git history to count from, the port version stays at ${portBaseMinor}")
+}
+def portVersion = "${portMajor}.${portBaseMinor + Math.max(0, commitsSinceBase)}"
 // The KeeperFX build this engine is: the merge base with dkfans/keeperfx, not
 // the number of commits in this fork. It becomes VER_BUILD, which is what the
 // multiplayer handshake compares - net_versions_match() requires all four
@@ -54,8 +65,9 @@ android {
         // Just the port's own version. Which KeeperFX this engine is has its
         // own line in the launcher and its own place in the log header, so
         // cramming it in here only made the number look like an official build
-        // without being comparable to one. versionCode still counts commits:
-        // Android needs it to rise on every build and never shows it to anyone.
+        // without being comparable to one. versionCode still counts every commit:
+        // Android needs it to rise on every build, a merge from upstream making it
+        // jump does no harm, and it is never shown to anyone.
         versionName portVersion
 
         ndk {

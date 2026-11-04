@@ -8,17 +8,28 @@ on:
     types: [ready_for_review, review_requested]
   workflow_dispatch:
 
+# Building runs code from a long list of third party projects, so it only ever
+# holds a token that can read. The publish job asks for more, and runs none of it.
+permissions:
+  contents: read
+
 jobs:
   build-android:
     name: "Build Android arm64 APK"
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
+    outputs:
+      artifact-name: ${{ steps.apk.outputs.artifact-name }}
+      version-name: ${{ steps.apk.outputs.version-name }}
+      engine-version: ${{ steps.apk.outputs.engine-version }}
+      package-suffix: ${{ steps.apk.outputs.package-suffix }}
+      git-revision: ${{ steps.apk.outputs.git-revision }}
+      build-number: ${{ steps.apk.outputs.build-number }}
 
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        persist-credentials: false
 
     - uses: actions/setup-java@v4
       with:
@@ -69,10 +80,11 @@ jobs:
         # commits would blend upstream's counter with ours into a number that
         # looks like an official build without being comparable to one; the
         # merge base is the honest answer, and it is the same counter that an
-        # alpha patch is numbered with.
+        # alpha patch is numbered with. No fallback: this goes on the wire and
+        # picks the alpha patch, so a build without it must not get published.
         git remote add upstream https://github.com/dkfans/keeperfx.git 2>/dev/null || true
-        git fetch --no-tags --quiet upstream master || true
-        ENGINE_BUILD=$(git rev-list --count "$(git merge-base HEAD upstream/master)" 2>/dev/null || echo 0)
+        git fetch --no-tags --quiet upstream master
+        ENGINE_BUILD=$(git rev-list --count "$(git merge-base HEAD upstream/master)")
         echo "ENGINE_BUILD=$ENGINE_BUILD" >> $GITHUB_ENV
         echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
         echo "GIT_REVISION=$GIT_REVISION" >> $GITHUB_ENV
@@ -89,6 +101,7 @@ jobs:
           -Pkeeperfx.packageSuffix="$PACKAGE_SUFFIX"
 
     - name: Inspect the APK
+      id: apk
       run: |
         set -eux
         APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -n1)
@@ -108,6 +121,22 @@ jobs:
         mkdir -p out
         # Stable file name: the in-app updater downloads this exact URL.
         cp "$APK" "out/keeperfx-android-arm64.apk"
+        # The version comes out of the APK rather than being worked out a second
+        # time here, so the tag can never disagree with what the app reports.
+        VERSION_NAME=$("$ANDROID_HOME/build-tools/34.0.0/aapt2" dump badging "$APK" \
+          | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+        test -n "$VERSION_NAME"
+        VER_MAJOR=$(grep -E '^VER_MAJOR=' version.mk | cut -d= -f2)
+        VER_MINOR=$(grep -E '^VER_MINOR=' version.mk | cut -d= -f2)
+        VER_RELEASE=$(grep -E '^VER_RELEASE=' version.mk | cut -d= -f2)
+        {
+          echo "artifact-name=$ARTIFACT_NAME"
+          echo "version-name=$VERSION_NAME"
+          echo "engine-version=${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${ENGINE_BUILD}"
+          echo "package-suffix=$PACKAGE_SUFFIX"
+          echo "git-revision=$GIT_REVISION"
+          echo "build-number=$BUILD_NUMBER"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
@@ -116,29 +145,49 @@ jobs:
         path: out/*.apk
         if-no-files-found: error
 
-    # One release per build, tagged with its version, so there is a history to
-    # go back through. Action artifacts expire after 90 days and cannot be
-    # fetched without a GitHub account; a release is a permanent, login-free URL.
+  # One release per build, tagged with its version, so there is a history to go
+  # back through. Action artifacts expire after 90 days and cannot be fetched
+  # without a GitHub account; a release is a permanent, login-free URL.
+  publish:
+    name: "Publish the release"
+    needs: build-android
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+    # The whole history, for the changelog. Nothing from it gets executed.
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: ${{ needs.build-android.outputs.artifact-name }}
+        path: out
+
     - name: Publish the release
-      if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
       env:
         GH_TOKEN: ${{ github.token }}
+        VERSION_NAME: ${{ needs.build-android.outputs.version-name }}
+        ENGINE_VERSION: ${{ needs.build-android.outputs.engine-version }}
+        PACKAGE_SUFFIX: ${{ needs.build-android.outputs.package-suffix }}
+        GIT_REVISION: ${{ needs.build-android.outputs.git-revision }}
+        BUILD_NUMBER: ${{ needs.build-android.outputs.build-number }}
       run: |
         set -eux
-        VER_MAJOR=$(grep -E '^VER_MAJOR=' version.mk | cut -d= -f2)
-        VER_MINOR=$(grep -E '^VER_MINOR=' version.mk | cut -d= -f2)
-        VER_RELEASE=$(grep -E '^VER_RELEASE=' version.mk | cut -d= -f2)
-        # The KeeperFX version this runs on, then the port's own version, both
-        # composed exactly as android/app/build.gradle composes them.
-        PORT_MAJOR=$(grep -E '^keeperfx.portMajor=' android/gradle.properties | cut -d= -f2)
-        PORT_BASELINE=$(grep -E '^keeperfx.portBaseline=' android/gradle.properties | cut -d= -f2)
-        PORT_MINOR=$((BUILD_NUMBER - PORT_BASELINE))
-        [ "$PORT_MINOR" -ge 0 ] || PORT_MINOR=0
         # The app version is the port's own. Which KeeperFX the engine is
         # gets its own row in the notes below.
-        VERSION_NAME="${PORT_MAJOR}.${PORT_MINOR}"
-        ENGINE_VERSION="${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${ENGINE_BUILD}"
         TAG="android-v${VERSION_NAME}"
+
+        # Installed apps ignore anything that is not newer than what they run,
+        # and GitHub would still make it the release they all look at.
+        LATEST=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName --jq .tagName || true)
+        if [ -n "$LATEST" ] && [ "$(printf '%s\n%s\n' "${LATEST#android-v}" "$VERSION_NAME" | sort -V | tail -n1)" != "$VERSION_NAME" ]; then
+          echo "::error::$TAG would go out behind $LATEST"
+          exit 1
+        fi
 
         cat > out/version.json <<JSON
         {
@@ -169,10 +218,10 @@ jobs:
           echo "**Unofficial community build.** Not produced by the KeeperFX team and"
           echo "not supported by them, so report anything you find here rather than to"
           echo "them. The game says so itself: it reports its version as"
-          echo "\`${VERSION_NAME} ${PACKAGE_SUFFIX}\`, in the title bar and at the top of"
+          echo "\`${ENGINE_VERSION} ${PACKAGE_SUFFIX}\`, in the title bar and at the top of"
           echo "every log, so a screenshot cannot be mistaken for an official release."
           echo
-          echo "Development build of the \`feature/android-support\` branch."
+          echo "Development build of the \`${GITHUB_REF_NAME}\` branch."
           echo
           echo "| | |"
           echo "|---|---|"
@@ -197,10 +246,8 @@ jobs:
           echo "for the files that must come from the original game."
         } > out/notes.md
 
-        # Every call names the repository explicitly: the build step above adds
-        # an "upstream" remote to work out which KeeperFX build the engine is,
-        # and gh then resolves the default repository to dkfans/keeperfx and
-        # tries to publish this fork's APK there.
+        # Every call names the repository explicitly, so that gh can never resolve
+        # it to dkfans/keeperfx and try to publish this fork's APK there.
         #
         # The releases API answers 403 under secondary rate limiting, which is
         # easy to hit when several builds land close together or the releases
