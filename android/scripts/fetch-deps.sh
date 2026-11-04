@@ -96,7 +96,12 @@ fetch_tarball() {
     rm -rf "${target}" "${target}.tmp"
     mkdir -p "${target}.tmp"
     curl -fL --proto '=https' --retry 3 --retry-delay 5 -o "${DEPS_DIR}/${name}.archive" "${url}"
-    echo "${sha256}  ${DEPS_DIR}/${name}.archive" | sha256sum -c --quiet -
+    local got
+    got="$(sha256sum "${DEPS_DIR}/${name}.archive" | cut -d' ' -f1)"
+    if [ "${got}" != "${sha256}" ]; then
+        echo "${name}: the download has the checksum ${got}, expected ${sha256}" >&2
+        exit 1
+    fi
     # No -z: the archives are a mix of gzip and bzip2 and GNU tar picks the
     # decompressor itself.
     tar -xf "${DEPS_DIR}/${name}.archive" -C "${target}.tmp"
