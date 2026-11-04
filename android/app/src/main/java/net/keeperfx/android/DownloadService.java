@@ -310,6 +310,10 @@ public class DownloadService extends Service {
             case GAME_ALPHA:
             case ALPHA_REVERT:
             case MUSIC: {
+                // Asked again per job: a queue of them can have been going for a while.
+                if (GameProcess.isAlive(this)) {
+                    return getString(R.string.game_still_open);
+                }
                 final ReleaseDownloader downloader =
                     new ReleaseDownloader(this, new ReleaseDownloader.Listener() {
                         @Override

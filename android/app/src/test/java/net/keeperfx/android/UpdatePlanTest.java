@@ -70,6 +70,20 @@ public class UpdatePlanTest {
         return UpdateManager.plan(facts).get(index).detail;
     }
 
+    /** What the launcher refuses while the game is open. */
+    @Test
+    public void onlyAnAppUpdateLeavesTheInstallationAlone() {
+        final UpdateManager.Item app = new UpdateManager.Item(UpdateManager.Kind.APP, "", "", null);
+        final UpdateManager.Item music = new UpdateManager.Item(UpdateManager.Kind.MUSIC, "", "", null);
+        final UpdateManager.Item data = new UpdateManager.Item(UpdateManager.Kind.GAME_DATA, "", "", null);
+        final UpdateManager.Item alpha = new UpdateManager.Item(UpdateManager.Kind.GAME_ALPHA, "", "", null);
+        assertFalse(UpdateManager.changesInstallation(Arrays.asList(app)));
+        assertFalse(UpdateManager.changesInstallation(Collections.emptyList()));
+        assertTrue(UpdateManager.changesInstallation(Arrays.asList(app, music)));
+        assertTrue(UpdateManager.changesInstallation(Arrays.asList(data)));
+        assertTrue(UpdateManager.changesInstallation(Arrays.asList(alpha, app)));
+    }
+
     /** An imported folder has no version, and the sentence used to have a hole there. */
     @Test
     public void theAlphaOfferOnAnImportedFolderReadsLikeASentence() {

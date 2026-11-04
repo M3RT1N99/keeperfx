@@ -75,6 +75,16 @@ public final class UpdateManager {
         return false;
     }
 
+    /** An app update waits for the player's own say in the system's installer, the rest does not. */
+    static boolean changesInstallation(List<Item> items) {
+        for (Item item : items) {
+            if (item.kind != Kind.APP) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static List<Item> without(List<Item> items, Kind kind) {
         final List<Item> rest = new ArrayList<>(items);
         rest.removeIf(item -> item.kind == kind);

@@ -174,6 +174,10 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             @Override public void onNothingSelected(AdapterView<?> parent) { }
         });
         useAlphaBox.setOnCheckedChangeListener((v, checked) -> {
+            if (!checked && patchIsOn() && refuseWhileGameOpen()) {
+                v.setChecked(true);
+                return;
+            }
             prefs.setAlphaEnabled(checked);
             if (!checked && patchIsOn()) {
                 // Restores the files the patch replaced from the copies taken
@@ -202,9 +206,17 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         });
 
         installButton.setOnClickListener(v -> confirmInstallOrUpdate());
-        importKeeperfxButton.setOnClickListener(v -> pickFolder(REQUEST_PICK_KEEPERFX,
-            R.string.import_keeperfx_title, R.string.import_keeperfx_explanation));
-        importOriginalButton.setOnClickListener(v -> askOriginalDkSource());
+        importKeeperfxButton.setOnClickListener(v -> {
+            if (!refuseWhileGameOpen()) {
+                pickFolder(REQUEST_PICK_KEEPERFX,
+                    R.string.import_keeperfx_title, R.string.import_keeperfx_explanation);
+            }
+        });
+        importOriginalButton.setOnClickListener(v -> {
+            if (!refuseWhileGameOpen()) {
+                askOriginalDkSource();
+            }
+        });
         sendButton.setOnClickListener(v -> confirmSend());
         receiveButton.setOnClickListener(v -> askForReceivedFile());
         cancelJobButton.setOnClickListener(v -> DownloadService.requestCancel());
@@ -246,9 +258,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         if (!busy && !DownloadService.isRunning()) {
             if (!prefs.isAlphaEnabled() && patchIsOn()) {
                 // Switched off, but taking it off never finished: Android took the
-                // process, or a download was running at the time.
-                setBusy(true);
-                DownloadService.startAlphaRevert(this);
+                // process, or a download was running at the time. With the game still
+                // open it waits, this comes round again when the player returns.
+                if (!GameProcess.isAlive(this)) {
+                    setBusy(true);
+                    DownloadService.startAlphaRevert(this);
+                }
             } else {
                 checkForUpdateInBackground();
             }
@@ -437,6 +452,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
      * The next tap on the app update asks again.
      */
     private void runUpdates(List<UpdateManager.Item> items) {
+        if (UpdateManager.changesInstallation(items) && refuseWhileGameOpen()) {
+            return;
+        }
         final boolean appLeftOut = UpdateManager.contains(items, UpdateManager.Kind.APP)
             && !AppUpdater.canInstallPackages(this);
         final List<UpdateManager.Item> runnable =
@@ -780,6 +798,10 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     }
 
     private void startImport(Uri treeUri, boolean keeperfxRelease, boolean fromZip) {
+        // Again: the picker can take a while, and the recent apps can bring the game back.
+        if (refuseWhileGameOpen()) {
+            return;
+        }
         setBusy(true);
         progressBar.setIndeterminate(true);
         detailView.setText("");
@@ -853,6 +875,21 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         });
     }
 
+    /**
+     * For everything that replaces or removes files under the installation: the engine
+     * can be alive behind the launcher, with those files open and, in a network game,
+     * still running.
+     *
+     * @return whether the game is open, in which case the player has been told so.
+     */
+    private boolean refuseWhileGameOpen() {
+        if (!GameProcess.isAlive(this)) {
+            return false;
+        }
+        showMessage(R.string.game_still_open_title, getString(R.string.game_still_open));
+        return true;
+    }
+
     private void showMessage(int titleRes, String message) {
         new AlertDialog.Builder(this)
             .setTitle(titleRes)
@@ -862,10 +899,16 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     }
 
     private void confirmRemoveData() {
+        if (refuseWhileGameOpen()) {
+            return;
+        }
         new AlertDialog.Builder(this)
             .setTitle(R.string.remove_title)
             .setMessage(R.string.remove_explanation)
             .setPositiveButton(R.string.remove_confirm, (dialog, which) -> {
+                if (refuseWhileGameOpen()) {
+                    return;
+                }
                 setBusy(true);
                 // Thousands of files, which is more than the main thread may spend.
                 new Thread(() -> {
