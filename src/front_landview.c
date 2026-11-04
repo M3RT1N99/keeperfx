@@ -64,6 +64,9 @@
 #include "custom_sprites.h"
 #include "config_translation.h"
 #include "api.h"
+#ifdef __ANDROID__
+#include "bflib_touch.h"
+#endif
 #include "post_inc.h"
 
 #ifdef __cplusplus
@@ -1214,6 +1217,13 @@ void frontmap_draw(void)
 void check_mouse_scroll(void)
 {
     long mx = GetMouseX();
+#ifdef __ANDROID__
+    // A pointer on a touch screen stays where the last finger left it, and the map would
+    // run from there to its limit. As in a level, only a finger dragging there means it.
+    const TbBool edges_count = touch_allows_edge_scroll();
+    if (!edges_count)
+        mx = RendererPhysicalWidth() / 2;
+#endif
     if ( (mx < 8) || ( (is_game_key_pressed(Gkey_MoveLeft, false, false)) || (is_key_pressed(KC_LEFT,KMod_DONTCARE)) ) )
     {
         map_info.velocity_x -= LANDVIEW_PAN_ACCEL * local_state.delta_time;
@@ -1231,6 +1241,10 @@ void check_mouse_scroll(void)
       map_info.velocity_x = LANDVIEW_PAN_MAX_SPEED;
   }
   long my = GetMouseY();
+#ifdef __ANDROID__
+  if (!edges_count)
+      my = lbDisplay.PhysicalScreenHeight / 2;
+#endif
   if ( (my < 8) || ( (is_game_key_pressed(Gkey_MoveUp, false, false)) || (is_key_pressed(KC_UP,KMod_DONTCARE)) ) )
   {
     map_info.velocity_y -= LANDVIEW_PAN_ACCEL * local_state.delta_time;
