@@ -77,6 +77,11 @@ android {
 
         externalNativeBuild {
             cmake {
+                // Without a list Gradle builds and packages every library target in
+                // the project, EXCLUDE_FROM_ALL or not, which is how the shared zlib
+                // nothing links against ended up in the APK. Everything libkeeperfx
+                // does link against comes along by itself.
+                targets "keeperfx"
                 arguments "-DANDROID_STL=c++_shared",
                           "-DBUILD_NUMBER=${engineBuild}",
                           // Left empty on purpose: CMake then builds the suffix
@@ -196,6 +201,9 @@ def fetchNativeDeps = tasks.register("fetchNativeDeps", Exec) {
     description = "Downloads the pinned native dependency sources"
     workingDir rootDir
     commandLine "bash", "scripts/fetch-deps.sh"
+    // It only looks at its stamps when nothing changed, and a new pin has to reach
+    // a machine that already has the sources.
+    inputs.file("${rootDir}/scripts/fetch-deps.sh")
     outputs.upToDateWhen { sdlJavaDir.exists() }
 }
 

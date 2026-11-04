@@ -378,9 +378,6 @@ target_include_directories(kfx_astronomy PUBLIC "${KFX_DEPS}/astronomy/source/c"
 # is fully API and ABI compatible, which is all the engine needs - level scripts
 # are not performance critical.
 #******************************************************************************
-include(ExternalProject)
-
-get_filename_component(NDK_BIN "${CMAKE_C_COMPILER}" DIRECTORY)
 set(LUAJIT_WORK "${CMAKE_CURRENT_BINARY_DIR}/luajit")
 set(LUAJIT_LIB  "${LUAJIT_WORK}/src/libluajit.a")
 # ANDROID_LLVM_TRIPLE already carries the API level (aarch64-none-linux-android21),
@@ -411,12 +408,12 @@ ExternalProject_Add(luajit_external
     # need for the target architecture.
     BUILD_COMMAND "${KFX_MAKE_PROGRAM}" -C "${LUAJIT_WORK}/src"
         "HOST_CC=cc"
-        "CROSS=${NDK_BIN}/llvm-"
-        "STATIC_CC=${NDK_BIN}/clang"
-        "DYNAMIC_CC=${NDK_BIN}/clang -fPIC"
-        "TARGET_LD=${NDK_BIN}/clang"
-        "TARGET_AR=${NDK_BIN}/llvm-ar rcus"
-        "TARGET_STRIP=${NDK_BIN}/llvm-strip"
+        "CROSS=${KFX_NDK_BIN}/llvm-"
+        "STATIC_CC=${KFX_NDK_BIN}/clang"
+        "DYNAMIC_CC=${KFX_NDK_BIN}/clang -fPIC"
+        "TARGET_LD=${KFX_NDK_BIN}/clang"
+        "TARGET_AR=${KFX_NDK_BIN}/llvm-ar rcus"
+        "TARGET_STRIP=${KFX_NDK_BIN}/llvm-strip"
         "TARGET_FLAGS=${LUAJIT_TARGET_FLAGS}"
         "TARGET_SYS=Linux"
         "XCFLAGS=-DLUAJIT_DISABLE_JIT -fPIC"
