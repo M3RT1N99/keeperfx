@@ -69,6 +69,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private RadioGroup inputModeGroup;
     private CheckBox useAlphaBox;
     private Spinner languageSpinner;
+    private TextView languageNote;
     private CheckBox backButtonBox;
     private CheckBox noIntroBox;
     private CheckBox noSoundBox;
@@ -99,6 +100,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         inputModeGroup = findViewById(R.id.inputMode);
         useAlphaBox = findViewById(R.id.useAlpha);
         languageSpinner = findViewById(R.id.language);
+        languageNote = findViewById(R.id.languageNote);
         backButtonBox = findViewById(R.id.backButton);
         noIntroBox = findViewById(R.id.noIntro);
         noSoundBox = findViewById(R.id.noSound);
@@ -142,6 +144,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 final String code = GameLanguage.codeAt(position);
                 prefs.setLanguage(code);
                 GameLanguage.applyToConfig(LauncherActivity.this, code);
+                refreshLanguageNote();
             }
 
             @Override public void onNothingSelected(AdapterView<?> parent) { }
@@ -267,8 +270,21 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             }
         }
         detailView.setText(sb.toString().trim());
+        refreshLanguageNote();
 
         setBusy(busy);
+    }
+
+    private void refreshLanguageNote() {
+        final String language = prefs.getLanguage();
+        // Before anything is installed there is nothing to say about what is missing.
+        final boolean missing = GameData.isKeeperfxInstalled(this) && !language.equals(
+            GameLanguage.usableCode(language, GameData.gameDirectory(this)));
+        languageNote.setVisibility(missing ? View.VISIBLE : View.GONE);
+        if (missing) {
+            languageNote.setText(getString(R.string.language_not_installed,
+                GameLanguage.displayName(language)));
+        }
     }
 
     /**

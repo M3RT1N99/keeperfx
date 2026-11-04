@@ -278,6 +278,15 @@
                     android:text="@string/settings_language_hint"
                     android:textColor="@color/kfx_text_dim"
                     android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/languageNote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/kfx_warn"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <TextView

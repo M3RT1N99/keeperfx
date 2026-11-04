@@ -13,6 +13,11 @@
  *     Codes are the ones config_keeperfx.c accepts. Only those with a matching
  *     Android language tag are offered for automatic selection; the rest are
  *     still selectable by hand.
+ *
+ *     The engine refuses to start without the text file of its language, and the
+ *     official data has none for several languages the engine knows: Hungarian,
+ *     Danish, Norwegian and Arabic right now. So what is written is what is
+ *     installed, whatever a device is set to.
  * @author   KeeperFX Team
  * @date     05 Aug 2026
  * @par  Copying and copyrights:
@@ -29,7 +34,7 @@ import android.util.Log;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,6 +76,7 @@ public final class GameLanguage {
         {"SWE", "sv", "Svenska"},
         {"CZE", "cs", "Čeština"},
         {"RUS", "ru", "Русский"},
+        {"UKR", "uk", "Українська"},
         {"HUN", "hu", "Magyar"},
         {"DAN", "da", "Dansk"},
         {"NOR", "no", "Norsk"},
@@ -117,8 +123,15 @@ public final class GameLanguage {
      * two Chinese variants sharing a tag.
      */
     public static String forDevice() {
-        final Locale locale = Locale.getDefault();
+        return forLocale(Locale.getDefault());
+    }
+
+    static String forLocale(Locale locale) {
         final String language = locale.getLanguage();
+        // Android reports Norwegian as one of its two written forms.
+        if ("nb".equals(language) || "nn".equals(language)) {
+            return "NOR";
+        }
         if ("zh".equals(language)) {
             final String country = locale.getCountry();
             if ("TW".equals(country) || "HK".equals(country) || "MO".equals(country)) {
@@ -132,6 +145,17 @@ public final class GameLanguage {
             }
         }
         return "ENG";
+    }
+
+    /** What the engine can run in: the language asked for, or English without its texts. */
+    static String usableCode(String code, File gameDirectory) {
+        final String textFile = "fxdata/gtext_" + code.toLowerCase(Locale.US) + ".dat";
+        return new File(gameDirectory, textFile).isFile() ? code : "ENG";
+    }
+
+    /** The name a language is listed under, for telling the player it is not there. */
+    static String displayName(String code) {
+        return LANGUAGES[indexOf(code)][2];
     }
 
     /**
@@ -149,38 +173,46 @@ public final class GameLanguage {
      * whole interface to English over some absent mp3s.
      */
     public static void applyToConfig(Context context, String code) {
-        final File config = new File(GameData.gameDirectory(context), "keeperfx.cfg");
+        final File root = GameData.gameDirectory(context);
+        final File config = new File(root, "keeperfx.cfg");
         if (!config.isFile()) {
             return;
         }
+        final String usable = usableCode(code, root);
+        if (!usable.equals(code)) {
+            Log.w(TAG, "This installation has no texts for " + code + ", running in " + usable);
+        }
         try {
-            final Charset charset = Charset.forName("UTF-8");
-            final List<String> lines = Files.readAllLines(config.toPath(), charset);
-            boolean changed = false;
-            boolean seen = false;
-            for (int i = 0; i < lines.size(); i++) {
-                final String trimmed = lines.get(i).trim();
-                if (!trimmed.toUpperCase(Locale.US).startsWith("LANGUAGE=")) {
-                    continue;
-                }
-                seen = true;
-                final String wanted = "LANGUAGE=" + code;
-                if (!trimmed.equals(wanted)) {
-                    lines.set(i, wanted);
-                    changed = true;
-                }
-                break;
-            }
-            if (!seen) {
-                lines.add("LANGUAGE=" + code);
-                changed = true;
-            }
-            if (changed) {
-                Files.write(config.toPath(), lines, charset);
-                Log.i(TAG, "Game language set to " + code);
+            // Latin-1 reads any bytes and writes them back unchanged, and the line
+            // that matters is plain ASCII. A hand imported file may be anything, and
+            // failing on it would leave whichever language it happens to name.
+            final List<String> lines = withLanguage(
+                Files.readAllLines(config.toPath(), StandardCharsets.ISO_8859_1), usable);
+            if (lines != null) {
+                FileUtil.writeAtomically(config,
+                    (String.join("\n", lines) + "\n").getBytes(StandardCharsets.ISO_8859_1));
+                Log.i(TAG, "Game language set to " + usable);
             }
         } catch (IOException e) {
             Log.w(TAG, "Could not set the game language", e);
         }
+    }
+
+    /** The lines with LANGUAGE= set to code, or null when they already say that. */
+    static List<String> withLanguage(List<String> lines, String code) {
+        final String wanted = "LANGUAGE=" + code;
+        final List<String> result = new ArrayList<>(lines);
+        for (int i = 0; i < result.size(); i++) {
+            final String trimmed = result.get(i).trim();
+            if (trimmed.toUpperCase(Locale.US).startsWith("LANGUAGE=")) {
+                if (trimmed.equals(wanted)) {
+                    return null;
+                }
+                result.set(i, wanted);
+                return result;
+            }
+        }
+        result.add(wanted);
+        return result;
     }
 }
