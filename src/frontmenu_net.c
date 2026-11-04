@@ -129,10 +129,11 @@ TbBool frontnet_start_input(void)
     if (game_is_busy_doing_gui_string_input()) {
         return false;
     }
-#ifndef __ANDROID__
+#ifdef __ANDROID__
     // On a phone text input is the keyboard: raised here it would cover Start Game and Cancel, come
     // back after every Back, and, since this also runs right after the click that left the lobby,
     // outlive the lobby. There it takes a tap on the chat line, see frontnet_chat_line_tapped().
+#else
     if (!LbIsTextInputActive()) {
         LbStartTextInput();
     }
@@ -431,8 +432,8 @@ void frontnet_draw_current_message(struct GuiButton *gbtn)
     // And draw the message
     frontnet_draw_scroll_selection_box(gbtn, font_idx, text);
 }
-
 #ifdef __ANDROID__
+
 void frontnet_chat_line_tapped(struct GuiButton *gbtn)
 {
     LbStartTextInput();
