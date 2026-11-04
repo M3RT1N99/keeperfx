@@ -231,6 +231,11 @@ extern "C" size_t android_codepage_to_utf8(const char *charset, const char *src,
     return written;
 }
 
+static uint32_t ipv4_host_order(const struct sockaddr *address)
+{
+    return ntohl(reinterpret_cast<const struct sockaddr_in *>(address)->sin_addr.s_addr);
+}
+
 extern "C" int android_lan_broadcast_targets(char targets[ANDROID_LAN_TARGETS_MAX][ANDROID_LAN_ADDRESS_LEN])
 {
     static std::string last_logged;
@@ -250,12 +255,9 @@ extern "C" int android_lan_broadcast_targets(char targets[ANDROID_LAN_TARGETS_MA
             continue;
         if ((i->ifa_flags & (IFF_UP | IFF_LOOPBACK | IFF_BROADCAST)) != (IFF_UP | IFF_BROADCAST))
             continue;
-        const auto v4 = [](const struct sockaddr *a) {
-            return ntohl(reinterpret_cast<const struct sockaddr_in *>(a)->sin_addr.s_addr);
-        };
         const bool reported = i->ifa_broadaddr != nullptr && i->ifa_broadaddr->sa_family == AF_INET;
-        const uint32_t broadcast = lan_subnet_broadcast(v4(i->ifa_addr), v4(i->ifa_netmask),
-            reported ? v4(i->ifa_broadaddr) : 0);
+        const uint32_t broadcast = lan_subnet_broadcast(ipv4_host_order(i->ifa_addr),
+            ipv4_host_order(i->ifa_netmask), reported ? ipv4_host_order(i->ifa_broadaddr) : 0);
         if (broadcast == 0)
             continue;
         const struct in_addr wire = {htonl(broadcast)};

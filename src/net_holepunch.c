@@ -32,6 +32,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef __ANDROID__
+#include "front_network.h"
+#endif
+
 #include "post_inc.h"
 
 #define STUN_TIMEOUT_MS 500
@@ -159,6 +163,15 @@ uint16_t holepunch_stun_query(ENetHost *host, char *output_ip, size_t output_ip_
     keepalive_socket = ENET_SOCKET_NULL;
     if (output_ip && output_ip_buffer_size > 0)
         output_ip[0] = '\0';
+#ifdef __ANDROID__
+    // A local game has no use for a public address, and the phones playing one may have
+    // no internet. A gateway that swallows DNS, as a hotspot or router without an upstream
+    // can, holds the game on this thread for over a minute with these three lookups.
+    if (frontnet_service_selected(FrontendNetSvc_LAN)) {
+        LbNetLog("STUN: skipped for a local game\n");
+        return 0;
+    }
+#endif
     for (size_t i = 0; i < sizeof(servers) / sizeof(servers[0]); i++) {
         ENetAddress server;
         if (enet_address_set_host(&server, ENET_ADDRESS_TYPE_IPV4, servers[i]) < 0) {

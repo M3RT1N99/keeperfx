@@ -223,8 +223,8 @@ public class GameActivity extends SDLActivity {
     /**
      * Lets the device see local network game announcements.
      *
-     * Games on a LAN find each other by broadcasting to 255.255.255.255 once a
-     * second. Wi-Fi hardware drops everything that is not addressed to the
+     * Games on a LAN find each other by broadcasting once a second. Wi-Fi
+     * hardware drops everything that is not addressed to the
      * device while it is saving power, so without this lock the game list stays
      * empty even though both machines are on the same network. It is tied to
      * the activity being in the foreground: nobody is browsing for games behind
@@ -264,8 +264,8 @@ public class GameActivity extends SDLActivity {
      * @return the network's handle, 0 when there is no Wi-Fi network, -1 when Wi-Fi
      *     is the default network.
      */
-    @SuppressWarnings({"unused", "deprecation"}) // Called from native code. A callback
-    // could replace getAllNetworks, but only by keeping up with networks all the time.
+    @SuppressWarnings("deprecation") // getAllNetworks: the callback that replaces it would
+    // have to keep up with the networks all the time, for an answer needed once per socket.
     private long lanNetworkHandle() {
         final ConnectivityManager connectivity = getSystemService(ConnectivityManager.class);
         final NetworkCapabilities active =
