@@ -28,11 +28,13 @@
 #ifdef __ANDROID__
 
 #include "pre_inc.h"
+#include "android.h"
 #include "platform.h"
 #include "bflib_basics.h"
 #include "globals.h"
 #include <string>
 #include <vector>
+#include <jni.h>
 #include <unistd.h>
 #include <android/log.h>
 #include <SDL3/SDL.h>
@@ -114,6 +116,55 @@ static bool SDLCALL background_audio_watch(void *userdata, SDL_Event *event)
         break;
     }
     return true; // Leave the event in the queue for whoever else wants it
+}
+
+/**
+ * Decodes through java.lang.String, since Java has the double byte tables that
+ * bionic's iconv does not and sits in the same process.
+ *
+ * Bytes a table has no character for become U+FFFD instead of failing the whole
+ * text. The official gtext_kor.dat holds nearly five hundred of them, which is what
+ * Windows renders as well; iconv on Linux gives up on that file.
+ */
+extern "C" size_t android_codepage_to_utf8(const char *charset, const char *src, size_t src_size,
+    char *dst, size_t dst_size)
+{
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    if (env == nullptr || dst_size == 0 || env->PushLocalFrame(8) != JNI_OK)
+        return 0;
+    size_t written = 0;
+    jclass string_class = env->FindClass("java/lang/String");
+    jstring from = env->NewStringUTF(charset);
+    jstring to = env->NewStringUTF("UTF-8");
+    jbyteArray raw = env->NewByteArray(static_cast<jsize>(src_size));
+    if (!env->ExceptionCheck() && string_class != nullptr && raw != nullptr)
+    {
+        env->SetByteArrayRegion(raw, 0, static_cast<jsize>(src_size),
+            reinterpret_cast<const jbyte *>(src));
+        jobject text = env->NewObject(string_class,
+            env->GetMethodID(string_class, "<init>", "([BLjava/lang/String;)V"), raw, from);
+        if (!env->ExceptionCheck())
+        {
+            jbyteArray utf8 = static_cast<jbyteArray>(env->CallObjectMethod(text,
+                env->GetMethodID(string_class, "getBytes", "(Ljava/lang/String;)[B"), to));
+            if (!env->ExceptionCheck())
+            {
+                written = static_cast<size_t>(env->GetArrayLength(utf8));
+                if (written >= dst_size)
+                    written = dst_size - 1;
+                env->GetByteArrayRegion(utf8, 0, static_cast<jsize>(written),
+                    reinterpret_cast<jbyte *>(dst));
+                dst[written] = '\0';
+            }
+        }
+    }
+    if (env->ExceptionCheck())
+    {
+        env->ExceptionClear();
+        ERRORLOG("Cannot decode text as %s", charset);
+    }
+    env->PopLocalFrame(nullptr);
+    return written;
 }
 
 /**

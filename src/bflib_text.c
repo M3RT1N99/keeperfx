@@ -20,6 +20,8 @@
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
+#elif defined(__ANDROID__)
+#include "android.h"
 #else
 #include <iconv.h>
 #endif
@@ -184,6 +186,20 @@ size_t convert_codepage_to_utf8_buffer(const char *src, size_t src_size, char *d
     }
     dst[utf8_len] = '\0';
     return (size_t)utf8_len;
+#elif defined(__ANDROID__)
+    // Bionic's iconv has none of the three. These names are the ones whose
+    // Android tables decode what the Windows code pages above decode: "CP932"
+    // resolves to an IBM table there, without the NEC and IBM extensions.
+    const char *charset;
+    if (lang_id == Lang_Japanese)
+        charset = "Shift_JIS";
+    else if (lang_id == Lang_ChineseInt || lang_id == Lang_ChineseTra)
+        charset = "GBK";
+    else if (lang_id == Lang_Korean)
+        charset = "EUC-KR";
+    else
+        return 0;
+    return android_codepage_to_utf8(charset, src, src_size, dst, dst_size);
 #else
 
     iconv_t cd;

@@ -17,7 +17,7 @@
 #include "post_inc.h"
 
 #if defined(__ANDROID__)
-extern "C" void android_frame_watch(void);
+#include "android.h"
 #endif
 
 static IRenderer*   s_active_renderer = nullptr;
