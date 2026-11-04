@@ -65,6 +65,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private Button importKeeperfxButton;
     private Button importOriginalButton;
     private Button playButton;
+    private Button removeDataButton;
     private Button updateAppButton;
     private RadioGroup inputModeGroup;
     private CheckBox useAlphaBox;
@@ -94,6 +95,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         importKeeperfxButton = findViewById(R.id.importKeeperfx);
         importOriginalButton = findViewById(R.id.importOriginalDk);
         playButton = findViewById(R.id.play);
+        removeDataButton = findViewById(R.id.removeData);
         updateAppButton = findViewById(R.id.updateApp);
         updateAppButton.setText(getString(R.string.button_update_app,
             AppUpdater.installedVersionName(this)));
@@ -182,7 +184,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             R.string.import_keeperfx_title, R.string.import_keeperfx_explanation));
         importOriginalButton.setOnClickListener(v -> askOriginalDkSource());
         playButton.setOnClickListener(v -> startGame());
-        findViewById(R.id.removeData).setOnClickListener(v -> confirmRemoveData());
+        removeDataButton.setOnClickListener(v -> confirmRemoveData());
         updateAppButton.setOnClickListener(v -> checkAppUpdate());
         findViewById(R.id.showLog).setOnClickListener(
             v -> startActivity(new Intent(this, LogActivity.class)));
@@ -572,13 +574,6 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         if (treeUri == null) {
             return;
         }
-        try {
-            getContentResolver().takePersistableUriPermission(
-                treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        } catch (SecurityException ignored) {
-            // Not every provider offers persistable permissions; the copy below
-            // only needs the grant that is alive for this activity result.
-        }
         startImport(treeUri, requestCode == REQUEST_PICK_KEEPERFX,
             requestCode == REQUEST_PICK_ORIGINAL_DK_ZIP);
     }
@@ -639,6 +634,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         progressBar.setVisibility(value ? View.VISIBLE : View.GONE);
         installButton.setEnabled(!value);
         useAlphaBox.setEnabled(!value);
+        // Deleting the installation under a running install leaves a mess that the
+        // install then records as complete.
+        removeDataButton.setEnabled(!value);
         importKeeperfxButton.setEnabled(!value);
         importOriginalButton.setEnabled(!value);
         playButton.setEnabled(!value && GameData.isComplete(this));
@@ -669,13 +667,20 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             .setTitle(R.string.remove_title)
             .setMessage(R.string.remove_explanation)
             .setPositiveButton(R.string.remove_confirm, (dialog, which) -> {
-                FileUtil.deleteTree(GameData.gameDirectory(this));
-                // Not only the version: the alpha backup, the archive cache
-                // and the manifests all describe the installation that was
-                // just deleted, and an alpha backup that survives a reset
-                // would "restore" pieces of it into the next one.
-                ReleaseDownloader.wipeInstallState(this);
-                refreshStatus();
+                setBusy(true);
+                // Thousands of files, which is more than the main thread may spend.
+                new Thread(() -> {
+                    FileUtil.deleteTree(GameData.gameDirectory(this));
+                    // Not only the version: the alpha backup, the archive cache
+                    // and the manifests all describe the installation that was
+                    // just deleted, and an alpha backup that survives a reset
+                    // would "restore" pieces of it into the next one.
+                    ReleaseDownloader.wipeInstallState(this);
+                    postIfAlive(() -> {
+                        setBusy(false);
+                        refreshStatus();
+                    });
+                }, "kfx-reset").start();
             })
             .setNegativeButton(android.R.string.cancel, null)
             .show();
