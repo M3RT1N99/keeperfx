@@ -41,9 +41,8 @@
  * finger resting on glass always trembles a little and is meant to do nothing.
  */
 #define TS_REST_SLOP_SHARE (6.0f / 720.0f)
-/* The fly buttons. */
-#define TS_FLY_RADIUS_SHARE 0.44f   /* of the stick's radius at the default size */
-#define TS_DEFAULT_STICK_SHARE 0.15f
+/* The fly buttons, in shares of the screen height. */
+#define TS_FLY_RADIUS_SHARE (47.5f / 720.0f)
 #define TS_FLY_EDGE_SHARE (24.0f / 720.0f)
 #define TS_FLY_GAP_SHARE (16.0f / 720.0f)
 #define TS_FLY_HIT_SHARE (12.0f / 720.0f)
@@ -73,7 +72,7 @@ static const struct TsFinger *ts_find_role(const struct TsSteer *s, enum TsRole 
 
 void ts_fly_buttons(const struct TsScreen *screen, struct TsCircle *up, struct TsCircle *down)
 {
-    const float radius = screen->height * TS_DEFAULT_STICK_SHARE * TS_FLY_RADIUS_SHARE;
+    const float radius = screen->height * TS_FLY_RADIUS_SHARE;
     const float x = screen->width - radius - screen->height * TS_FLY_EDGE_SHARE;
     const float away = radius + screen->height * TS_FLY_GAP_SHARE;
     up->x = x;
