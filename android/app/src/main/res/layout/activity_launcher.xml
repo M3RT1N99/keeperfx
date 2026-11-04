@@ -458,7 +458,8 @@
             <!--
               Utility row, as in the desktop launcher. The reset sits at the far
               end, deliberately not next to the log button it would otherwise be
-              easy to hit by accident, and carries the outlined danger style.
+              easy to hit by accident, and carries the outlined danger style. Each is a third
+              of the width with an icon besides, so a longer word gets smaller rather than broken.
             -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -470,8 +471,7 @@
                 <Button
                     android:id="@+id/showLog"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:minHeight="48dp"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
                     android:background="@drawable/btn_slate"
                     android:drawableStart="@drawable/ic_logfile"
@@ -480,13 +480,15 @@
                     android:paddingEnd="10dp"
                     android:text="@string/button_log"
                     android:textColor="@color/btn_text"
-                    android:textSize="11sp" />
+                    android:autoSizeMaxTextSize="11sp"
+                    android:autoSizeMinTextSize="7sp"
+                    android:autoSizeTextType="uniform"
+                    android:maxLines="1" />
 
                 <Button
                     android:id="@+id/importKeeperfx"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:minHeight="48dp"
+                    android:layout_height="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:background="@drawable/btn_slate"
@@ -496,19 +498,24 @@
                     android:paddingEnd="10dp"
                     android:text="@string/button_import_keeperfx"
                     android:textColor="@color/btn_text"
-                    android:textSize="11sp" />
+                    android:autoSizeMaxTextSize="11sp"
+                    android:autoSizeMinTextSize="7sp"
+                    android:autoSizeTextType="uniform"
+                    android:maxLines="1" />
 
                 <Button
                     android:id="@+id/removeData"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:minHeight="48dp"
+                    android:layout_height="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:background="@drawable/btn_danger"
                     android:text="@string/button_remove"
                     android:textColor="@color/btn_danger_text"
-                    android:textSize="11sp" />
+                    android:autoSizeMaxTextSize="11sp"
+                    android:autoSizeMinTextSize="7sp"
+                    android:autoSizeTextType="uniform"
+                    android:maxLines="1" />
             </LinearLayout>
 
             <!--
