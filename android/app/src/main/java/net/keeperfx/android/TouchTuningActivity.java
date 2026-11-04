@@ -94,7 +94,6 @@ public class TouchTuningActivity extends Activity {
         reset.setTextColor(getColor(R.color.btn_text));
         reset.setOnClickListener(v -> {
             prefs.resetTouchTuning();
-            prefs.setDrawFps(60);
             // Rebuilds every row from the freshly cleared values.
             recreate();
         });
@@ -181,8 +180,7 @@ public class TouchTuningActivity extends Activity {
         final TextView label = addLabel(panel);
 
         final SeekBar seek = new SeekBar(this);
-        final int steps = Math.round((tunable.max - tunable.min) / tunable.step);
-        seek.setMax(steps);
+        seek.setMax(tunable.steps());
         seek.setProgress(progressFor(tunable, prefs.getTouchTune(tunable)));
         updateTunableLabel(label, tunable, prefs.getTouchTune(tunable));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -200,44 +198,18 @@ public class TouchTuningActivity extends Activity {
             @Override public void onStopTrackingTouch(SeekBar bar) { }
         });
         panel.addView(seek, marginTop(panel, 4));
-        addHint(panel, hintFor(tunable));
+        addHint(panel, tunable.hint);
     }
 
     private int progressFor(Prefs.TouchTunable tunable, float value) {
         final int progress = Math.round((value - tunable.min) / tunable.step);
-        return Math.max(0, Math.min(progress, Math.round((tunable.max - tunable.min) / tunable.step)));
+        return Math.max(0, Math.min(progress, tunable.steps()));
     }
 
     private void updateTunableLabel(TextView label, Prefs.TouchTunable tunable, float value) {
         final String shown = Prefs.formatTouchTune(tunable, value);
-        final boolean isDefault = Math.abs(value - tunable.def) < tunable.step / 2.0f;
-        label.setText(getString(isDefault ? R.string.tuning_value_default : R.string.tuning_value,
-            getString(labelFor(tunable)), shown));
-    }
-
-    private int labelFor(Prefs.TouchTunable tunable) {
-        switch (tunable.key) {
-            case "longpress":   return R.string.tuning_longpress;
-            case "dragslop":    return R.string.tuning_dragslop;
-            case "panslop":     return R.string.tuning_panslop;
-            case "zoomgate":    return R.string.tuning_zoomgate;
-            case "rotategate":  return R.string.tuning_rotategate;
-            case "looksens":    return R.string.tuning_looksens;
-            case "stickradius": return R.string.tuning_stickradius;
-            default:            return R.string.tuning_flickdecay;
-        }
-    }
-
-    private int hintFor(Prefs.TouchTunable tunable) {
-        switch (tunable.key) {
-            case "longpress":   return R.string.tuning_longpress_hint;
-            case "dragslop":    return R.string.tuning_dragslop_hint;
-            case "panslop":     return R.string.tuning_panslop_hint;
-            case "zoomgate":    return R.string.tuning_zoomgate_hint;
-            case "rotategate":  return R.string.tuning_rotategate_hint;
-            case "looksens":    return R.string.tuning_looksens_hint;
-            case "stickradius": return R.string.tuning_stickradius_hint;
-            default:            return R.string.tuning_flickdecay_hint;
-        }
+        label.setText(getString(
+            tunable.isDefault(value) ? R.string.tuning_value_default : R.string.tuning_value,
+            getString(tunable.label), shown));
     }
 }

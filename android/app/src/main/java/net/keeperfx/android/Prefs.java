@@ -48,6 +48,10 @@ public final class Prefs {
     private static final String KEY_INSTALLED_ALPHA = "installed_alpha";
     private static final String KEY_LANGUAGE = "game_language";
     private static final String KEY_USE_ALPHA = "use_alpha";
+    /** What travels in an export apart from the language and the knobs, by how it is stored. */
+    private static final List<String> TRAVELLING_INTS = Arrays.asList(KEY_INPUT_MODE, KEY_DRAW_FPS);
+    private static final List<String> TRAVELLING_BOOLEANS =
+        Arrays.asList(KEY_BACK_BUTTON, KEY_NO_INTRO, KEY_NO_SOUND, KEY_USE_ALPHA);
 
     private final SharedPreferences prefs;
 
@@ -184,13 +188,31 @@ public final class Prefs {
         public final float min;
         public final float max;
         public final float step;
+        /** What the tuning screen calls it. */
+        final int label;
+        final int hint;
 
-        TouchTunable(String key, float def, float min, float max, float step) {
+        TouchTunable(String key, float def, float min, float max, float step, int label, int hint) {
             this.key = key;
             this.def = def;
             this.min = min;
             this.max = max;
             this.step = step;
+            this.label = label;
+            this.hint = hint;
+        }
+
+        boolean isDefault(float value) {
+            return Math.abs(value - def) < step / 2.0f;
+        }
+
+        /** How many steps there are from one end of its range to the other. */
+        int steps() {
+            return Math.round((max - min) / step);
+        }
+
+        private String preference() {
+            return "tune_" + key;
         }
     }
 
@@ -199,29 +221,39 @@ public final class Prefs {
      * defaults and ranges must match, or the engine warns and ignores a value.
      */
     public static final TouchTunable[] TOUCH_TUNABLES = {
-        new TouchTunable("longpress",   420.0f, 120.0f, 2000.0f, 10.0f),
-        new TouchTunable("dragslop",     12.0f,   2.0f,   80.0f,  1.0f),
-        new TouchTunable("panslop",       1.4f,   0.2f,   10.0f,  0.1f),
-        new TouchTunable("zoomgate",      2.0f,   0.2f,   20.0f,  0.1f),
-        new TouchTunable("rotategate",   0.10f,  0.02f,    1.0f, 0.01f),
-        new TouchTunable("flickdecay",   0.93f,   0.0f,  0.99f, 0.01f),
-        new TouchTunable("looksens",     0.20f,  0.05f,  0.60f, 0.01f),
-        new TouchTunable("stickradius",  15.0f,   8.0f,  25.0f,  1.0f),
+        new TouchTunable("longpress",   420.0f, 120.0f, 2000.0f, 10.0f,
+            R.string.tuning_longpress, R.string.tuning_longpress_hint),
+        new TouchTunable("dragslop",     12.0f,   2.0f,   80.0f,  1.0f,
+            R.string.tuning_dragslop, R.string.tuning_dragslop_hint),
+        new TouchTunable("panslop",       1.4f,   0.2f,   10.0f,  0.1f,
+            R.string.tuning_panslop, R.string.tuning_panslop_hint),
+        new TouchTunable("zoomgate",      2.0f,   0.2f,   20.0f,  0.1f,
+            R.string.tuning_zoomgate, R.string.tuning_zoomgate_hint),
+        new TouchTunable("rotategate",   0.10f,  0.02f,    1.0f, 0.01f,
+            R.string.tuning_rotategate, R.string.tuning_rotategate_hint),
+        new TouchTunable("flickdecay",   0.93f,   0.0f,  0.99f, 0.01f,
+            R.string.tuning_flickdecay, R.string.tuning_flickdecay_hint),
+        new TouchTunable("looksens",     0.20f,  0.05f,  0.60f, 0.01f,
+            R.string.tuning_looksens, R.string.tuning_looksens_hint),
+        new TouchTunable("stickradius",  15.0f,   8.0f,  25.0f,  1.0f,
+            R.string.tuning_stickradius, R.string.tuning_stickradius_hint),
     };
 
     public float getTouchTune(TouchTunable tunable) {
-        return prefs.getFloat("tune_" + tunable.key, tunable.def);
+        return prefs.getFloat(tunable.preference(), tunable.def);
     }
 
     public void setTouchTune(TouchTunable tunable, float value) {
-        prefs.edit().putFloat("tune_" + tunable.key, value).apply();
+        prefs.edit().putFloat(tunable.preference(), value).apply();
     }
 
+    /** Everything on the tuning screen back to where it started. */
     public void resetTouchTuning() {
         final SharedPreferences.Editor editor = prefs.edit();
         for (TouchTunable tunable : TOUCH_TUNABLES) {
-            editor.remove("tune_" + tunable.key);
+            editor.remove(tunable.preference());
         }
+        editor.remove(KEY_DRAW_FPS);
         editor.apply();
     }
 
@@ -242,7 +274,7 @@ public final class Prefs {
         final StringBuilder sb = new StringBuilder();
         for (TouchTunable tunable : TOUCH_TUNABLES) {
             final float value = getTouchTune(tunable);
-            if (Math.abs(value - tunable.def) < tunable.step / 2.0f) {
+            if (tunable.isDefault(value)) {
                 continue;
             }
             if (sb.length() > 0) {
@@ -280,16 +312,14 @@ public final class Prefs {
     }
 
     private static boolean isAcceptable(String key, String value) {
+        if (TRAVELLING_BOOLEANS.contains(key)) {
+            return "true".equals(value) || "false".equals(value);
+        }
         switch (key) {
             case KEY_INPUT_MODE:
                 return isIntBetween(value, INPUT_AUTO, INPUT_POINTER);
             case KEY_DRAW_FPS:
                 return isIntBetween(value, 0, 1000);
-            case KEY_BACK_BUTTON:
-            case KEY_NO_INTRO:
-            case KEY_NO_SOUND:
-            case KEY_USE_ALPHA:
-                return "true".equals(value) || "false".equals(value);
             case KEY_LANGUAGE:
                 return GameLanguage.codeAt(GameLanguage.indexOf(value)).equals(value);
             default:
@@ -300,7 +330,7 @@ public final class Prefs {
 
     private static TouchTunable tunableOf(String key) {
         for (TouchTunable tunable : TOUCH_TUNABLES) {
-            if (key.equals("tune_" + tunable.key)) {
+            if (key.equals(tunable.preference())) {
                 return tunable;
             }
         }
@@ -353,23 +383,14 @@ public final class Prefs {
         for (Map.Entry<String, String> entry : accepted.entrySet()) {
             final String key = entry.getKey();
             final String value = entry.getValue();
-            switch (key) {
-                case KEY_INPUT_MODE:
-                case KEY_DRAW_FPS:
-                    editor.putInt(key, Integer.parseInt(value));
-                    break;
-                case KEY_BACK_BUTTON:
-                case KEY_NO_INTRO:
-                case KEY_NO_SOUND:
-                case KEY_USE_ALPHA:
-                    editor.putBoolean(key, Boolean.parseBoolean(value));
-                    break;
-                case KEY_LANGUAGE:
-                    editor.putString(key, value);
-                    break;
-                default:
-                    editor.putFloat(key, Float.parseFloat(value));
-                    break;
+            if (TRAVELLING_INTS.contains(key)) {
+                editor.putInt(key, Integer.parseInt(value));
+            } else if (TRAVELLING_BOOLEANS.contains(key)) {
+                editor.putBoolean(key, Boolean.parseBoolean(value));
+            } else if (KEY_LANGUAGE.equals(key)) {
+                editor.putString(key, value);
+            } else {
+                editor.putFloat(key, Float.parseFloat(value));
             }
         }
         editor.putString(KEY_INSTALLED_VERSION, release);
@@ -378,8 +399,8 @@ public final class Prefs {
     }
 
     private static boolean isTransferKey(String key) {
-        return Arrays.asList(KEY_INPUT_MODE, KEY_DRAW_FPS, KEY_BACK_BUTTON, KEY_NO_INTRO,
-            KEY_NO_SOUND, KEY_USE_ALPHA, KEY_LANGUAGE).contains(key) || tunableOf(key) != null;
+        return TRAVELLING_INTS.contains(key) || TRAVELLING_BOOLEANS.contains(key)
+            || KEY_LANGUAGE.equals(key) || tunableOf(key) != null;
     }
 
     private static String inputModeArgument(int mode) {
