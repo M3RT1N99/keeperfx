@@ -73,6 +73,36 @@ public class ArchiveUnpackerTest {
     }
 
     @Test
+    public void anAbsoluteEntryIsRefusedRatherThanMovedInside() throws IOException {
+        final File archive = TestArchives.sevenZ(folder.newFile("a.7z"), TestArchives.entries(
+            "/abs.txt", "x", "C:\\abs2.txt", "x", "fxdata/a.cfg", "one"));
+        assertEquals(Collections.singletonList("fxdata/a.cfg"),
+            ArchiveUnpacker.unpackSevenZ(archive, root, TestArchives.QUIET));
+        assertFalse(new File(root, "abs.txt").exists());
+    }
+
+    @Test
+    public void aBackslashIsASeparatorAndCannotClimbEither() throws IOException {
+        final File archive = TestArchives.sevenZ(folder.newFile("a.7z"), TestArchives.entries(
+            "fxdata\\a.cfg", "one", "..\\evil.txt", "x"));
+        assertEquals(Collections.singletonList("fxdata/a.cfg"),
+            ArchiveUnpacker.unpackSevenZ(archive, root, TestArchives.QUIET));
+        assertEquals("one", TestArchives.read(new File(root, "fxdata/a.cfg")));
+        assertFalse(sandboxFile("evil.txt").exists());
+    }
+
+    @Test
+    public void aLinkLeadingOutOfTheInstallationIsNotFollowed() throws IOException {
+        final File outside = folder.newFolder("sandbox", "outside");
+        java.nio.file.Files.createSymbolicLink(new File(root, "link").toPath(), outside.toPath());
+        final File archive = TestArchives.sevenZ(folder.newFile("a.7z"), TestArchives.entries(
+            "link/evil.txt", "x", "fxdata/a.cfg", "one"));
+        assertEquals(Collections.singletonList("fxdata/a.cfg"),
+            ArchiveUnpacker.unpackSevenZ(archive, root, TestArchives.QUIET));
+        assertFalse(new File(outside, "evil.txt").exists());
+    }
+
+    @Test
     public void aCancelStopsTheUnpackAtTheNextEntry() throws IOException {
         final File archive = TestArchives.sevenZ(folder.newFile("a.7z"), TestArchives.entries(
             "a.txt", "1", "b.txt", "2", "c.txt", "3"));

@@ -80,7 +80,6 @@ final class ArchiveUnpacker {
     static List<String> unpackSevenZ(File archive, File destination, Progress progress)
             throws IOException {
         FileUtil.ensureDirectory(destination);
-        final String canonicalRoot = destination.getCanonicalPath() + File.separator;
         final List<String> written = new ArrayList<>();
         try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
             SevenZArchiveEntry entry;
@@ -93,9 +92,8 @@ final class ArchiveUnpacker {
                 if (name == null || name.isEmpty()) {
                     continue;
                 }
-                final File out = new File(destination, name);
-                // Refuse anything that would escape the destination directory.
-                if (!out.getCanonicalPath().startsWith(canonicalRoot)) {
+                final File out = ArchivePaths.resolve(destination, name);
+                if (out == null) {
                     Log.w(TAG, "Skipping entry outside the destination: " + name);
                     continue;
                 }
@@ -114,7 +112,7 @@ final class ArchiveUnpacker {
                         os.write(buffer, 0, read);
                     }
                 }
-                written.add(name);
+                written.add(ArchivePaths.relativePath(name));
                 if ((written.size() % 100) == 0) {
                     progress.onFiles(written.size());
                 }
@@ -133,7 +131,6 @@ final class ArchiveUnpacker {
      * @return how many files it wrote.
      */
     static int unzipFlat(File archive, File target, Progress progress) throws IOException {
-        final String canonicalRoot = target.getCanonicalPath() + File.separator;
         int files = 0;
         try (ZipInputStream zip = new ZipInputStream(
                 new BufferedInputStream(new FileInputStream(archive)))) {
@@ -150,8 +147,8 @@ final class ArchiveUnpacker {
                 if (entry.isDirectory() || name.isEmpty()) {
                     continue;
                 }
-                final File out = new File(target, name);
-                if (!out.getCanonicalPath().startsWith(canonicalRoot)) {
+                final File out = ArchivePaths.resolve(target, name);
+                if (out == null) {
                     continue;
                 }
                 try (OutputStream os = new FileOutputStream(out)) {
@@ -202,10 +199,11 @@ final class ArchiveUnpacker {
                 if (!sectionApplies) {
                     continue;
                 }
-                final String relative = line.startsWith("/") ? line.substring(1) : line;
-                final File victim = new File(root, relative);
-                if (victim.isFile() && victim.getCanonicalPath()
-                        .startsWith(root.getCanonicalPath() + File.separator)) {
+                // The leading slash is how the list writes its paths, not an absolute one.
+                final String relative = ArchivePaths.relativePath(
+                    line.startsWith("/") ? line.substring(1) : line);
+                final File victim = ArchivePaths.resolve(root, relative);
+                if (victim != null && victim.isFile()) {
                     final boolean gone = (patchBackup != null && releaseFiles.contains(relative))
                         ? moveIntoBackup(victim, new File(patchBackup, relative))
                         : victim.delete();

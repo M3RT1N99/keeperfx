@@ -164,6 +164,55 @@ public class AlphaPatchTest {
         assertFalse(new File(root, "fxdata/font16.fxfont").exists());
     }
 
+    /**
+     * The backup goes first and reads the names before any check of the unpack,
+     * and a revert deletes what it wrote down. A name climbing out would copy a
+     * file of the app's over into the backup and delete it on the way back.
+     */
+    @Test
+    public void aClimbingEntryReachesNeitherTheBackupNorTheAddedList() throws IOException {
+        final File settings = new File(folder.getRoot(), "shared_prefs.xml");
+        TestArchives.write(settings, "the player's settings");
+        final File patch = TestArchives.sevenZ(new File(folder.getRoot(), "evil.7z"),
+            TestArchives.entries(
+                "../shared_prefs.xml", "overwritten",
+                "../../elsewhere.txt", "x",
+                "/abs.txt", "x",
+                "fxdata/shared.cfg", "patched"));
+        applyArchive(patch);
+        assertEquals("the player's settings", TestArchives.read(settings));
+        assertFalse(TestArchives.read(new File(backupDir, "added.txt")).contains(".."));
+
+        new AlphaBackup(root, backupDir).restore();
+
+        assertEquals("the player's settings", TestArchives.read(settings));
+        assertEquals("release", contents("fxdata/shared.cfg"));
+    }
+
+    /** The list is only a file on disk, written by whichever build came before. */
+    @Test
+    public void aRevertDoesNotBelieveThePathsOnItsList() throws IOException {
+        final File settings = new File(folder.getRoot(), "shared_prefs.xml");
+        TestArchives.write(settings, "the player's settings");
+        applyPatch();
+        TestArchives.write(new File(backupDir, "added.txt"), "../shared_prefs.xml\n/etc/hosts\n");
+
+        new AlphaBackup(root, backupDir).restore();
+
+        assertTrue(settings.exists());
+    }
+
+    /** A process dying in the middle of the copy leaves this behind. */
+    @Test
+    public void halfACopyInTheBackupIsNotRestored() throws IOException {
+        applyPatch();
+        TestArchives.write(new File(backupDir, "fxdata/other.cfg.part"), "torn");
+
+        new AlphaBackup(root, backupDir).restore();
+
+        assertFalse(new File(root, "fxdata/other.cfg.part").exists());
+    }
+
     @Test
     public void aRetiredFileAlreadyInTheBackupKeepsTheReleaseCopy() throws IOException {
         applyPatch();

@@ -15,6 +15,7 @@
 /******************************************************************************/
 package net.keeperfx.android;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -41,10 +42,34 @@ final class FileUtil {
         }
     }
 
-    static void copyFile(File from, File to) throws IOException {
-        try (InputStream in = new FileInputStream(from);
-             OutputStream out = new FileOutputStream(to)) {
-            copy(in, out);
+    /**
+     * Writes a whole file or none at all, so that a full disk or a dying process
+     * cannot leave half of one under a name that later counts as present.
+     */
+    static void writeAtomically(File target, InputStream content) throws IOException {
+        ensureDirectory(target.getParentFile());
+        final File partial = new File(target.getPath() + ".part");
+        try (OutputStream out = new FileOutputStream(partial)) {
+            copy(content, out);
+        } catch (IOException e) {
+            //noinspection ResultOfMethodCallIgnored
+            partial.delete();
+            throw e;
+        }
+        if (!partial.renameTo(target)) {
+            //noinspection ResultOfMethodCallIgnored
+            partial.delete();
+            throw new IOException("Cannot write " + target.getAbsolutePath());
+        }
+    }
+
+    static void writeAtomically(File target, byte[] content) throws IOException {
+        writeAtomically(target, new ByteArrayInputStream(content));
+    }
+
+    static void copyAtomically(File from, File to) throws IOException {
+        try (InputStream in = new FileInputStream(from)) {
+            writeAtomically(to, in);
         }
     }
 

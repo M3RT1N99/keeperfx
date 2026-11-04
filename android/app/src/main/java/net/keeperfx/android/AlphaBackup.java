@@ -72,12 +72,14 @@ final class AlphaBackup {
         try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
             SevenZArchiveEntry entry;
             while ((entry = sevenZ.getNextEntry()) != null) {
-                final String name = entry.getName();
-                if (name == null || name.isEmpty() || entry.isDirectory()
-                        || ArchiveUnpacker.isSkipped(name)) {
+                // The same check the unpack is about to make, and the name goes on
+                // the list a revert deletes from, so it cannot wait until then.
+                final File installed = ArchivePaths.resolve(gameDirectory, entry.getName());
+                if (installed == null || entry.isDirectory()
+                        || ArchiveUnpacker.isSkipped(entry.getName())) {
                     continue;
                 }
-                final File installed = new File(gameDirectory, name);
+                final String name = ArchivePaths.relativePath(entry.getName());
                 // A file the earlier patch added is on disk in the patch's own
                 // version; backing that up as if it were the release's would
                 // make a revert restore it. It stays on the added list instead.
@@ -89,10 +91,10 @@ final class AlphaBackup {
                 if (target.isFile()) {
                     continue;
                 }
-                // Skipping would silently cost this file its way back, so a
-                // folder that cannot be made is a failure.
-                FileUtil.ensureDirectory(target.getParentFile());
-                FileUtil.copyFile(installed, target);
+                // A failure here has to stop the patch: skipping would silently cost
+                // this file its way back. And it may not leave half a copy, which
+                // the next patch would take for the release's own.
+                FileUtil.copyAtomically(installed, target);
                 saved++;
             }
         }
@@ -127,8 +129,11 @@ final class AlphaBackup {
      */
     int restore() throws IOException {
         for (String name : readAddedList()) {
-            //noinspection ResultOfMethodCallIgnored
-            new File(gameDirectory, name).delete();
+            final File added = ArchivePaths.resolve(gameDirectory, name);
+            if (added != null) {
+                //noinspection ResultOfMethodCallIgnored
+                added.delete();
+            }
         }
         final int restored = restoreTree(directory, gameDirectory);
         FileUtil.deleteTree(directory);
@@ -147,8 +152,9 @@ final class AlphaBackup {
                 //noinspection ResultOfMethodCallIgnored
                 target.mkdirs();
                 restored += restoreTree(entry, target);
-            } else if (!entry.getName().equals(ADDED_LIST)) {
-                FileUtil.copyFile(entry, target);
+            } else if (!entry.getName().equals(ADDED_LIST)
+                    && !entry.getName().endsWith(".part")) {
+                FileUtil.copyAtomically(entry, target);
                 restored++;
             }
         }
