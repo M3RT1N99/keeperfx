@@ -3260,10 +3260,11 @@ void input(void)
  * finger's width, keeping it as near to where the finger actually was as the
  * button allows.
  *
- * The search is skipped entirely while the pointer is outside every menu, so
- * placing rooms and tagging blocks keep the exact position the finger had. It
- * also does nothing unless the native touch scheme is driving the game, which
- * leaves the desktop ports untouched.
+ * The search covers each menu and a finger's width around it, because a finger
+ * aimed at a button by the menu's edge can land just outside. Away from the menus
+ * it is skipped, so placing rooms and tagging blocks keep the exact position the
+ * finger had. It also does nothing unless the native touch scheme is driving the
+ * game, which leaves the desktop ports untouched.
  */
 static void touch_assist_gui_pointer(void)
 {
