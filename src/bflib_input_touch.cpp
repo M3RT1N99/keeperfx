@@ -646,10 +646,10 @@ static void touch_normalized_to_game(float nx, float ny, long *x, long *y)
  * areas and rooms can be painted the same way as with a mouse - once a second finger
  * had its chance to arrive and make this a camera gesture instead.
  */
-static void touch_start_drag_when_due(const struct TouchFinger *finger)
+static void touch_start_drag_when_due(const struct TouchFinger *finger, Uint64 now_ms)
 {
     if (!finger->moved || (touch_gesture != TGest_Point)
-     || ((SDL_GetTicks() - finger->down_ticks) < TOUCH_SECOND_FINGER_GRACE_MS))
+     || ((now_ms - finger->down_ticks) < TOUCH_SECOND_FINGER_GRACE_MS))
         return;
     touch_gesture = TGest_Drag;
     // Dragging with the toggle on undesignates an area, which is
@@ -658,6 +658,18 @@ static void touch_start_drag_when_due(const struct TouchFinger *finger)
         touch_press_right();
     else
         touch_press_left();
+}
+
+/**
+ * When a finger event happened, on the same clock as SDL_GetTicks(). After a slow
+ * frame several events wait in the queue, and timing them by when they get processed
+ * would count that wait as the finger's: a tap would read as held too long, and a
+ * first finger's motion would run out the grace with the second finger's touch right
+ * behind it in the queue.
+ */
+static Uint64 touch_event_ms(const SDL_Event *ev)
+{
+    return SDL_NS_TO_MS(ev->tfinger.timestamp);
 }
 
 /**
@@ -689,7 +701,7 @@ void TEvent(const SDL_Event *ev)
         touch_normalized_to_game(ev->tfinger.x, ev->tfinger.y, &finger->x, &finger->y);
         finger->start_x = finger->x;
         finger->start_y = finger->y;
-        finger->down_ticks = SDL_GetTicks();
+        finger->down_ticks = touch_event_ms(ev);
         finger->moved = false;
         touch_finger_count++;
         if (touch_finger_count > touch_max_fingers_this_contact)
@@ -744,7 +756,7 @@ void TEvent(const SDL_Event *ev)
         else if ((touch_finger_count == 1) && (touch_gesture != TGest_Blocked))
         {
             touch_move_pointer(finger->x, finger->y);
-            touch_start_drag_when_due(finger);
+            touch_start_drag_when_due(finger, touch_event_ms(ev));
         }
         break;
     }
@@ -755,7 +767,7 @@ void TEvent(const SDL_Event *ev)
         struct TouchFinger *finger = touch_find(ev->tfinger.fingerID);
         if (finger == NULL)
             break;
-        const Uint64 held_ms = SDL_GetTicks() - finger->down_ticks;
+        const Uint64 held_ms = touch_event_ms(ev) - finger->down_ticks;
         // A contact the system took away ends the gesture like a lifted finger
         // does, but nobody meant it as a tap, so it counts as a drag.
         const TbBool canceled = (ev->type == SDL_EVENT_FINGER_CANCELED);
@@ -795,7 +807,7 @@ void TEvent(const SDL_Event *ev)
                     touch_camera_release(&tuning, touch_contact_moved);
                 }
                 // Multi finger taps that never turned into a drag act as shortcuts.
-                if (!touch_contact_moved && ((SDL_GetTicks() - touch_contact_start_ticks) <= TOUCH_TAP_MAX_MS))
+                if (!touch_contact_moved && ((touch_event_ms(ev) - touch_contact_start_ticks) <= TOUCH_TAP_MAX_MS))
                 {
                     // Two fingers is the shortest gesture there is, and right
                     // click is the verb Dungeon Keeper uses most after left:
@@ -913,7 +925,8 @@ void update_touch_inputs(void)
             if (!finger->active)
                 continue;
             // A finger that stopped within the grace sends no more motion to start its drag.
-            touch_start_drag_when_due(finger);
+            // The queue was emptied just before this, so no second finger can be waiting.
+            touch_start_drag_when_due(finger, SDL_GetTicks());
             if (finger->moved)
                 continue;
             if ((SDL_GetTicks() - finger->down_ticks) >= touch_longpress_ms)
