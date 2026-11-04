@@ -26,6 +26,7 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -465,16 +466,30 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             DownloadService.start(this, runnable);
         }
         if (appLeftOut) {
-            new AlertDialog.Builder(this)
-                .setTitle(R.string.updates_permission_title)
-                .setMessage(runnable.isEmpty()
-                    ? R.string.updates_permission : R.string.updates_permission_rest_running)
+            askForInstallPermission(!runnable.isEmpty());
+        }
+    }
+
+    /**
+     * Android 11 ends every process of an app when this permission is granted to it, and
+     * the downloads that were just started would go with them. There the settings wait
+     * until the next tap, when the app update is all that is left and nothing is running.
+     */
+    private void askForInstallPermission(boolean othersRunning) {
+        final AlertDialog.Builder dialog = new AlertDialog.Builder(this)
+            .setTitle(R.string.updates_permission_title);
+        if (othersRunning && Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
+            dialog.setMessage(R.string.updates_permission_rest_running_later)
+                .setPositiveButton(android.R.string.ok, null);
+        } else {
+            dialog.setMessage(othersRunning
+                    ? R.string.updates_permission_rest_running : R.string.updates_permission)
                 .setPositiveButton(R.string.updates_permission_open, (d, w) -> startActivity(
                     new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                         Uri.parse("package:" + getPackageName()))))
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                .setNegativeButton(android.R.string.cancel, null);
         }
+        dialog.show();
     }
 
     /**

@@ -58,6 +58,7 @@
     <string name="updates_permission_title">Berechtigung nötig</string>
     <string name="updates_permission">Um sich selbst zu aktualisieren, braucht KeeperFX die Berechtigung, Apps zu installieren. Erteile sie einmal in den folgenden Einstellungen und starte das Update dann noch einmal.</string>
     <string name="updates_permission_rest_running">Die anderen Downloads laufen. Das App-Update wurde ausgelassen: Um sich selbst zu aktualisieren, braucht KeeperFX die Berechtigung, Apps zu installieren. Erteile sie einmal in den folgenden Einstellungen und starte das Update dann noch einmal.</string>
+    <string name="updates_permission_rest_running_later">Die anderen Downloads laufen. Das App-Update wurde ausgelassen: Es braucht die Berechtigung, Apps zu installieren, und das Erteilen beendet alles, was die App gerade tut. Starte das Update noch einmal, wenn diese fertig sind.</string>
     <string name="updates_permission_open">Einstellungen öffnen</string>
 
     <string name="notification_install_update">Update geladen. Zum Installieren tippen.</string>
