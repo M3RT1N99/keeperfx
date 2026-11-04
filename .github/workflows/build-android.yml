@@ -95,9 +95,11 @@ jobs:
         echo "GIT_REVISION=$GIT_REVISION" >> $GITHUB_ENV
         # Passing a suffix here overrides the one the CMake side would compose,
         # so the marker from version.mk has to be carried along or the APK ends
-        # up looking like an official build. See AGENTS.md.
-        VERSION_MK_SUFFIX=$(cd .. && grep -E '^PACKAGE_SUFFIX=' version.mk | cut -d= -f2- || true)
-        PACKAGE_SUFFIX="Android${VERSION_MK_SUFFIX:+-$VERSION_MK_SUFFIX}_$GIT_REVISION"
+        # up looking like an official build. See AGENTS.md. No marker found means
+        # the line in version.mk changed form, and that must stop the build here.
+        VERSION_MK_SUFFIX=$(cd .. && grep -E '^PACKAGE_SUFFIX=' version.mk | cut -d= -f2-)
+        test -n "$VERSION_MK_SUFFIX"
+        PACKAGE_SUFFIX="Android-${VERSION_MK_SUFFIX}_$GIT_REVISION"
         echo "PACKAGE_SUFFIX=$PACKAGE_SUFFIX" >> $GITHUB_ENV
         gradle --no-daemon assembleRelease \
           -Pkeeperfx.buildNumber="$BUILD_NUMBER" \
@@ -123,7 +125,12 @@ jobs:
         done
         # zlib is linked statically. Its shared twin only ever got packaged by accident.
         test ! -e apk-check/lib/arm64-v8a/libz.so
-        ARTIFACT_NAME="keeperfx-android-arm64-${GIT_REVISION}"
+        # What was asked for is not proof: an APK once went out with a plain suffix
+        # because of what the build did with it. The marker has to be in the library.
+        strings apk-check/lib/arm64-v8a/libkeeperfx.so | grep -F "$PACKAGE_SUFFIX"
+        # Only the Actions artifact. The release assets keep their names, because
+        # installed updaters look for them.
+        ARTIFACT_NAME="keeperfx-android-arm64-unofficial-${GIT_REVISION}"
         echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
         mkdir -p out
         # Stable file name: the in-app updater downloads this exact URL.
