@@ -84,4 +84,23 @@ final class FileUtil {
         //noinspection ResultOfMethodCallIgnored
         root.delete();
     }
+
+    /**
+     * Clears out earlier downloads of the same thing. A file and its partial stay;
+     * they are this download and what it resumes from.
+     */
+    static void deleteOtherVersions(File keep, String prefix) {
+        final File[] entries = keep.getParentFile().listFiles();
+        if (entries == null) {
+            return;
+        }
+        for (File entry : entries) {
+            final String name = entry.getName();
+            if (name.startsWith(prefix) && !name.equals(keep.getName())
+                    && !name.equals(ResumableDownload.partialOf(keep).getName())) {
+                //noinspection ResultOfMethodCallIgnored
+                entry.delete();
+            }
+        }
+    }
 }

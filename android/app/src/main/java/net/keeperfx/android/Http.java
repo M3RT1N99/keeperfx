@@ -57,10 +57,25 @@ final class Http {
             if (next == null) {
                 throw new IOException("Redirect without a Location header");
             }
-            connection = connect(next, from, accept);
+            connection = connect(redirectTarget(url, next), from, accept);
+            url = connection.getURL().toString();
             status = connection.getResponseCode();
         }
         return connection;
+    }
+
+    /**
+     * Where a redirect leads. A Location can be relative. Android refuses plain
+     * http for this app anyway, but "file:" and friends would reach the cast below,
+     * and a download should not depend on the platform noticing.
+     */
+    static String redirectTarget(String from, String location) throws IOException {
+        final URL origin = new URL(from);
+        final URL next = new URL(origin, location);
+        if (origin.getProtocol().equals("https") && !next.getProtocol().equals("https")) {
+            throw new IOException("Refusing a redirect from https to " + next.getProtocol());
+        }
+        return next.toString();
     }
 
     private static HttpURLConnection connect(String url, long from, String accept)

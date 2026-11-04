@@ -109,24 +109,15 @@ public final class AppUpdater {
     /** Runs synchronously; the caller provides the thread. */
     void downloadAndInstall(AppRelease available) {
         try {
-            final File dir = new File(context.getFilesDir(), "updates");
-            //noinspection ResultOfMethodCallIgnored
-            dir.mkdirs();
             // Named after the version so a partial download of an older build
             // is never mistaken for this one and resumed into nonsense.
-            final File target = new File(dir, "keeperfx-" + available.versionName + ".apk");
-            for (File stale : dir.listFiles() != null ? dir.listFiles() : new File[0]) {
-                if (!stale.equals(target)) {
-                    //noinspection ResultOfMethodCallIgnored
-                    stale.delete();
-                }
-            }
+            final File target = new File(new File(context.getFilesDir(), "updates"),
+                "keeperfx-" + available.versionName + ".apk");
+            FileUtil.ensureDirectory(target.getParentFile());
+            FileUtil.deleteOtherVersions(target, "keeperfx-");
 
             listener.onProgress(-1, "");
-            download(available.apkUrl, target, available.apkSize);
-            if (isCancelled()) {
-                //noinspection ResultOfMethodCallIgnored
-                target.delete();
+            if (!download(available.apkUrl, target, available.apkSize)) {
                 listener.onFinished(false, "Download cancelled");
                 return;
             }
@@ -146,8 +137,9 @@ public final class AppUpdater {
         }
     }
 
-    private void download(String url, File target, long expectedSize) throws IOException {
-        ResumableDownload.fetch(url, target, expectedSize, new ResumableDownload.Progress() {
+    /** @return true when the file is complete, false when cancelled. */
+    private boolean download(String url, File target, long expectedSize) throws IOException {
+        return ResumableDownload.fetch(url, target, expectedSize, new ResumableDownload.Progress() {
             @Override
             public void onBytes(long done, long total) {
                 final int percent = (total > 0) ? (int) (done * 100 / total) : -1;

@@ -109,8 +109,7 @@ public final class UpdateManager {
         if (facts.dataInstalled && facts.alphaEnabled) {
             try {
                 facts.latestAlpha = ReleaseApi.latestAlpha();
-                facts.alphaCached =
-                    ReleaseDownloader.isAlphaCached(context, facts.latestAlpha.version);
+                facts.alphaCached = ReleaseDownloader.isAlphaCached(context, facts.latestAlpha);
             } catch (Exception e) {
                 Log.w(TAG, "Could not check the KeeperFX alpha", e);
             }

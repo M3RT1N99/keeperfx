@@ -90,9 +90,9 @@ public final class ReleaseDownloader {
                 return;
             }
 
-            archive = new File(downloadDirectory(), "keeperfx-music.zip");
-            download(url, archive, -1, "music");
-            if (isCancelled()) {
+            archive = new File(downloadDirectory(), "keeperfx-music-archive.zip");
+            FileUtil.deleteOtherVersions(archive, "keeperfx-music");
+            if (!download(url, archive, -1, "music")) {
                 finish(false, "Download cancelled");
                 return;
             }
@@ -106,9 +106,9 @@ public final class ReleaseDownloader {
             Log.e(TAG, "Music download failed", e);
             finish(false, "Failed: " + e.getMessage());
         } finally {
-            // Only a completed archive is removed. A partial one is what the
-            // next attempt resumes from.
-            if (archive != null && archive.exists() && !isCancelled()) {
+            // Only ever a whole archive under this name. What is still partial
+            // is what the next attempt resumes from.
+            if (archive != null && !isCancelled()) {
                 //noinspection ResultOfMethodCallIgnored
                 archive.delete();
             }
@@ -124,6 +124,7 @@ public final class ReleaseDownloader {
      * stable release with a patch on top.
      */
     public void runAlpha() {
+        File archive = null;
         try {
             listener.onStage("Checking for the current alpha", -1, "");
             final ReleaseApi.ReleaseInfo alpha = ReleaseApi.latestAlpha();
@@ -137,15 +138,13 @@ public final class ReleaseDownloader {
             // Kept between switches. Turning the patch off restores the files
             // it replaced from a local copy, so turning it back on should not
             // cost 33 MB again just because it went away in between.
-            final File archive = alphaArchiveCache(version);
-            if (archive.isFile() && archive.length() > 0) {
+            archive = alphaArchiveCache(context, version);
+            FileUtil.deleteOtherVersions(archive, "alpha-");
+            if (ResumableDownload.isComplete(archive, alpha.sizeInBytes)) {
                 listener.onStage("Using the archive already downloaded", -1, "");
-            } else {
-                download(alpha.downloadUrl, archive, alpha.sizeInBytes, version);
-                if (isCancelled()) {
-                    finish(false, "Download cancelled");
-                    return;
-                }
+            } else if (!download(alpha.downloadUrl, archive, alpha.sizeInBytes, version)) {
+                finish(false, "Download cancelled");
+                return;
             }
 
             listener.onStage("Saving the files being replaced", -1, "");
@@ -164,9 +163,14 @@ public final class ReleaseDownloader {
             finish(true, "KeeperFX alpha " + version + " applied");
         } catch (Exception e) {
             Log.e(TAG, "Alpha download failed", e);
+            // Kept on success, see above. After a failure it may be what failed,
+            // and keeping it would have every further attempt fail the same way.
+            if (archive != null) {
+                //noinspection ResultOfMethodCallIgnored
+                archive.delete();
+            }
             finish(false, "Failed: " + e.getMessage());
         }
-        // The archive is deliberately not deleted; see alphaArchiveCache().
     }
 
     /**
@@ -175,10 +179,9 @@ public final class ReleaseDownloader {
      * Asked before the list of downloads is worded, so an entry that costs
      * nothing but unpacking does not present itself as a 33 MB download.
      */
-    public static boolean isAlphaCached(Context context, String version) {
-        final File f = new File(new File(context.getFilesDir(), "alpha-cache"),
-            "alpha-" + version + ".7z");
-        return f.isFile() && f.length() > 0;
+    static boolean isAlphaCached(Context context, ReleaseApi.ReleaseInfo alpha) {
+        return ResumableDownload.isComplete(alphaArchiveCache(context, alpha.version),
+            alpha.sizeInBytes);
     }
 
     /**
@@ -186,20 +189,8 @@ public final class ReleaseDownloader {
      * free. Named after the version, so a newer alpha is still fetched and the
      * old one can be dropped.
      */
-    private File alphaArchiveCache(String version) {
-        final File dir = new File(context.getFilesDir(), "alpha-cache");
-        //noinspection ResultOfMethodCallIgnored
-        dir.mkdirs();
-        final File[] stale = dir.listFiles();
-        if (stale != null) {
-            for (File f : stale) {
-                if (!f.getName().equals("alpha-" + version + ".7z")) {
-                    //noinspection ResultOfMethodCallIgnored
-                    f.delete();
-                }
-            }
-        }
-        return new File(dir, "alpha-" + version + ".7z");
+    private static File alphaArchiveCache(Context context, String version) {
+        return new File(new File(context.getFilesDir(), "alpha-cache"), "alpha-" + version + ".7z");
     }
 
     private AlphaBackup alphaBackup() {
@@ -252,6 +243,9 @@ public final class ReleaseDownloader {
         prefs.setInstalledAlphaVersion("");
         FileUtil.deleteTree(GameData.alphaBackupDirectory(context));
         FileUtil.deleteTree(new File(context.getFilesDir(), "alpha-cache"));
+        // Hundreds of megabytes of partial release, and what "Reset" is often for.
+        FileUtil.deleteTree(new File(context.getFilesDir(), "downloads"));
+        FileUtil.deleteTree(new File(context.getFilesDir(), "updates"));
         //noinspection ResultOfMethodCallIgnored
         GameData.stableManifest(context).delete();
         //noinspection ResultOfMethodCallIgnored
@@ -271,17 +265,17 @@ public final class ReleaseDownloader {
             }
             Log.i(TAG, "Latest KeeperFX release: " + version + " at " + release.downloadUrl);
 
-            // A partial install must not look complete, so forget the recorded
-            // version until the new one is fully unpacked.
-            new Prefs(context).setInstalledVersion("");
-
-            archive = new File(downloadDirectory(), "keeperfx-release.7z");
-            download(release.downloadUrl, archive, release.sizeInBytes, version);
-            if (isCancelled()) {
+            archive = new File(downloadDirectory(), "keeperfx-release-" + version + ".7z");
+            FileUtil.deleteOtherVersions(archive, "keeperfx-release");
+            if (!download(release.downloadUrl, archive, release.sizeInBytes, version)) {
                 finish(false, "Download cancelled");
                 return;
             }
 
+            // A partial install must not look complete, so forget the recorded
+            // version until the new one is fully unpacked. Not any earlier: a
+            // download that fails has not touched what is installed.
+            new Prefs(context).setInstalledVersion("");
             final List<String> unpacked = unpack(archive);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
@@ -306,19 +300,23 @@ public final class ReleaseDownloader {
             Log.e(TAG, "Release download failed", e);
             finish(false, "Failed: " + e.getMessage());
         } finally {
-            if (archive != null && archive.exists()) {
+            // Only ever a whole archive under this name, whether it unpacked or
+            // turned out to be damaged. What is still partial is what the next
+            // attempt resumes from, and a cancelled unpack can start over for free.
+            if (archive != null && !isCancelled()) {
                 //noinspection ResultOfMethodCallIgnored
                 archive.delete();
             }
         }
     }
 
-    private void download(String url, File target, long expectedSize, String version)
+    /** @return true when the file is complete, false when cancelled. */
+    private boolean download(String url, File target, long expectedSize, String version)
             throws IOException {
         final String stage = "music".equals(version)
             ? "Downloading the music"
             : "Downloading KeeperFX " + version;
-        ResumableDownload.fetch(url, target, expectedSize, new ResumableDownload.Progress() {
+        return ResumableDownload.fetch(url, target, expectedSize, new ResumableDownload.Progress() {
             @Override
             public void onBytes(long done, long total) {
                 final long known = (total > 0) ? total : expectedSize;

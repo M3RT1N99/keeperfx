@@ -13,6 +13,11 @@
  *     update and the KeeperFX release. The music archive on keeperfx.net does
  *     not advertise ranges; that case falls back to starting over, which is
  *     handled by checking the response rather than by assuming either way.
+ *
+ *     Everything in flight lives under a name of its own, so a file under the
+ *     target's name is whole and nobody has to wonder about an archive they find.
+ *     Name a download after its version to have a partial only ever continued
+ *     with the bytes it started with.
  * @author   KeeperFX Team
  * @date     05 Aug 2026
  * @par  Copying and copyrights:
@@ -32,12 +37,15 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class ResumableDownload {
 
     private static final String TAG = "KeeperFX";
+
+    private static final Pattern CONTENT_RANGE = Pattern.compile("bytes (\\d+)-\\d+/(\\d+|\\*)");
 
     public interface Progress {
         /**
@@ -52,9 +60,22 @@ public final class ResumableDownload {
     private ResumableDownload() {
     }
 
+    /** Where a download of target keeps its bytes until they are all there. */
+    static File partialOf(File target) {
+        return new File(target.getPath() + ".part");
+    }
+
     /**
-     * Downloads url into target, continuing an earlier attempt when the file is
-     * already partly there and the server allows it.
+     * Whether a whole download of this size is already on disk. Without a size to
+     * compare with, a file under the target's name still is whole.
+     */
+    static boolean isComplete(File target, long expectedSize) {
+        return target.isFile() && (expectedSize <= 0 || target.length() == expectedSize);
+    }
+
+    /**
+     * Downloads url into target, continuing an earlier attempt when the partial
+     * file is there and the server allows it.
      *
      * The size is what the caller was promised by whatever API named the file,
      * or -1. Two protections come from knowing it: a partial file larger than
@@ -62,54 +83,66 @@ public final class ResumableDownload {
      * resumed into garbage, and a transfer that ends early is an error rather
      * than a quietly truncated archive.
      *
-     * @return true when the file is complete, false when cancelled.
+     * @return true when the file is complete, false when cancelled. On a failure
+     *         or a cancel the partial file stays for the next attempt.
      */
     public static boolean fetch(String url, File target, long expectedSize, Progress progress)
             throws IOException {
-        long existing = target.isFile() ? target.length() : 0;
+        if (isComplete(target, expectedSize)) {
+            return true;
+        }
+        //noinspection ResultOfMethodCallIgnored
+        target.delete();
+        FileUtil.ensureDirectory(target.getParentFile());
+
+        final File partial = partialOf(target);
+        long existing = partial.isFile() ? partial.length() : 0;
         if (expectedSize > 0 && existing > expectedSize) {
             Log.w(TAG, "Partial file is larger than the download itself, starting over");
             //noinspection ResultOfMethodCallIgnored
-            target.delete();
+            partial.delete();
             existing = 0;
+        }
+        if (expectedSize > 0 && existing == expectedSize) {
+            // The process died between the last byte and the rename.
+            moveIntoPlace(partial, target);
+            return true;
         }
 
         HttpURLConnection connection = Http.open(url, existing);
         try {
-            final int status = connection.getResponseCode();
-            boolean append = false;
-
-            if (status == HttpURLConnection.HTTP_PARTIAL) {
+            int status = connection.getResponseCode();
+            if (existing > 0 && !canContinue(status, connection, existing, expectedSize)) {
+                Log.i(TAG, "Cannot continue the partial file (HTTP " + status + "), starting over");
+                connection.disconnect();
+                //noinspection ResultOfMethodCallIgnored
+                partial.delete();
+                existing = 0;
+                connection = Http.open(url, 0);
+                status = connection.getResponseCode();
+            }
+            final boolean append;
+            if (status == HttpURLConnection.HTTP_PARTIAL && existing > 0) {
                 append = true;
                 Log.i(TAG, "Resuming at " + existing + " bytes");
             } else if (status == HttpURLConnection.HTTP_OK) {
                 if (existing > 0) {
                     Log.i(TAG, "Server ignored the range request, starting over");
                 }
+                append = false;
                 existing = 0;
-            } else if (status == 416) {
-                // Requested range beyond the file: what is on disk is already
-                // the whole thing, or it is stale. Start over to be sure.
-                connection.disconnect();
-                //noinspection ResultOfMethodCallIgnored
-                target.delete();
-                existing = 0;
-                connection = Http.open(url, 0);
-                if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
-                    throw new IOException("Server returned HTTP " + connection.getResponseCode());
-                }
             } else {
                 throw new IOException("Server returned HTTP " + status);
             }
 
             final long remaining = connection.getContentLengthLong();
             final long total = (remaining >= 0) ? existing + remaining : -1;
+            final long expected = (total > 0) ? total : expectedSize;
+            requireRoom(partial, expected - existing);
             long done = existing;
 
-            FileUtil.ensureDirectory(target.getParentFile());
-
             try (InputStream in = new BufferedInputStream(connection.getInputStream());
-                 OutputStream out = openOutput(target, append)) {
+                 OutputStream out = new FileOutputStream(partial, append)) {
                 final byte[] buffer = new byte[256 * 1024];
                 long lastReported = -1;
                 int read;
@@ -131,42 +164,59 @@ public final class ResumableDownload {
             // drops the connection, a chunked response cut short - and an
             // archive missing its tail unpacks into exactly the kind of torso
             // this launcher once installed without noticing.
-            final long expected = (total > 0) ? total : expectedSize;
             if (expected > 0 && done != expected) {
                 if (done > expected) {
                     // More than the download is supposed to be: the file on
                     // disk is not this download. Resuming it would not help.
                     //noinspection ResultOfMethodCallIgnored
-                    target.delete();
+                    partial.delete();
                 }
                 throw new IOException(
                     "Download ended at " + done + " of " + expected + " bytes");
             }
+            moveIntoPlace(partial, target);
             return true;
         } finally {
             connection.disconnect();
         }
     }
 
-    private static OutputStream openOutput(File target, boolean append) throws IOException {
-        if (!append) {
-            return new FileOutputStream(target);
+    /**
+     * Whether the answer to a range request really continues what is on disk. A 416
+     * means the partial is stale. A 206 for another start or another total would
+     * splice two different files together; an API can promise a new archive under
+     * a name that was used before.
+     */
+    private static boolean canContinue(int status, HttpURLConnection connection, long existing,
+            long expectedSize) {
+        if (status == 416) {
+            return false;
         }
-        // Seek to the end rather than trusting append mode across filesystems.
-        final RandomAccessFile raf = new RandomAccessFile(target, "rw");
-        raf.seek(raf.length());
-        return new OutputStream() {
-            @Override public void write(int b) throws IOException {
-                raf.write(b);
-            }
+        if (status != HttpURLConnection.HTTP_PARTIAL) {
+            return true;
+        }
+        final String range = connection.getHeaderField("Content-Range");
+        final Matcher match = CONTENT_RANGE.matcher(range != null ? range.trim() : "");
+        if (!match.matches() || Long.parseLong(match.group(1)) != existing) {
+            return false;
+        }
+        return expectedSize <= 0 || match.group(2).equals("*")
+            || Long.parseLong(match.group(2)) == expectedSize;
+    }
 
-            @Override public void write(byte[] b, int off, int len) throws IOException {
-                raf.write(b, off, len);
-            }
+    /** Says so before a 360 MB transfer runs into the wall at the far end. */
+    private static void requireRoom(File partial, long bytes) throws IOException {
+        final long usable = partial.getParentFile().getUsableSpace();
+        if (bytes > usable) {
+            throw new IOException("Not enough free storage: this needs "
+                + GameData.describeBytes(bytes) + " and " + GameData.describeBytes(usable)
+                + " are free");
+        }
+    }
 
-            @Override public void close() throws IOException {
-                raf.close();
-            }
-        };
+    private static void moveIntoPlace(File partial, File target) throws IOException {
+        if (!partial.renameTo(target)) {
+            throw new IOException("Cannot write " + target.getAbsolutePath());
+        }
     }
 }
