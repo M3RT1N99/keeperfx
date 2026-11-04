@@ -38,10 +38,8 @@ def portVersion = "${portMajor}.${portBaseMinor + Math.max(0, commitsSinceBase)}
 // numbers to be equal, so reporting our own commit count made this build
 // incompatible with every KeeperFX in existence, official or not. Falls back
 // to the fork count only for a local build, which has no upstream remote.
-def engineBuild = (project.findProperty("keeperfx.engineBuild") ?: "0") as int
-if (engineBuild <= 0) {
-    engineBuild = buildNumber
-}
+def knownEngineBuild = (project.findProperty("keeperfx.engineBuild") ?: "0") as int
+def engineBuild = (knownEngineBuild > 0) ? knownEngineBuild : buildNumber
 
 def sdlJavaDir = file("${rootDir}/.deps/SDL3/android-project/app/src/main/java")
 
@@ -68,6 +66,9 @@ android {
         // Android needs it to rise on every build, a merge from upstream making it
         // jump does no harm, and it is never shown to anyone.
         versionName portVersion
+        // Picks the alpha patch that belongs to this engine. 0 when not known, not
+        // the fallback above: that number would pick some unrelated patch.
+        buildConfigField "int", "ENGINE_BUILD", "${knownEngineBuild}"
 
         ndk {
             abiFilters.addAll(
@@ -119,6 +120,10 @@ android {
             minifyEnabled false
             shrinkResources false
         }
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     compileOptions {

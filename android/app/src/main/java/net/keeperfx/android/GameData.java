@@ -334,6 +334,22 @@ public final class GameData {
         return alpha.isEmpty() ? base : base + " + alpha " + alpha;
     }
 
+    /**
+     * Whether the data fits the engine, for the header of a shared log. A mismatch
+     * explains a lot of strange reports, and nothing else would reveal it.
+     */
+    static String describeDataFit(int engineBuild, String alphaVersion) {
+        if (alphaVersion.isEmpty()) {
+            return "no alpha patch, release only";
+        }
+        if (engineBuild <= 0) {
+            return "unknown, this build does not know its engine's number";
+        }
+        return ReleaseApi.fitsEngine(alphaVersion, engineBuild)
+            ? "alpha patch matches"
+            : "MISMATCH, alpha patch is build " + ReleaseApi.buildOf(alphaVersion);
+    }
+
     /** Human readable size of the installation, for the launcher status line. */
     public static String describeSize(File dir) {
         return describeBytes(directorySize(dir));

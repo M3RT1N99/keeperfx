@@ -23,6 +23,7 @@
     <string name="status_original_missing">%1$d files from the original Dungeon Keeper are missing</string>
     <string name="status_importing">Copying KeeperFX…</string>
     <string name="status_searching_original">Searching for the original game files…</string>
+    <string name="status_engine_mismatch">The alpha patch is build %1$d and this app\'s engine is build %2$d, because there was no patch for that build. If something looks wrong, this may be why.</string>
     <string name="status_import_progress">%1$d files copied — %2$s</string>
 
     <string name="hint_install_keeperfx">Tap "Install KeeperFX" to download the current release, or import a folder you already have.</string>
@@ -106,7 +107,7 @@ The system back button and the back gesture also leave a menu. On screen: a back
     <string name="game_right_click">Right click</string>
 
     <string name="settings_data">Game data</string>
-    <string name="option_use_alpha">Also install the newest alpha patch</string>
+    <string name="option_use_alpha">Also install the alpha patch for this engine</string>
     <string name="option_use_alpha_hint">The engine in this app is built from the current source, and the stable release does not carry everything it expects - the fonts for Japanese, Chinese and Korean among them. The alpha patch adds those, a small download on top of the release. Turn this off to stay strictly on 1.4.0; the patch comes back off without downloading anything.</string>
 
     <string name="settings_language">Language</string>

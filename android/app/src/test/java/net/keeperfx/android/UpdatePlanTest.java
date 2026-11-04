@@ -1,6 +1,7 @@
 package net.keeperfx.android;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Before;
@@ -38,7 +39,8 @@ public class UpdatePlanTest {
         facts.hasMusic = true;
         facts.appVersionName = "1.57";
         facts.latestStable = STABLE;
-        facts.latestAlpha = ALPHA;
+        facts.alphaForEngine = ALPHA;
+        facts.engineBuild = 5591;
     }
 
     private List<UpdateManager.Kind> plannedKinds() {
@@ -164,9 +166,64 @@ public class UpdatePlanTest {
     }
 
     @Test
+    public void aPatchThatFitsTheEngineIsOfferedWithoutFurtherAdo() {
+        facts.alphaVersion = "";
+        assertEquals("KeeperFX alpha 1.4.0.5591", plannedTitle(0));
+        assertFalse(plannedDetail(0).contains("no patch for engine"));
+    }
+
+    @Test
+    public void aPatchForAnotherBuildSaysSo() {
+        facts.alphaVersion = "";
+        facts.alphaForEngine = new ReleaseApi.ReleaseInfo("1.4.0.5700", "https://example.test/a", 1);
+        assertEquals("KeeperFX alpha 1.4.0.5700", plannedTitle(0));
+        assertTrue(plannedDetail(0).contains("no patch for engine build 5591"));
+    }
+
+    @Test
+    public void aDriftedPatchIsReplacedByTheOneThatFits() {
+        facts.alphaVersion = "1.4.0.5598";
+        assertEquals("KeeperFX alpha 1.4.0.5591", plannedTitle(0));
+        assertTrue(plannedDetail(0).startsWith("Replaces 1.4.0.5598"));
+    }
+
+    /** The API losing an old build must not pull a working install away from its engine. */
+    @Test
+    public void aPatchThatFitsStaysEvenWhenOnlyANewerOneIsOffered() {
+        facts.alphaForEngine = new ReleaseApi.ReleaseInfo("1.4.0.5700", "https://example.test/a", 1);
+        assertEquals(Collections.emptyList(), plannedKinds());
+    }
+
+    @Test
+    public void aBuildThatDoesNotKnowItsEngineFollowsTheNewest() {
+        facts.engineBuild = 0;
+        facts.alphaVersion = "1.4.0.5591";
+        facts.alphaForEngine = new ReleaseApi.ReleaseInfo("1.4.0.5700", "https://example.test/a", 1);
+        assertEquals("KeeperFX alpha 1.4.0.5700", plannedTitle(0));
+    }
+
+    @Test
+    public void theBuildOfAPatchIsTheEndOfItsVersion() {
+        assertEquals(5591, ReleaseApi.buildOf("1.4.0.5591"));
+        assertEquals(0, ReleaseApi.buildOf(""));
+        assertEquals(0, ReleaseApi.buildOf("unknown"));
+        assertTrue(ReleaseApi.fitsEngine("1.4.0.5591", 5591));
+        assertFalse(ReleaseApi.fitsEngine("1.4.0.5592", 5591));
+        assertFalse("an unknown engine fits nothing", ReleaseApi.fitsEngine("x", 0));
+    }
+
+    @Test
+    public void aSharedLogSaysWhetherTheDataFits() {
+        assertEquals("alpha patch matches", GameData.describeDataFit(5591, "1.4.0.5591"));
+        assertTrue(GameData.describeDataFit(5591, "1.4.0.5700").startsWith("MISMATCH"));
+        assertTrue(GameData.describeDataFit(5591, "").startsWith("no alpha"));
+        assertTrue(GameData.describeDataFit(0, "1.4.0.5591").startsWith("unknown"));
+    }
+
+    @Test
     public void beingOfflineHidesOnlyWhatNeedsTheNetwork() {
         facts.latestStable = null;
-        facts.latestAlpha = null;
+        facts.alphaForEngine = null;
         facts.hasMusic = false;
         assertEquals(Arrays.asList(UpdateManager.Kind.MUSIC), plannedKinds());
     }

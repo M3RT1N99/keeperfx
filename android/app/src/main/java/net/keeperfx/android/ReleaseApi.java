@@ -15,6 +15,8 @@
 /******************************************************************************/
 package net.keeperfx.android;
 
+import android.util.Log;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -24,10 +26,12 @@ import java.util.Locale;
 
 final class ReleaseApi {
 
+    private static final String TAG = "KeeperFX";
+
     private static final String API_LATEST = "https://keeperfx.net/api/v1/release/stable/latest";
     /**
-     * The newest alpha patch, a ~33 MB archive that is laid over the stable
-     * release rather than replacing it.
+     * An alpha patch, a ~33 MB archive that is laid over the stable release rather
+     * than replacing it.
      *
      * This port matters more than it does on the desktop: the engine here is
      * built from master, while the data comes from the last stable release, and
@@ -35,7 +39,8 @@ final class ReleaseApi {
      * a device log complain about missing fxdata/font12.fxfont, font16.fxfont
      * and sounds.cfg - all three are in the alpha patch and none are in 1.4.0.
      */
-    private static final String API_ALPHA = "https://keeperfx.net/api/v1/release/alpha/latest";
+    private static final String API_ALPHA_BUILD = "https://keeperfx.net/api/v1/release/alpha/build/";
+    private static final String API_ALPHA_LATEST = "https://keeperfx.net/api/v1/release/alpha/latest";
     /** Workshop item 393 holds the music, the same one the desktop launcher uses. */
     private static final String API_MUSIC = "https://keeperfx.net/api/v1/workshop/item/393";
 
@@ -67,9 +72,39 @@ final class ReleaseApi {
         return ReleaseInfo.fromJson(Http.getJson(API_LATEST).getJSONObject("release"));
     }
 
-    /** Asks which alpha patch is current. Blocking. */
-    static ReleaseInfo latestAlpha() throws IOException, JSONException {
-        return ReleaseInfo.fromJson(Http.getJson(API_ALPHA).getJSONObject("alpha_build"));
+    /**
+     * The alpha patch to lay over the release under an engine of this build.
+     * Blocking.
+     *
+     * Every commit upstream gets a patch numbered like the merge base this engine
+     * is built from, and that one is what fits: the newest one drifts away from the
+     * engine as soon as upstream moves. Only when the API does not have it, or a
+     * local build does not know its number, does the newest have to do. Being
+     * better than nothing, it still is offered, and fitsEngine() tells.
+     */
+    static ReleaseInfo alphaForEngine(int engineBuild) throws IOException, JSONException {
+        if (engineBuild > 0) {
+            try {
+                return ReleaseInfo.fromJson(
+                    Http.getJson(API_ALPHA_BUILD + engineBuild).getJSONObject("alpha_build"));
+            } catch (Http.NotFoundException noSuchBuild) {
+                Log.w(TAG, "No alpha patch for engine build " + engineBuild + ", taking the newest");
+            }
+        }
+        return ReleaseInfo.fromJson(Http.getJson(API_ALPHA_LATEST).getJSONObject("alpha_build"));
+    }
+
+    /** The build number a patch's version ends in: 5591 for 1.4.0.5591. 0 when it has none. */
+    static int buildOf(String alphaVersion) {
+        try {
+            return Integer.parseInt(alphaVersion.substring(alphaVersion.lastIndexOf('.') + 1));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    static boolean fitsEngine(String alphaVersion, int engineBuild) {
+        return engineBuild > 0 && buildOf(alphaVersion) == engineBuild;
     }
 
     /**

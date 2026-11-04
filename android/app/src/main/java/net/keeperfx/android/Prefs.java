@@ -135,7 +135,7 @@ public final class Prefs {
     }
 
     /**
-     * Whether to lay the newest alpha patch over the stable release.
+     * Whether to lay the alpha patch for this engine over the stable release.
      *
      * On by default, and deliberately so: the engine in this APK is built from
      * master, and the stable release does not carry the data files it has

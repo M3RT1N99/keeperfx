@@ -105,7 +105,7 @@ public class AlphaPatchTest {
         facts.alphaVersion = "1.4.0.5591";
         facts.hasMusic = true;
         facts.latestStable = new ReleaseApi.ReleaseInfo("1.4.0", "https://example.test/s", 1);
-        facts.latestAlpha = new ReleaseApi.ReleaseInfo("1.4.0.5591", "https://example.test/a", 1);
+        facts.alphaForEngine = new ReleaseApi.ReleaseInfo("1.4.0.5591", "https://example.test/a", 1);
         assertEquals(Collections.emptyList(), UpdateManager.plan(facts));
     }
 

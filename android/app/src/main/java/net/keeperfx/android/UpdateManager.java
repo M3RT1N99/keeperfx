@@ -77,11 +77,12 @@ public final class UpdateManager {
         boolean alphaEnabled;
         String alphaVersion = "";
         boolean alphaCached;
+        int engineBuild;
         boolean hasMusic;
         String appVersionName = "";
 
         ReleaseApi.ReleaseInfo latestStable;
-        ReleaseApi.ReleaseInfo latestAlpha;
+        ReleaseApi.ReleaseInfo alphaForEngine;
         AppRelease appUpdate;
     }
 
@@ -98,6 +99,7 @@ public final class UpdateManager {
         facts.verified = GameData.verifyInstalledFiles(context);
         facts.alphaEnabled = prefs.isAlphaEnabled();
         facts.alphaVersion = prefs.getInstalledAlphaVersion();
+        facts.engineBuild = BuildConfig.ENGINE_BUILD;
         facts.hasMusic = GameData.hasMusic(context);
         facts.appVersionName = AppUpdater.installedVersionName(context);
 
@@ -108,8 +110,8 @@ public final class UpdateManager {
         }
         if (facts.dataInstalled && facts.alphaEnabled) {
             try {
-                facts.latestAlpha = ReleaseApi.latestAlpha();
-                facts.alphaCached = ReleaseDownloader.isAlphaCached(context, facts.latestAlpha);
+                facts.alphaForEngine = ReleaseApi.alphaForEngine(facts.engineBuild);
+                facts.alphaCached = ReleaseDownloader.isAlphaCached(context, facts.alphaForEngine);
             } catch (Exception e) {
                 Log.w(TAG, "Could not check the KeeperFX alpha", e);
             }
@@ -201,9 +203,9 @@ public final class UpdateManager {
         // font16.fxfont and sounds.cfg, all three of which the alpha patch
         // carries. It is only meaningful once the release it patches is there,
         // and that check must never ask for a file only this patch brings.
-        if (f.dataInstalled && f.alphaEnabled && f.latestAlpha != null
-                && !f.latestAlpha.version.isEmpty()) {
-            final ReleaseApi.ReleaseInfo alpha = f.latestAlpha;
+        if (f.dataInstalled && f.alphaEnabled && f.alphaForEngine != null
+                && !f.alphaForEngine.version.isEmpty()) {
+            final ReleaseApi.ReleaseInfo alpha = f.alphaForEngine;
             final String current = f.alphaVersion;
             // Nothing to fetch if the archive is still on the device from a
             // previous switch, and saying "33 MB" then would be a plain untruth
@@ -211,21 +213,28 @@ public final class UpdateManager {
             final String cost = f.alphaCached
                 ? "already downloaded, only needs applying"
                 : GameData.describeBytes(alpha.sizeInBytes);
-            if (!alpha.version.equals(current)) {
+            if (alpha.version.equals(current)) {
+                if (!f.verified.alphaProblems.isEmpty()) {
+                    // The patch is current but files it brought are gone or wrong;
+                    // re-applying it is the download that fixes them.
+                    items.add(new Item(Kind.GAME_ALPHA,
+                        "Repair KeeperFX alpha " + alpha.version,
+                        f.verified.alphaProblems.size()
+                            + (f.verified.alphaProblems.size() == 1 ? " file" : " files")
+                            + " missing or damaged, " + cost, null));
+                }
+            } else if (!ReleaseApi.fitsEngine(current, f.engineBuild)) {
+                // What is installed stays if it fits, even when the API has lost
+                // that build and has only something newer to suggest.
+                final StringBuilder detail = new StringBuilder(current.isEmpty()
+                    ? "Files the current engine needs and " + f.stableVersion + " does not have, "
+                    : "Replaces " + current + ", ").append(cost);
+                if (!ReleaseApi.fitsEngine(alpha.version, f.engineBuild)) {
+                    detail.append("\n    The newest one: there is no patch for engine build ")
+                        .append(f.engineBuild);
+                }
                 items.add(new Item(Kind.GAME_ALPHA,
-                    "KeeperFX alpha " + alpha.version,
-                    (current.isEmpty()
-                        ? "Files the current engine needs and 1.4.0 does not have, "
-                        : "Update from " + current + ", ")
-                        + cost, null));
-            } else if (!f.verified.alphaProblems.isEmpty()) {
-                // The patch is current but files it brought are gone or wrong;
-                // re-applying it is the download that fixes them.
-                items.add(new Item(Kind.GAME_ALPHA,
-                    "Repair KeeperFX alpha " + alpha.version,
-                    f.verified.alphaProblems.size()
-                        + (f.verified.alphaProblems.size() == 1 ? " file" : " files")
-                        + " missing or damaged, " + cost, null));
+                    "KeeperFX alpha " + alpha.version, detail.toString(), null));
             }
         }
 

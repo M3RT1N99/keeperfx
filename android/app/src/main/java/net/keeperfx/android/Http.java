@@ -30,6 +30,13 @@ final class Http {
     private static final int READ_TIMEOUT_MS = 60000;
     private static final int MAX_REDIRECTS = 5;
 
+    /** The server says this does not exist, which can be an answer and not a failure. */
+    static final class NotFoundException extends IOException {
+        NotFoundException(String url) {
+            super("Server returned HTTP 404 for " + url);
+        }
+    }
+
     private Http() {
     }
 
@@ -97,6 +104,9 @@ final class Http {
         final HttpURLConnection connection = open(url, 0, "application/json");
         try {
             final int status = connection.getResponseCode();
+            if (status == HttpURLConnection.HTTP_NOT_FOUND) {
+                throw new NotFoundException(url);
+            }
             if (status != HttpURLConnection.HTTP_OK) {
                 throw new IOException("Server returned HTTP " + status + " for " + url);
             }

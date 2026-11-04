@@ -232,10 +232,16 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             ? getString(R.string.button_update_keeperfx)
             : getString(R.string.button_install_keeperfx));
 
+        final StringBuilder sb = new StringBuilder();
+        final String alphaVersion = prefs.getInstalledAlphaVersion();
+        if (!alphaVersion.isEmpty() && BuildConfig.ENGINE_BUILD > 0
+                && !ReleaseApi.fitsEngine(alphaVersion, BuildConfig.ENGINE_BUILD)) {
+            sb.append(getString(R.string.status_engine_mismatch,
+                ReleaseApi.buildOf(alphaVersion), BuildConfig.ENGINE_BUILD)).append("\n\n");
+        }
         if (hasKeeperfx && hasOriginal) {
-            detailView.setText(GameData.gameDirectory(this).getAbsolutePath());
+            sb.append(GameData.gameDirectory(this).getAbsolutePath());
         } else {
-            final StringBuilder sb = new StringBuilder();
             if (!hasKeeperfx) {
                 sb.append(getString(R.string.hint_install_keeperfx)).append("\n\n");
             }
@@ -251,8 +257,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                     sb.append("  • ").append(entry).append('\n');
                 }
             }
-            detailView.setText(sb.toString().trim());
         }
+        detailView.setText(sb.toString().trim());
 
         setBusy(busy);
     }

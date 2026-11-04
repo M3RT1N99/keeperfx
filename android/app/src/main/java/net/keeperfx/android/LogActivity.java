@@ -141,6 +141,11 @@ public class LogActivity extends Activity {
         sb.append("KeeperFX data  : ")
           .append(GameData.describeInstalledVersion(this))
           .append('\n');
+        sb.append("engine build   : ").append(BuildConfig.ENGINE_BUILD).append('\n');
+        sb.append("data for engine: ")
+          .append(GameData.describeDataFit(BuildConfig.ENGINE_BUILD,
+              prefs.getInstalledAlphaVersion()))
+          .append('\n');
         sb.append("device         : ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n');
         sb.append("android        : ").append(Build.VERSION.RELEASE)
           .append(" (API ").append(Build.VERSION.SDK_INT).append(")\n");

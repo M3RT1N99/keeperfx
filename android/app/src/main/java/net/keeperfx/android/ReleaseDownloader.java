@@ -116,7 +116,7 @@ public final class ReleaseDownloader {
     }
 
     /**
-     * Downloads the newest alpha patch and lays it over the installation.
+     * Downloads the alpha patch for this engine and lays it over the installation.
      *
      * Deliberately the same unpacking path as a full release: the archive has
      * the same layout, only fewer files, and it merges rather than replaces. The
@@ -126,14 +126,15 @@ public final class ReleaseDownloader {
     public void runAlpha() {
         File archive = null;
         try {
-            listener.onStage("Checking for the current alpha", -1, "");
-            final ReleaseApi.ReleaseInfo alpha = ReleaseApi.latestAlpha();
+            listener.onStage("Checking for the alpha patch", -1, "");
+            final ReleaseApi.ReleaseInfo alpha = ReleaseApi.alphaForEngine(BuildConfig.ENGINE_BUILD);
             if (alpha.downloadUrl.isEmpty()) {
                 finish(false, "The alpha API returned no download URL");
                 return;
             }
             final String version = alpha.version.isEmpty() ? "unknown" : alpha.version;
-            Log.i(TAG, "Latest KeeperFX alpha: " + version + " at " + alpha.downloadUrl);
+            Log.i(TAG, "KeeperFX alpha for engine build " + BuildConfig.ENGINE_BUILD + ": "
+                + version + " at " + alpha.downloadUrl);
 
             // Kept between switches. Turning the patch off restores the files
             // it replaced from a local copy, so turning it back on should not
@@ -186,7 +187,7 @@ public final class ReleaseDownloader {
 
     /**
      * The alpha archive for one version, kept so switching back and forth is
-     * free. Named after the version, so a newer alpha is still fetched and the
+     * free. Named after the version, so another alpha is still fetched and the
      * old one can be dropped.
      */
     private static File alphaArchiveCache(Context context, String version) {
