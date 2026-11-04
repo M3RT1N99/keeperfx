@@ -47,6 +47,7 @@
     <string name="updates_download_all">Alle laden</string>
     <string name="updates_replaces_data">Die Spieldaten werden dabei ersetzt. Spielstände, importierte Originaldateien, Musik und eigene Karten bleiben erhalten.</string>
     <string name="updates_use_wifi">Am besten im WLAN. Der Download läuft weiter, wenn du die App verlässt.</string>
+    <string name="notification_install_update">Update geladen. Zum Installieren tippen.</string>
     <string name="updates_running">Es läuft bereits ein Download.</string>
     <string name="notification_channel_network_game">Netzwerkspiel</string>
     <string name="notification_network_game">Netzwerkspiel läuft. Tippen, um zurückzukehren, die anderen warten.</string>

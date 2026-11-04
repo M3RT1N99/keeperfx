@@ -46,7 +46,6 @@ public final class ReleaseDownloader {
 
     private final Context context;
     private final Listener listener;
-    private volatile boolean cancelled = false;
 
     private final ArchiveUnpacker.Progress unpackProgress = new ArchiveUnpacker.Progress() {
         @Override
@@ -65,13 +64,9 @@ public final class ReleaseDownloader {
         this.listener = listener;
     }
 
-    public void cancel() {
-        cancelled = true;
-    }
-
-    /** A cancel can also come from the notification while the app is closed. */
+    /** A cancel comes from the notification, the launcher may well be closed. */
     private boolean isCancelled() {
-        return cancelled || DownloadService.isCancelRequested();
+        return DownloadService.isCancelRequested();
     }
 
     /**

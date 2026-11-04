@@ -70,6 +70,7 @@ The update installs over this one; game data and settings are kept.</string>
     <string name="notification_preparing">Preparing…</string>
     <string name="notification_done">Download finished</string>
     <string name="notification_cancelled">Download cancelled</string>
+    <string name="notification_install_update">Update downloaded. Tap to install.</string>
     <string name="updates_running">A download is already running.</string>
     <string name="notification_channel_network_game">Network game</string>
     <string name="notification_network_game">Network game running. Tap to go back, the others are waiting.</string>

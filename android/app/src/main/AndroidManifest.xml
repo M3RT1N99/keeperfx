@@ -46,8 +46,13 @@
         android:largeHeap="true"
         android:theme="@style/Theme.KeeperFX">
 
+        <!--
+          Handles rotation and the like itself: its layout is the same either way, and
+          being recreated would cancel a folder import that is running.
+        -->
         <activity
             android:name=".LauncherActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>

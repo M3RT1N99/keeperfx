@@ -54,24 +54,18 @@ public final class AppUpdater {
     public interface Listener {
         void onProgress(int percent, String detail);
 
+        /** The system installer's intent, in case it has to be opened some other way. */
+        void onReadyToInstall(Intent install);
+
         void onFinished(boolean success, String message);
     }
 
     private final Context context;
     private final Listener listener;
-    private volatile boolean cancelled = false;
 
     public AppUpdater(Context context, Listener listener) {
         this.context = context.getApplicationContext();
         this.listener = listener;
-    }
-
-    public void cancel() {
-        cancelled = true;
-    }
-
-    private boolean isCancelled() {
-        return cancelled || DownloadService.isCancelRequested();
     }
 
     // ------------------------------------------------------------ version check
@@ -128,6 +122,7 @@ public final class AppUpdater {
             intent.setDataAndType(uri, "application/vnd.android.package-archive");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                 | Intent.FLAG_ACTIVITY_NEW_TASK);
+            listener.onReadyToInstall(intent);
             context.startActivity(intent);
 
             listener.onFinished(true, "");
@@ -149,7 +144,7 @@ public final class AppUpdater {
 
             @Override
             public boolean isCancelled() {
-                return AppUpdater.this.isCancelled();
+                return DownloadService.isCancelRequested();
             }
         });
     }

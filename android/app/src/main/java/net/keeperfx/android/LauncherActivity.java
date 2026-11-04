@@ -152,7 +152,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 // Restores the files the patch replaced from the copies taken
                 // before it was applied, so switching back deletes nothing and
                 // costs no download. refreshStatus() runs when it finishes.
-                removeAlphaPatch();
+                setBusy(true);
+                DownloadService.startAlphaRevert(this);
             } else {
                 // Both the version shown at the top and the list of downloads
                 // depend on this, so refresh one and ask again for the other.
@@ -192,7 +193,14 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         DownloadService.addObserver(this);
         refreshStatus();
         if (!busy && !DownloadService.isRunning()) {
-            checkForUpdateInBackground();
+            if (!prefs.isAlphaEnabled() && !prefs.getInstalledAlphaVersion().isEmpty()) {
+                // Switched off, but taking it off never finished: Android took the
+                // process, or a download was running at the time.
+                setBusy(true);
+                DownloadService.startAlphaRevert(this);
+            } else {
+                checkForUpdateInBackground();
+            }
         }
     }
 
@@ -271,7 +279,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private void checkForUpdateInBackground() {
         new Thread(() -> {
             final List<UpdateManager.Item> items = UpdateManager.check(this);
-            mainHandler.post(() -> {
+            postIfAlive(() -> {
                 if (!items.isEmpty() && !busy) {
                     installButton.setText(getString(R.string.button_updates_waiting, items.size()));
                 }
@@ -296,7 +304,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
         new Thread(() -> {
             final List<UpdateManager.Item> items = UpdateManager.check(this);
-            mainHandler.post(() -> {
+            postIfAlive(() -> {
                 setBusy(false);
                 refreshStatus();
                 if (items.isEmpty()) {
@@ -374,6 +382,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             return;
         }
         requestNotificationPermission();
+        setBusy(true);
         DownloadService.start(this, items);
     }
 
@@ -409,6 +418,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         }
         refreshStatus();
         if (state.error != null) {
+            DownloadService.errorShown();
             showError(R.string.install_failed, state.error);
         }
         // One finished download can open the way to the next: the alpha patch and
@@ -445,7 +455,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             }
             final AppRelease found = available;
             final boolean online = reachable;
-            mainHandler.post(() -> {
+            postIfAlive(() -> {
                 updateAppButton.setEnabled(true);
                 updateAppButton.setText(getString(R.string.button_update_app,
                     AppUpdater.installedVersionName(this)));
@@ -486,35 +496,6 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                     .show();
             });
         }, "kfx-app-update-check").start();
-    }
-
-    /**
-     * Takes the alpha patch back off without downloading anything.
-     *
-     * The files it replaced were saved when it went on, so this is a local
-     * copy of a few megabytes rather than the 374 MB release again.
-     */
-    private void removeAlphaPatch() {
-        setBusy(true);
-        new Thread(() -> {
-            final ReleaseDownloader downloader =
-                new ReleaseDownloader(this, new ReleaseDownloader.Listener() {
-                    @Override
-                    public void onStage(String stage, int percent, String detail) {
-                        mainHandler.post(() -> detailView.setText(stage));
-                    }
-
-                    @Override
-                    public void onFinished(boolean success, String message) {
-                        mainHandler.post(() -> {
-                            setBusy(false);
-                            detailView.setText(message);
-                            refreshStatus();
-                        });
-                    }
-                });
-            downloader.revertAlpha();
-        }, "kfx-alpha-revert").start();
     }
 
     // ---------------------------------------------------------------- import
@@ -605,7 +586,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
             @Override
             public void onFinished(boolean success, String message) {
-                mainHandler.post(() -> {
+                postIfAlive(() -> {
                     runningImport = null;
                     setBusy(false);
                     if (success && keeperfxRelease) {
@@ -641,9 +622,22 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         busy = value;
         progressBar.setVisibility(value ? View.VISIBLE : View.GONE);
         installButton.setEnabled(!value);
+        useAlphaBox.setEnabled(!value);
         importKeeperfxButton.setEnabled(!value);
         importOriginalButton.setEnabled(!value);
         playButton.setEnabled(!value && GameData.isComplete(this));
+    }
+
+    /**
+     * For what a background thread has to say once it is done, which can be after
+     * the player has left. Opening a dialog on a destroyed activity crashes the app.
+     */
+    private void postIfAlive(Runnable action) {
+        mainHandler.post(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                action.run();
+            }
+        });
     }
 
     private void showError(int titleRes, String message) {
@@ -691,7 +685,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 failure = e.getMessage();
             }
             final String message = failure;
-            mainHandler.post(() -> {
+            postIfAlive(() -> {
                 setBusy(false);
                 if (message != null) {
                     showError(R.string.config_failed, message);

@@ -38,6 +38,8 @@ public final class UpdateManager {
         GAME_ALPHA,
         MUSIC,
         APP,
+        /** Never offered; the launcher's switch for the patch runs it. */
+        ALPHA_REVERT,
     }
 
     public static final class Item {

@@ -34,13 +34,13 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -64,7 +64,7 @@ public class DownloadService extends Service {
         /** 0..100, or -1 when the length is unknown. */
         public final int percent;
         public final String detail;
-        /** Set once when a job failed; null otherwise. */
+        /** Set when a job failed, until an observer has shown it; null otherwise. */
         public final String error;
 
         State(boolean running, String stage, int percent, String detail, String error) {
@@ -82,7 +82,8 @@ public class DownloadService extends Service {
 
     private static final CopyOnWriteArrayList<Observer> observers = new CopyOnWriteArrayList<>();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private static volatile State currentState = new State(false, "", -1, "", null);
+    private static final State IDLE = new State(false, "", -1, "", null);
+    private static volatile State currentState = IDLE;
     private static volatile boolean cancelRequested = false;
 
     public static void addObserver(Observer observer) {
@@ -94,12 +95,19 @@ public class DownloadService extends Service {
         observers.remove(observer);
     }
 
-    public static State getState() {
-        return currentState;
-    }
-
     public static boolean isRunning() {
         return currentState.running;
+    }
+
+    /**
+     * A failure is shown once. It stays in the state until then because the launcher
+     * may be away when it happens, but an observer gets the state again every time it
+     * comes back, which would raise the same dialog on every return to the launcher.
+     */
+    static void errorShown() {
+        if (!currentState.running) {
+            currentState = IDLE;
+        }
     }
 
     private static void publish(State state) {
@@ -118,20 +126,37 @@ public class DownloadService extends Service {
         for (int i = 0; i < items.size(); i++) {
             kinds[i] = items.get(i).kind.ordinal();
         }
-        final Intent intent = new Intent(context, DownloadService.class)
-            .setAction(ACTION_START)
-            .putExtra(EXTRA_KINDS, kinds);
-        context.startForegroundService(intent);
+        start(context, kinds);
     }
 
-    public static void cancel(Context context) {
-        cancelRequested = true;
-        context.startService(new Intent(context, DownloadService.class).setAction(ACTION_CANCEL));
+    /** Takes the alpha patch off, with the same protection from the process going away. */
+    static void startAlphaRevert(Context context) {
+        start(context, new int[] {UpdateManager.Kind.ALPHA_REVERT.ordinal()});
+    }
+
+    private static void start(Context context, int[] kinds) {
+        // Running from this moment on, not from the first progress report: until
+        // then the launcher would still let the player press Play, or start the
+        // same thing again.
+        publish(new State(true, context.getString(R.string.notification_preparing), -1, "", null));
+        try {
+            context.startForegroundService(new Intent(context, DownloadService.class)
+                .setAction(ACTION_START)
+                .putExtra(EXTRA_KINDS, kinds));
+        } catch (IllegalStateException e) {
+            // Android refuses when the app is not on screen any more.
+            Log.w(TAG, "Cannot start the download service", e);
+            publish(new State(false, "", -1, "", "Cannot start: " + e.getMessage()));
+        }
     }
 
     // ------------------------------------------------------------ service
 
     private Thread worker;
+    /** Only touched by the worker, and by the main thread once the worker is done. */
+    private volatile Intent installIntent;
+    private int lastPercent;
+    private String lastStage = "";
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -155,20 +180,21 @@ public class DownloadService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_CANCEL.equals(intent.getAction())) {
             cancelRequested = true;
+            if (worker == null) {
+                stopSelf(startId);
+            }
             return START_NOT_STICKY;
         }
         if (intent == null || !ACTION_START.equals(intent.getAction()) || worker != null) {
             return START_NOT_STICKY;
         }
 
-        final int[] kinds = intent.getIntArrayExtra(EXTRA_KINDS);
-        if (kinds == null || kinds.length == 0) {
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-
-        cancelRequested = false;
+        // Before anything else: Android kills an app that was started with
+        // startForegroundService() and did not get here.
         startForegroundWith(getString(R.string.notification_preparing), -1);
+        final int[] kinds = intent.getIntArrayExtra(EXTRA_KINDS);
+        cancelRequested = false;
+        installIntent = null;
 
         worker = new Thread(() -> runJobs(kinds), "kfx-download-service");
         worker.start();
@@ -176,21 +202,13 @@ public class DownloadService extends Service {
     }
 
     private void runJobs(int[] kinds) {
-        final UpdateManager.Kind[] all = UpdateManager.Kind.values();
-        final List<UpdateManager.Kind> jobs = new ArrayList<>();
-        for (int ordinal : kinds) {
-            if (ordinal >= 0 && ordinal < all.length) {
-                jobs.add(all[ordinal]);
-            }
-        }
-
         String failure = null;
-        for (UpdateManager.Kind kind : jobs) {
+        for (int ordinal : kinds) {
             if (cancelRequested) {
                 failure = getString(R.string.notification_cancelled);
                 break;
             }
-            failure = runJob(kind);
+            failure = runJob(UpdateManager.Kind.values()[ordinal]);
             if (failure != null) {
                 break;
             }
@@ -213,13 +231,13 @@ public class DownloadService extends Service {
         switch (kind) {
             case GAME_DATA:
             case GAME_ALPHA:
+            case ALPHA_REVERT:
             case MUSIC: {
                 final ReleaseDownloader downloader =
                     new ReleaseDownloader(this, new ReleaseDownloader.Listener() {
                         @Override
                         public void onStage(String stage, int percent, String detail) {
-                            publish(new State(true, stage, percent, detail, null));
-                            updateNotification(stage, percent);
+                            report(stage, percent, detail);
                         }
 
                         @Override
@@ -231,6 +249,8 @@ public class DownloadService extends Service {
                     downloader.run();
                 } else if (kind == UpdateManager.Kind.GAME_ALPHA) {
                     downloader.runAlpha();
+                } else if (kind == UpdateManager.Kind.ALPHA_REVERT) {
+                    downloader.revertAlpha();
                 } else {
                     downloader.runMusic();
                 }
@@ -240,9 +260,12 @@ public class DownloadService extends Service {
                 final AppUpdater updater = new AppUpdater(this, new AppUpdater.Listener() {
                     @Override
                     public void onProgress(int percent, String detail) {
-                        final String stage = getString(R.string.status_downloading_app);
-                        publish(new State(true, stage, percent, detail, null));
-                        updateNotification(stage, percent);
+                        report(getString(R.string.status_downloading_app), percent, detail);
+                    }
+
+                    @Override
+                    public void onReadyToInstall(Intent install) {
+                        installIntent = install;
                     }
 
                     @Override
@@ -266,11 +289,30 @@ public class DownloadService extends Service {
         return failure[0];
     }
 
+    private void report(String stage, int percent, String detail) {
+        publish(new State(true, stage, percent, detail, null));
+        // A notification per 256 KB is more than Android accepts: it starts dropping
+        // them, and then possibly the last one that says how it all ended.
+        if (percent != lastPercent || !stage.equals(lastStage)) {
+            lastPercent = percent;
+            lastStage = stage;
+            updateNotification(stage, percent);
+        }
+    }
+
     // ------------------------------------------------------------ notification
 
     private PendingIntent launcherIntent() {
+        // Back to the launcher that is already open rather than a second one on top.
         return PendingIntent.getActivity(this, 0,
-            new Intent(this, LauncherActivity.class),
+            new Intent(this, LauncherActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    private PendingIntent cancelIntent() {
+        return PendingIntent.getService(this, 0,
+            new Intent(this, DownloadService.class).setAction(ACTION_CANCEL),
             PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
@@ -288,6 +330,9 @@ public class DownloadService extends Service {
             } else {
                 builder.setProgress(0, 0, true);
             }
+            builder.addAction(new Notification.Action.Builder(
+                Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
+                getString(android.R.string.cancel), cancelIntent()).build());
         } else {
             builder.setSmallIcon(android.R.drawable.stat_sys_download_done);
         }
@@ -311,6 +356,20 @@ public class DownloadService extends Service {
 
     private void showFinishedNotification(String failure) {
         final NotificationManager manager = getSystemService(NotificationManager.class);
+        final Intent install = (failure == null) ? installIntent : null;
+        if (install != null) {
+            // The installer cannot open itself when the launcher is not on screen,
+            // and Android drops that without a word. The notification still can.
+            manager.notify(NOTIFICATION_ID, new Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText(getString(R.string.notification_install_update))
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentIntent(PendingIntent.getActivity(this, 1, install,
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT))
+                .setAutoCancel(true)
+                .build());
+            return;
+        }
         final String text = (failure == null)
             ? getString(R.string.notification_done)
             : failure;
