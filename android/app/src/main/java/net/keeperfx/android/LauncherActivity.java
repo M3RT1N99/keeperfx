@@ -175,7 +175,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         });
         useAlphaBox.setOnCheckedChangeListener((v, checked) -> {
             prefs.setAlphaEnabled(checked);
-            if (!checked && !prefs.getInstalledAlphaVersion().isEmpty()) {
+            if (!checked && patchIsOn()) {
                 // Restores the files the patch replaced from the copies taken
                 // before it was applied, so switching back deletes nothing and
                 // costs no download. refreshStatus() runs when it finishes.
@@ -244,7 +244,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         DownloadService.addObserver(this);
         refreshStatus();
         if (!busy && !DownloadService.isRunning()) {
-            if (!prefs.isAlphaEnabled() && !prefs.getInstalledAlphaVersion().isEmpty()) {
+            if (!prefs.isAlphaEnabled() && patchIsOn()) {
                 // Switched off, but taking it off never finished: Android took the
                 // process, or a download was running at the time.
                 setBusy(true);
@@ -253,6 +253,16 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 checkForUpdateInBackground();
             }
         }
+    }
+
+    /**
+     * A patch that was cut short has no version recorded, only its backup says it is
+     * there. The verification calls that no damage because the patch is offered again,
+     * which does not happen while it is switched off, so it has to come off instead.
+     */
+    private boolean patchIsOn() {
+        return !prefs.getInstalledAlphaVersion().isEmpty()
+            || GameData.alphaBackupDirectory(this).isDirectory();
     }
 
     @Override

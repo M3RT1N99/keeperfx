@@ -105,10 +105,13 @@ final class InstallManifest {
      * damage to it is alpha damage, because re-applying the patch is what fixes
      * it. Files the bundled configuration overlay owns are checked for
      * existence only; they are deliberately replaced with the APK's own copies,
-     * so their size says nothing about the health of the unpacked release. A
-     * release file the patch retired is meant to be gone: reporting it would offer
-     * the release again, and that download clears the patch, which retires the
-     * same files the next time it is applied.
+     * so their size says nothing about the health of the unpacked release.
+     *
+     * A release file with a copy in the backup and not on the patch's list is the
+     * patch's doing and no damage. Either the patch retired it, or it was cancelled or
+     * killed half way and never got to write its manifest. Reporting it would offer
+     * the 374 MB release, which clears the patch, when applying the patch again is all
+     * it takes.
      *
      * @param overlay the files the configuration overlay owns, lower case
      */
@@ -121,17 +124,17 @@ final class InstallManifest {
         for (Map.Entry<String, Long> want : expected.entrySet()) {
             final String path = want.getKey();
             final File f = new File(root, path);
-            final boolean damaged;
-            if (!f.isFile()) {
-                damaged = alpha.containsKey(path) || !new File(alphaBackup, path).isFile();
-            } else {
-                final String lower = path.toLowerCase(Locale.US).replace('\\', '/');
-                damaged = f.length() != want.getValue()
+            final String lower = path.toLowerCase(Locale.US).replace('\\', '/');
+            final boolean damaged = !f.isFile()
+                || (f.length() != want.getValue()
                     && !overlay.contains(lower)
-                    && !lower.equals("keeperfx.cfg");
-            }
+                    && !lower.equals("keeperfx.cfg"));
             if (damaged) {
-                (alpha.containsKey(path) ? report.alphaProblems : report.stableProblems).add(path);
+                if (alpha.containsKey(path)) {
+                    report.alphaProblems.add(path);
+                } else if (!new File(alphaBackup, path).isFile()) {
+                    report.stableProblems.add(path);
+                }
             }
         }
         return report;

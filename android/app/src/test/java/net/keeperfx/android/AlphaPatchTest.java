@@ -45,13 +45,15 @@ public class AlphaPatchTest {
         InstallManifest.write(stableManifest, root, unpacked);
     }
 
-    private File applyPatch() throws IOException {
-        final File patch = new File(folder.getRoot(), "patch.7z");
-        TestArchives.sevenZ(patch, TestArchives.entries(
+    private File thePatch() throws IOException {
+        return TestArchives.sevenZ(new File(folder.getRoot(), "patch.7z"), TestArchives.entries(
             "fxdata/shared.cfg", "patched, and longer than before",
             "fxdata/font12.fxfont", "only the patch has this",
             "launcher-auto-file-removal.txt", "[1.4.0.5500]\n/campgns/retired.dat\n"));
-        return applyArchive(patch);
+    }
+
+    private File applyPatch() throws IOException {
+        return applyArchive(thePatch());
     }
 
     private File applyArchive(File patch) throws IOException {
@@ -61,6 +63,42 @@ public class AlphaPatchTest {
         ArchiveUnpacker.removeRetiredFiles(root, backupDir, releaseFiles);
         InstallManifest.write(alphaManifest, root, unpacked);
         return patch;
+    }
+
+    /**
+     * Cancels the unpack after this many entries and stops where runAlpha() stops
+     * then: the backup is whole, those files are replaced, and neither the retirement
+     * list nor the manifest has run. A killed process leaves the same behind.
+     */
+    private void cancelAfter(File patch, final int entries) throws IOException {
+        new AlphaBackup(root, backupDir).extendFor(patch);
+        ArchiveUnpacker.unpackSevenZ(patch, root, new ArchiveUnpacker.Progress() {
+            private int asked;
+
+            @Override
+            public void onFiles(int unpacked) {
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return asked++ >= entries;
+            }
+        });
+    }
+
+    private static UpdateManager.Facts factsOfAnInstallation(InstallManifest.Report report,
+            String alphaVersion) {
+        final UpdateManager.Facts facts = new UpdateManager.Facts();
+        facts.dataInstalled = true;
+        facts.stableVersion = "1.4.0";
+        facts.hasManifest = true;
+        facts.verified = report;
+        facts.alphaEnabled = true;
+        facts.alphaVersion = alphaVersion;
+        facts.hasMusic = true;
+        facts.latestStable = new ReleaseApi.ReleaseInfo("1.4.0", "https://example.test/s", 1);
+        facts.alphaForEngine = new ReleaseApi.ReleaseInfo("1.4.0.5591", "https://example.test/a", 1);
+        return facts;
     }
 
     private InstallManifest.Report verify() throws IOException {
@@ -96,17 +134,79 @@ public class AlphaPatchTest {
         assertEquals(Collections.emptyList(), report.stableProblems);
         assertEquals(Collections.emptyList(), report.alphaProblems);
 
-        final UpdateManager.Facts facts = new UpdateManager.Facts();
-        facts.dataInstalled = true;
-        facts.stableVersion = "1.4.0";
-        facts.hasManifest = true;
-        facts.verified = report;
-        facts.alphaEnabled = true;
-        facts.alphaVersion = "1.4.0.5591";
-        facts.hasMusic = true;
-        facts.latestStable = new ReleaseApi.ReleaseInfo("1.4.0", "https://example.test/s", 1);
-        facts.alphaForEngine = new ReleaseApi.ReleaseInfo("1.4.0.5591", "https://example.test/a", 1);
-        assertEquals(Collections.emptyList(), UpdateManager.plan(facts));
+        assertEquals(Collections.emptyList(),
+            UpdateManager.plan(factsOfAnInstallation(report, "1.4.0.5591")));
+    }
+
+    /**
+     * Each replaced file is whole, so the game plays on. Reporting it as damage to the
+     * release offered the 374 MB release first, when applying the patch again is all
+     * it takes.
+     */
+    @Test
+    public void aPatchCutShortIsNotDamageToTheRelease() throws IOException {
+        cancelAfter(thePatch(), 1);
+        assertEquals("patched, and longer than before", contents("fxdata/shared.cfg"));
+        assertFalse(new File(root, "fxdata/font12.fxfont").exists());
+        assertFalse(alphaManifest.exists());
+
+        final InstallManifest.Report report = verify();
+        assertEquals(Collections.emptyList(), report.stableProblems);
+        assertEquals(Collections.emptyList(), report.alphaProblems);
+
+        final List<UpdateManager.Item> offered =
+            UpdateManager.plan(factsOfAnInstallation(report, ""));
+        assertEquals(1, offered.size());
+        assertEquals(UpdateManager.Kind.GAME_ALPHA, offered.get(0).kind);
+    }
+
+    /** The copy in the backup is what excuses a file, and only the patch's files have one. */
+    @Test
+    public void aPatchCutShortExcusesOnlyTheFilesItSaved() throws IOException {
+        cancelAfter(thePatch(), 1);
+        TestArchives.write(new File(root, "fxdata/untouched.cfg"), "torn, and of another size");
+        assertEquals(Collections.singletonList("fxdata/untouched.cfg"), verify().stableProblems);
+    }
+
+    /** The manifest on disk is then the earlier patch's, which never heard of this file. */
+    @Test
+    public void aNewerPatchCutShortIsNotDamageEither() throws IOException {
+        applyPatch();
+        final File newer = TestArchives.sevenZ(new File(folder.getRoot(), "newer.7z"),
+            TestArchives.entries(
+                "fxdata/untouched.cfg", "patched for the first time",
+                "fxdata/shared.cfg", "patched again"));
+        cancelAfter(newer, 1);
+        assertEquals("patched for the first time", contents("fxdata/untouched.cfg"));
+        assertTrue(verify().isClean());
+    }
+
+    @Test
+    public void applyingAPatchCutShortAgainFinishesIt() throws IOException {
+        final File patch = thePatch();
+        cancelAfter(patch, 2);
+        applyArchive(patch);
+
+        assertTrue(verify().isClean());
+        assertEquals("only the patch has this", contents("fxdata/font12.fxfont"));
+        assertFalse(new File(root, "campgns/retired.dat").exists());
+
+        new AlphaBackup(root, backupDir).restore();
+        assertEquals("release", contents("fxdata/shared.cfg"));
+        assertFalse(new File(root, "fxdata/font12.fxfont").exists());
+    }
+
+    /** What switching the patch off does to one that never finished. */
+    @Test
+    public void aPatchCutShortComesOffLikeAWholeOne() throws IOException {
+        cancelAfter(thePatch(), 2);
+
+        new AlphaBackup(root, backupDir).restore();
+
+        assertEquals("release", contents("fxdata/shared.cfg"));
+        assertFalse(new File(root, "fxdata/font12.fxfont").exists());
+        assertFalse(backupDir.exists());
+        assertTrue(verify().isClean());
     }
 
     @Test
