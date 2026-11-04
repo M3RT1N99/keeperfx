@@ -278,6 +278,9 @@ ui | grep -F "resource-id=\"${ID}/play\"" | grep -qF 'enabled="true"' || fail "P
 say "pressing Play"
 tap "${ID}/play"
 
+# The launcher copies the bundled configuration before it starts the game, so the engine's
+# process can be some time coming: only one that was there and is gone has died.
+ENGINE_SEEN=""
 for ((i = 0; i < LEVEL_TIMEOUT_S; i++)); do
     sleep 1
     if adb shell cat "${LOG}" 2>/dev/null | grep -q 'Setting up game failed\|Basic engine initialization failed'; then
@@ -286,7 +289,9 @@ for ((i = 0; i < LEVEL_TIMEOUT_S; i++)); do
     if adb shell cat "${LOG}" 2>/dev/null | grep -q 'Started level'; then
         break
     fi
-    if [ -z "$(adb shell pidof "${PKG}:game" | tr -d '\r')" ]; then
+    if [ -n "$(adb shell pidof "${PKG}:game" | tr -d '\r')" ]; then
+        ENGINE_SEEN=1
+    elif [ -n "${ENGINE_SEEN}" ]; then
         fail "the engine's process died before a level started"
     fi
 done
