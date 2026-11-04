@@ -120,16 +120,6 @@ static float touch_flick_decay = 0.93f;
  */
 #define TOUCH_PAN_FULL_SPEED_PX 7.0f
 
-/** Pinch distance change in pixels that corresponds to a fully deflected zoom axis. */
-#define TOUCH_PINCH_FULL_SPEED_PX 16.0f
-
-/** Twist in radians that corresponds to a fully deflected rotation axis. */
-#define TOUCH_TWIST_FULL_SPEED_RAD 0.07f
-
-/** Deadzones, so that a slightly imprecise two finger drag does not zoom or rotate. */
-#define TOUCH_PINCH_DEADZONE_PX 2.5f
-#define TOUCH_TWIST_DEADZONE_RAD 0.012f
-
 /**
  * How far each part of a two finger gesture has to get from where it started
  * before its channel unlocks. Two fingers on a screen always produce a little
@@ -171,8 +161,6 @@ static TbBool touch_initialised = false;
 /* Gesture axis values, all in the range 0.0 to 1.0. */
 static float touch_axis_pan_left, touch_axis_pan_right;
 static float touch_axis_pan_up, touch_axis_pan_down;
-static float touch_axis_zoom_in, touch_axis_zoom_out;
-static float touch_axis_rotate_cw, touch_axis_rotate_ccw;
 
 /** Two finger tap: a right click where the first finger landed. */
 static TbBool touch_tapped_right_click = false;
@@ -201,10 +189,6 @@ static TbBool touch_t2f_rotate;
 
 /* Finger travel collected since the last frame, in screen pixels. */
 static float touch_pan_accum_x, touch_pan_accum_y;
-/* The same for the pinch and the twist, for the same reason: SDL reports one
-   motion event per finger per display frame, so a single event on a 120 Hz
-   panel carries a fraction of the movement a deadzone is meant to filter. */
-static float touch_pinch_accum, touch_twist_accum;
 
 /* State since the two finger gesture began, used to unlock the channels. */
 static float touch_start_dist;
@@ -213,7 +197,6 @@ static long touch_start_cx, touch_start_cy;
 static float touch_total_twist;
 
 /* Reference values of the running two finger gesture. */
-static float touch_camera_prev_dist = 0.0f;
 static float touch_camera_prev_angle = 0.0f;
 static long touch_camera_prev_cx = 0, touch_camera_prev_cy = 0;
 
@@ -342,13 +325,10 @@ TbBool touch_controls_active(void)
 static void touch_reset_gesture_axes(void)
 {
     touch_pan_accum_x = touch_pan_accum_y = 0.0f;
-    touch_pinch_accum = touch_twist_accum = 0.0f;
     touch_t2f_pan = touch_t2f_zoom = touch_t2f_rotate = false;
     touch_total_twist = 0.0f;
     touch_axis_pan_left = touch_axis_pan_right = 0.0f;
     touch_axis_pan_up = touch_axis_pan_down = 0.0f;
-    touch_axis_zoom_in = touch_axis_zoom_out = 0.0f;
-    touch_axis_rotate_cw = touch_axis_rotate_ccw = 0.0f;
 }
 
 /** The camera tuning for the screen as it is now, in pixels of that screen. */
@@ -531,16 +511,14 @@ static void touch_begin_camera_gesture(void)
         return;
     const float dx = (float)(b->x - a->x);
     const float dy = (float)(b->y - a->y);
-    touch_camera_prev_dist = sqrtf(dx * dx + dy * dy);
+    touch_start_dist = sqrtf(dx * dx + dy * dy);
     touch_camera_prev_angle = atan2f(dy, dx);
     touch_camera_prev_cx = (a->x + b->x) / 2;
     touch_camera_prev_cy = (a->y + b->y) / 2;
-    touch_start_dist = touch_camera_prev_dist;
     touch_start_cx = touch_camera_prev_cx;
     touch_start_cy = touch_camera_prev_cy;
     touch_t2f_pan = touch_t2f_zoom = touch_t2f_rotate = false;
     touch_total_twist = 0.0f;
-    touch_pinch_accum = touch_twist_accum = 0.0f;
     touch_gesture = TGest_Camera;
     const struct TgFingers fingers = {(float)a->x, (float)a->y, (float)b->x, (float)b->y};
     touch_camera_regrip(&fingers);
@@ -571,7 +549,6 @@ static void touch_update_camera_gesture(void)
 
     const float pan_dx = (float)(cx - touch_camera_prev_cx);
     const float pan_dy = (float)(cy - touch_camera_prev_cy);
-    const float dist_delta = dist - touch_camera_prev_dist;
     float angle_delta = angle - touch_camera_prev_angle;
     while (angle_delta > TOUCH_PI)
         angle_delta -= 2.0f * TOUCH_PI;
@@ -611,20 +588,7 @@ static void touch_update_camera_gesture(void)
         touch_pan_accum_x += pan_dx;
         touch_pan_accum_y += pan_dy;
     }
-    if (touch_t2f_zoom)
-    {
-        // Collected, not acted on. Testing one event's delta against a
-        // deadzone measured in whole pixels asks a 120 Hz screen for movement
-        // it never reports in a single event, so a deliberate pinch cleared
-        // the threshold and then produced nothing at all.
-        touch_pinch_accum += dist_delta;
-    }
-    if (touch_t2f_rotate)
-    {
-        touch_twist_accum += angle_delta;
-    }
 
-    touch_camera_prev_dist = dist;
     touch_camera_prev_angle = angle;
     touch_camera_prev_cx = cx;
     touch_camera_prev_cy = cy;
@@ -933,7 +897,6 @@ void TEvent(const SDL_Event *ev)
 /******************************************************************************/
 
 static void touch_apply_pan_accumulator(void);
-static void touch_apply_camera_accumulators(void);
 
 /** Turns what the fingers asked for into clicks, one at a time. */
 static void touch_serve_steering(void)
@@ -1094,39 +1057,9 @@ void update_touch_inputs(void)
         touch_back_key_frames = 2;
     }
 
-    // All four camera axes are summed over the frame now, so none of them needs
-    // decaying: a frame in which the fingers did not move already yields zero.
+    // Summed over the frame, so it needs no decaying: a frame in which the fingers
+    // did not move already yields zero.
     touch_apply_pan_accumulator();
-    touch_apply_camera_accumulators();
-}
-
-/**
- * Turns the pinch and twist collected since the last frame into axis values.
- *
- * The deadzone is subtracted from the total rather than gating on it, so a slow
- * steady pinch still moves at a rate that follows the fingers instead of
- * switching on and off at frame boundaries. Both axes are read as booleans by
- * the engine - they end up as discrete zoom and rotate packets - so what this
- * really decides is whether the gesture does anything at all.
- */
-static void touch_apply_camera_accumulators(void)
-{
-    touch_axis_zoom_in = touch_axis_zoom_out = 0.0f;
-    touch_axis_rotate_cw = touch_axis_rotate_ccw = 0.0f;
-
-    if (touch_gesture == TGest_Camera)
-    {
-        if (touch_pinch_accum > TOUCH_PINCH_DEADZONE_PX)
-            touch_axis_zoom_in = touch_clamp01((touch_pinch_accum - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
-        else if (touch_pinch_accum < -TOUCH_PINCH_DEADZONE_PX)
-            touch_axis_zoom_out = touch_clamp01((-touch_pinch_accum - TOUCH_PINCH_DEADZONE_PX) / TOUCH_PINCH_FULL_SPEED_PX);
-
-        if (touch_twist_accum > TOUCH_TWIST_DEADZONE_RAD)
-            touch_axis_rotate_cw = touch_clamp01((touch_twist_accum - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
-        else if (touch_twist_accum < -TOUCH_TWIST_DEADZONE_RAD)
-            touch_axis_rotate_ccw = touch_clamp01((-touch_twist_accum - TOUCH_TWIST_DEADZONE_RAD) / TOUCH_TWIST_FULL_SPEED_RAD);
-    }
-    touch_pinch_accum = touch_twist_accum = 0.0f;
 }
 
 /**
@@ -1172,10 +1105,6 @@ float touch_game_key_axis_value(long key_id)
     case Gkey_MoveRight: return touch_axis_pan_right;
     case Gkey_MoveUp:    return touch_axis_pan_up;
     case Gkey_MoveDown:  return touch_axis_pan_down;
-    case Gkey_ZoomIn:    return touch_axis_zoom_in;
-    case Gkey_ZoomOut:   return touch_axis_zoom_out;
-    case Gkey_RotateCW:  return touch_axis_rotate_cw;
-    case Gkey_RotateCCW: return touch_axis_rotate_ccw;
     default:             return 0.0f;
     }
 }
