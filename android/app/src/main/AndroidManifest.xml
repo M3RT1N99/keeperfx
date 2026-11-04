@@ -17,8 +17,9 @@
     -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!--
-      Downloads keep running when the launcher is closed. A foreground service
-      is the only supported way to do that, and it needs a visible notification.
+      Downloads keep running when the launcher is closed, and a network game when
+      a call comes in. A foreground service is the only supported way to do either,
+      and it needs a visible notification.
     -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
@@ -69,6 +70,11 @@
 
         <service
             android:name=".DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".NetworkGameService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 

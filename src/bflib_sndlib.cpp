@@ -6,6 +6,10 @@
 #include "game_legacy.h"
 #include "bflib_sound.h"
 #include "bflib_fileio.h"
+#ifdef __ANDROID__
+// alcDevicePauseSOFT; the port builds OpenAL Soft itself, so it is always there.
+#define AL_ALEXT_PROTOTYPES
+#endif
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <AL/alext.h>
@@ -1292,6 +1296,43 @@ extern "C" void ShutDownSDLAudio()
 }
 
 #ifdef __ANDROID__
+/**
+ * OpenAL has its own output, so SDL pausing its devices does nothing for it, and
+ * a stream playing silence still holds a wake lock in the audio server. A frozen
+ * game makes no new sounds, so its device can simply stop. A running one keeps
+ * starting sources, which on a paused device would all sound at once on return;
+ * it stays muted instead, which is fine for as long as a network game survives
+ * in the background anyway.
+ */
+extern "C" void android_audio_enter_background(int engine_keeps_running)
+{
+	if (g_openal_device) {
+		alListenerf(AL_GAIN, 0.0f);
+		if (!engine_keeps_running) {
+			alcDevicePauseSOFT(g_openal_device.get());
+		}
+	}
+	// SDL only pauses its own devices when it blocks.
+	if (engine_keeps_running && g_mixer) {
+		SDL_PauseAudioDevice((SDL_AudioDeviceID)SDL_GetNumberProperty(
+			MIX_GetMixerProperties(g_mixer), MIX_PROP_MIXER_DEVICE_NUMBER, 0));
+	}
+}
+
+extern "C" void android_audio_enter_foreground(int engine_kept_running)
+{
+	if (g_openal_device) {
+		if (!engine_kept_running) {
+			alcDeviceResumeSOFT(g_openal_device.get());
+		}
+		alListenerf(AL_GAIN, 1.0f);
+	}
+	if (engine_kept_running && g_mixer) {
+		SDL_ResumeAudioDevice((SDL_AudioDeviceID)SDL_GetNumberProperty(
+			MIX_GetMixerProperties(g_mixer), MIX_PROP_MIXER_DEVICE_NUMBER, 0));
+	}
+}
+
 // The streamed speech - the land view narration and the mentor phrases - is
 // played through OpenAL here, not through an SDL_mixer channel. On a real
 // device the mixer path stuttered and every layer of it was ruled out one by

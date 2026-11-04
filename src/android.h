@@ -40,6 +40,16 @@ size_t android_codepage_to_utf8(const char *charset, const char *src, size_t src
  */
 const char *android_absolute_path(const char *path, char *buf, size_t bufsize);
 
+/** Whether the engine is running behind a paused activity, with no surface to draw on. */
+int android_running_in_background(void);
+
+/** Whether event polling should ask SDL for events right now. */
+int android_event_pump_due(void);
+
+/** Implemented in bflib_sndlib.cpp, called when the activity goes away and comes back. */
+void android_audio_enter_background(int engine_keeps_running);
+void android_audio_enter_foreground(int engine_kept_running);
+
 #ifdef __cplusplus
 }
 #endif

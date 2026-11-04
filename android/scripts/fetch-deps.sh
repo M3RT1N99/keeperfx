@@ -131,9 +131,27 @@ fetch_git() {
     echo "${commit}" > "${target}/.stamp"
 }
 
+# SDL reads SDL_HINT_ANDROID_BLOCK_ON_PAUSE once, when video starts. Whether the
+# engine may stop depends on what it is doing when the activity pauses, so this
+# makes SDL read the hint at every pause, after the events the engine answers it
+# from. src/android.cpp explains the rest.
+reread_block_on_pause_hint() {
+    local file="${DEPS_DIR}/SDL3/src/video/android/SDL_androidevents.c"
+    local line='    Android_BlockOnPause = SDL_GetHintBoolean(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, true);'
+    if grep -qxF "${line}" "${file}"; then
+        return 0
+    fi
+    sed -i "s/^    if (Android_BlockOnPause) {\$/${line}\n&/" "${file}"
+    if [ "$(grep -cxF "${line}" "${file}")" != "1" ]; then
+        echo "SDL_androidevents.c no longer looks the way this patch expects" >&2
+        exit 1
+    fi
+}
+
 fetch_tarball SDL3 \
     "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/SDL3-${SDL3_VERSION}.tar.gz" \
     "SDL3-${SDL3_VERSION}" "${SDL3_SHA256}"
+reread_block_on_pause_hint
 
 fetch_tarball SDL3_image \
     "https://github.com/libsdl-org/SDL_image/releases/download/release-${SDL3_IMAGE_VERSION}/SDL3_image-${SDL3_IMAGE_VERSION}.tar.gz" \

@@ -5,7 +5,7 @@
  *     Android entry point.
  * @par Purpose:
  *     Everything that has to happen before the engine starts on Android, plus
- *     the two lifecycle helpers that have no counterpart on the desktop. The
+ *     the helpers shared engine code needs here and nowhere else (android.h). The
  *     OS services the engine asks for at run time are in
  *     kfx/platform/PlatformAndroid.h.
  * @par Comment:
@@ -31,6 +31,7 @@
 #include "android.h"
 #include "platform.h"
 #include "bflib_basics.h"
+#include "game_legacy.h"
 #include "globals.h"
 #include <string>
 #include <vector>
@@ -41,10 +42,19 @@
 #include <android/log.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
-#include <AL/al.h>
 #include "post_inc.h"
 
 #define KFX_ANDROID_LOG_TAG "KeeperFX"
+
+// Every pump behind a paused activity sleeps in SDL for up to 100 ms when it finds
+// no lifecycle event, and the engine pumps twice a frame, which would hold a network
+// game at 5 turns a second for everyone in it. This often leaves it room for its
+// 20 turns and still notices the return of the activity at once by human standards.
+#define BACKGROUND_PUMP_INTERVAL_MS 500
+
+// Whether the engine carries on behind a paused activity. Only the main thread
+// touches it: the watch below runs inside its event pump.
+static bool running_in_background = false;
 
 /**
  * Consumes "-datadir <path>" from the argument vector and makes it the working
@@ -87,15 +97,17 @@ static bool apply_data_directory(std::vector<char *> & args)
 }
 
 /**
- * Silences OpenAL while the game is in the background, and brings it back after.
+ * Decides what happens to the engine while the activity is away.
  *
- * The engine itself stops when the activity pauses - that is what
- * SDL_HINT_ANDROID_BLOCK_ON_PAUSE arranges - and SDL pauses its own audio
- * devices along with it, which covers the music and everything else SDL_mixer
- * plays. Pausing the mixer's tracks here as well would only add a way to wake a
- * track the game had paused itself. OpenAL has its own output and keeps mixing
- * whatever was playing, so the sound effects and the speech carried on after the
- * phone was locked.
+ * Alone, it stops: SDL blocks the main thread inside its event pump and pauses its
+ * audio devices, so a phone in a pocket spends nothing on a game nobody is playing.
+ * In a network game that would hold everyone else up until the player is dropped
+ * after PEER_TIMEOUT_MS, so there the engine carries on, without drawing and without
+ * sound, and GameActivity starts NetworkGameService to be allowed to.
+ *
+ * SDL reads the hint once when video starts, too early to know which of the two this
+ * pause is, so fetch-deps.sh makes it read the hint again at every pause. That
+ * happens after the event sent here.
  *
  * This has to be an event watch rather than a case in the normal event loop.
  * SDL queues the background events and then blocks the main thread inside
@@ -103,21 +115,47 @@ static bool apply_data_directory(std::vector<char *> & args)
  * was already back in the foreground. A watch is called synchronously from
  * SDL_SendAppEvent, before the block.
  */
-static bool SDLCALL background_audio_watch(void *userdata, SDL_Event *event)
+static bool SDLCALL background_watch(void *userdata, SDL_Event *event)
 {
     (void)userdata;
     switch (event->type)
     {
     case SDL_EVENT_WILL_ENTER_BACKGROUND:
-        alListenerf(AL_GAIN, 0.0f);
+        running_in_background = network_is_active();
+        SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, running_in_background ? "0" : "1");
+        android_audio_enter_background(running_in_background);
         break;
     case SDL_EVENT_DID_ENTER_FOREGROUND:
-        alListenerf(AL_GAIN, 1.0f);
+        android_audio_enter_foreground(running_in_background);
+        running_in_background = false;
         break;
     default:
         break;
     }
     return true; // Leave the event in the queue for whoever else wants it
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_net_keeperfx_android_GameActivity_nativeNetworkGameActive(JNIEnv *, jclass)
+{
+    return network_is_active() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" int android_running_in_background(void)
+{
+    return running_in_background;
+}
+
+extern "C" int android_event_pump_due(void)
+{
+    static Uint64 last_pump = 0;
+    if (!running_in_background)
+        return true;
+    const Uint64 now = SDL_GetTicks();
+    if (now - last_pump < BACKGROUND_PUMP_INTERVAL_MS)
+        return false;
+    last_pump = now;
+    return true;
 }
 
 /**
@@ -258,9 +296,6 @@ extern "C" int main(int argc, char *argv[])
     // SDL's built-in translation would collapse multi touch into a fake mouse.
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
     SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
-    // Stop the engine while the activity is in the background. SDL pauses its
-    // audio devices along with it, which background_audio_watch() relies on.
-    SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1");
     // Left alone, the back button closes the activity, which drops the player
     // out of the game entirely. Trapped, it arrives as SDLK_AC_BACK and the
     // input layer turns it into Escape, which is what leaves a menu.
@@ -273,7 +308,7 @@ extern "C" int main(int argc, char *argv[])
     // output that does not tear. Nothing here is latency sensitive.
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "openslES");
 
-    SDL_AddEventWatch(background_audio_watch, nullptr);
+    SDL_AddEventWatch(background_watch, nullptr);
 
     args.push_back(nullptr);
     const int result = kfxmain((int)(args.size() - 1), args.data());

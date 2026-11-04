@@ -40,6 +40,9 @@
 #include "keeperfx.hpp"
 #include <SDL3/SDL.h>
 #include "kfx/renderer/RendererManager.h" // RendererPhysicalWidth
+#ifdef __ANDROID__
+#include "android.h"
+#endif
 #include "post_inc.h"
 
 using namespace std;
@@ -584,6 +587,10 @@ static void process_event(const SDL_Event *ev)
 /******************************************************************************/
 TbBool LbPollInputs(void)
 {
+#ifdef __ANDROID__
+    if (!android_event_pump_due())
+        return (lbUserQuit < 1);
+#endif
     SDL_Event ev;
     //process events until event queue is empty
     while (SDL_PollEvent(&ev)) {

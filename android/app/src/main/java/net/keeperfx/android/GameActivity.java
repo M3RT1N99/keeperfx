@@ -183,13 +183,22 @@ public class GameActivity extends SDLActivity {
     protected void onResume() {
         super.onResume();
         acquireMulticastLock();
+        NetworkGameService.stop(this);
     }
 
     @Override
     protected void onPause() {
         releaseMulticastLock();
+        // Here rather than from the engine's own background event, which arrives
+        // a moment later: a foreground service can only be started from the screen.
+        if (!mBrokenLibraries && nativeNetworkGameActive()) {
+            NetworkGameService.start(this);
+        }
         super.onPause();
     }
+
+    /** Whether other players are depending on this engine right now. */
+    private static native boolean nativeNetworkGameActive();
 
     /**
      * Lets the device see local network game announcements.
@@ -198,8 +207,8 @@ public class GameActivity extends SDLActivity {
      * second. Wi-Fi hardware drops everything that is not addressed to the
      * device while it is saving power, so without this lock the game list stays
      * empty even though both machines are on the same network. It is tied to
-     * the activity being in the foreground, which is also the only time the
-     * engine is running - SDL_HINT_ANDROID_BLOCK_ON_PAUSE stops it otherwise.
+     * the activity being in the foreground: nobody is browsing for games behind
+     * a paused activity, and a game already joined talks to its peers directly.
      */
     private void acquireMulticastLock() {
         if (multicastLock != null) {

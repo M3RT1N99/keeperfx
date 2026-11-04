@@ -156,6 +156,12 @@ void RendererClearScreen(unsigned char colour)
 
 void RendererPresentFrame(void)
 {
+#if defined(__ANDROID__)
+    // SDL has taken the GL context away with the surface. Nothing would crash,
+    // the calls just fail one by one, so there is no point in making them.
+    if (android_running_in_background())
+        return;
+#endif
     if (s_active_renderer != nullptr) {
         s_active_renderer->PresentFrame();
     }
@@ -233,6 +239,11 @@ TbBool RendererCanDraw(void)
 
 TbBool RendererCanPresent(void)
 {
+#if defined(__ANDROID__)
+    // Lets the game loop skip drawing a frame nobody can see, and keep its turns.
+    if (android_running_in_background())
+        return 0;
+#endif
     return s_active_renderer != nullptr && s_active_renderer->CanPresent();
 }
 
