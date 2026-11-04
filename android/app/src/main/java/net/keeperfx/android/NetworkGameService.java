@@ -47,6 +47,10 @@ public class NetworkGameService extends Service {
     private static final String CHANNEL_ID = "network_game";
     private static final int NOTIFICATION_ID = 2;
     private static final long KEEP_ALIVE_MS = 5 * 60 * 1000;
+    private static final String ACTION_STOP = "net.keeperfx.android.NETWORK_GAME_STOP";
+
+    /** Whether a start has been asked for since the last stop. Main thread only. */
+    private static boolean startRequested = false;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -58,13 +62,24 @@ public class NetworkGameService extends Service {
     static void start(Context context) {
         try {
             context.startForegroundService(new Intent(context, NetworkGameService.class));
+            startRequested = true;
         } catch (IllegalStateException e) {
             Log.w(TAG, "Cannot keep the network game alive in the background: " + e);
         }
     }
 
+    /**
+     * Sent as a request of its own rather than through stopService(). A quick return
+     * could get there before the service has reached startForeground(), and Android
+     * answers a service stopped at that point by killing the app. This way the
+     * service gets through the start first.
+     */
     static void stop(Context context) {
-        context.stopService(new Intent(context, NetworkGameService.class));
+        if (startRequested) {
+            startRequested = false;
+            context.startService(
+                new Intent(context, NetworkGameService.class).setAction(ACTION_STOP));
+        }
     }
 
     @Override
@@ -74,6 +89,10 @@ public class NetworkGameService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         final NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(new NotificationChannel(CHANNEL_ID,
             getString(R.string.notification_channel_network_game),
