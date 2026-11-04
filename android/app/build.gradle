@@ -107,7 +107,9 @@ android {
     signingConfigs {
         // Sideload key. It is intentionally committed: an APK has to be signed to
         // be installable at all, and a stable key means CI builds can be updated
-        // in place instead of forcing an uninstall. It grants nothing beyond that.
+        // in place instead of forcing an uninstall. Being public, it also lets anyone
+        // sign an APK Android accepts as an update, so what the in-app updater really
+        // trusts is TLS to GitHub.
         ci {
             storeFile file("keeperfx-ci.keystore")
             storePassword "keeperfx"
@@ -188,16 +190,14 @@ dependencies {
     testImplementation "org.json:json:20240303"
 }
 
-// ---------------------------------------------------------------------------
-// Native dependency sources. CI runs this script explicitly before the build;
-// wiring it in here as well keeps a plain "gradlew assembleRelease" working.
-// ---------------------------------------------------------------------------
 def copyBundledConfig = tasks.register("copyBundledConfig", Copy) {
     description = "Stages the engine's config/ tree as an APK asset"
     from("${rootDir}/../config")
     into(bundledConfigStage.map { it.dir("kfx-config") })
 }
 
+// CI runs this script explicitly before the build; wiring it in here as well keeps
+// a plain "gradle assembleRelease" working.
 def fetchNativeDeps = tasks.register("fetchNativeDeps", Exec) {
     description = "Downloads the pinned native dependency sources"
     workingDir rootDir

@@ -133,7 +133,8 @@ jobs:
         ARTIFACT_NAME="keeperfx-android-arm64-unofficial-${GIT_REVISION}"
         echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
         mkdir -p out
-        # Stable file name: the in-app updater downloads this exact URL.
+        # Stable file name: the in-app updater finds the release asset by it, and the
+        # oldest builds download it from a fixed URL.
         cp "$APK" "out/keeperfx-android-arm64.apk"
         # The version comes out of the APK rather than being worked out a second
         # time here, so the tag can never disagree with what the app reports.

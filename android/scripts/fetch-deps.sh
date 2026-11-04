@@ -68,14 +68,14 @@ MBEDTLS_SHA256=a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6
 CURL_VERSION=8.21.0
 CURL_TAG=curl-8_21_0
 CURL_SHA256=d9b327997999045a24cda50f3983e69e51c516bd8be6ef9842fc7f99135e33bb
-# Automatic port forwarding. miniupnpc lives in a subdirectory of the miniupnp
-# repository, which also holds the daemon we have no use for.
 # The Smacker videos. Only the demuxer and the two decoders for them are built,
 # so this is a few megabytes rather than the whole of FFmpeg, and
 # src/bflib_fmvids.cpp then compiles unchanged like every other module whose
 # library was missing.
 FFMPEG_VERSION=7.1
 FFMPEG_SHA256=40973d44970dbc83ef302b0609f2e74982be2d85916dd2ee7472d30678a7abe6
+# Automatic port forwarding. miniupnpc lives in a subdirectory of the miniupnp
+# repository, which also holds the daemon we have no use for.
 MINIUPNP_TAG=miniupnpc_2_3_3
 MINIUPNP_COMMIT=bf4215a7574f88aa55859db9db00e3ae58cf42d6
 LIBNATPMP_COMMIT=134fc89e2781e154e40042641f4d8bcbe42579f1

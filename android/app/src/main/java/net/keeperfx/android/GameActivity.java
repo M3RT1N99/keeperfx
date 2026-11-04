@@ -163,7 +163,7 @@ public class GameActivity extends SDLActivity {
      * Puts a back arrow over the top right corner of the game.
      *
      * The engine leaves menus on Escape, which a phone has no key for. The
-     * system back gesture is mapped onto it and so is a two finger tap, but
+     * system back gesture is mapped onto it and so is a three finger tap, but
      * neither is discoverable, and a player who cannot find the way out of a
      * menu is stuck in it. The status panel is anchored to the left, so the
      * opposite corner is the one place the button covers nothing but scenery.

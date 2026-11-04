@@ -436,12 +436,12 @@ extern "C" int main(int argc, char *argv[])
     // out of the game entirely. Trapped, it arrives as SDLK_AC_BACK and the
     // input layer turns it into Escape, which is what leaves a menu.
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
-    // SDL's default Android audio backend is AAudio, and the mentor speech
-    // stuttered through it on a Samsung device even with the data verified,
-    // the CPU idle between frames and the locking clean. AAudio glitches on
-    // Samsung firmwares are a known SDL issue and the usual cure is exactly
-    // this: the older OpenSL ES backend, which trades a little latency for
-    // output that does not tear. Nothing here is latency sensitive.
+    // SDL's default Android audio backend is AAudio, and AAudio glitches on
+    // Samsung firmwares are a known SDL issue. The older OpenSL ES backend trades
+    // a little latency for output that does not tear, and nothing here is latency
+    // sensitive. It did not cure the mentor speech stuttering on a Samsung device,
+    // the same as on AAudio, which is why speech goes through OpenAL instead, see
+    // bflib_sndlib.cpp. This is for what still goes through SDL.
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "openslES");
 
     SDL_AddEventWatch(background_watch, nullptr);

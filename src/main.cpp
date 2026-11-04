@@ -1835,8 +1835,8 @@ static short process_command_line(unsigned short argc, char *argv[])
           // "-touchtune panslop=2,longpress=350". Every gesture constant was
           // chosen without a device to try it on, so this exists to let them be
           // settled on real hardware in one sitting instead of one rebuild per
-          // guess. The launcher passes its extra arguments field through
-          // verbatim, so no launcher change is needed to reach it.
+          // guess. The launcher's Fine-tune screen passes the knobs it has
+          // off their default through this, and the extra arguments field can too.
           narg++;
           char tune[256];
           snprintf(tune, sizeof(tune), "%s", pr2str);

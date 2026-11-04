@@ -167,7 +167,7 @@ static TbBool touch_tapped_right_click = false;
 /** While set, an ordinary tap is a right click. Driven by the on screen toggle. */
 static TbBool touch_sticky_rmb = false;
 
-/* Two finger tap: leaves whatever is open. Emitted as Escape rather than as a
+/* Three finger tap: leaves whatever is open. Emitted as Escape rather than as a
    game key because that is the one the menus themselves listen for, and it is
    what the system back button produces too. */
 static TbBool touch_tapped_back = false;
