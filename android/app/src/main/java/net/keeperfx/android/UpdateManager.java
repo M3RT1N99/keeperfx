@@ -55,11 +55,6 @@ public final class UpdateManager {
             this.detail = detail;
             this.appUpdate = appUpdate;
         }
-
-        @Override
-        public String toString() {
-            return detail.isEmpty() ? title : title + "\n" + detail;
-        }
     }
 
     private UpdateManager() {

@@ -17,7 +17,6 @@
     <string name="button_log">Protokoll</string>
 
     <string name="version_unknown">importierter Ordner</string>
-    <string name="version_latest">die aktuelle Version</string>
 
     <string name="status_keeperfx_ready">KeeperFX %1$s installiert (%2$s)</string>
     <string name="status_keeperfx_missing">KeeperFX ist nicht installiert</string>
@@ -60,9 +59,6 @@
     <string name="app_update_offline">Die Update-Prüfung ist fehlgeschlagen. Besteht eine Internetverbindung?</string>
     <string name="app_update_install">Installieren</string>
 
-    <string name="install_title">KeeperFX installieren</string>
-    <string name="install_update_title">KeeperFX aktualisieren</string>
-    <string name="install_start">Herunterladen</string>
     <string name="install_failed">Installation fehlgeschlagen: %1$s</string>
 
     <string name="import_keeperfx_title">KeeperFX-Ordner importieren</string>

@@ -15,7 +15,6 @@
     <string name="button_log">Log</string>
 
     <string name="version_unknown">imported folder</string>
-    <string name="version_latest">the current release</string>
 
     <string name="status_keeperfx_ready">KeeperFX %1$s installed (%2$s)</string>
     <string name="status_keeperfx_missing">KeeperFX is not installed</string>
@@ -75,10 +74,6 @@ The update installs over this one; game data and settings are kept.</string>
     <string name="notification_channel_network_game">Network game</string>
     <string name="notification_network_game">Network game running. Tap to go back, the others are waiting.</string>
 
-    <string name="install_title">Install KeeperFX</string>
-    <string name="install_update_title">Update KeeperFX</string>
-    <string name="install_explanation">Downloads %1$s from keeperfx.net and unpacks it over the current installation. The archive is around 360 MB, so use Wi-Fi.\n\nSave games, the files from the original game, downloaded music and any campaigns, map packs or mods you added are kept.</string>
-    <string name="install_start">Download</string>
     <string name="install_failed">Installation failed</string>
 
     <string name="import_keeperfx_title">Import KeeperFX folder</string>
