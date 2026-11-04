@@ -40,4 +40,24 @@ static inline uint32_t lan_subnet_broadcast(uint32_t address, uint32_t netmask, 
     return broadcast != UINT32_MAX ? broadcast : 0;
 }
 
+/** What GameActivity.lanNetworkHandle() answers when it names no network. */
+#define LAN_NO_WIFI_NETWORK 0
+#define LAN_WIFI_IS_DEFAULT (-1)
+#define LAN_NETWORKS_UNKNOWN (-2)
+
+/**
+ * Which network a local game's socket belongs on, given that answer.
+ *
+ * @return The network's handle, or 0, which android_setsocknetwork() takes as none, for
+ *  a socket that has to follow the default network: Wi-Fi is the default there, or there
+ *  is no Wi-Fi network and whatever the socket was bound to is gone.
+ *  LAN_NETWORKS_UNKNOWN when the answer says nothing and the socket stays as it is.
+ */
+static inline int64_t lan_socket_network(int64_t answer)
+{
+    if (answer == LAN_NETWORKS_UNKNOWN)
+        return LAN_NETWORKS_UNKNOWN;
+    return answer > 0 ? answer : 0;
+}
+
 #endif // KFX_ANDROID_LAN_RULES_H

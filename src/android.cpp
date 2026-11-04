@@ -285,11 +285,6 @@ extern "C" int android_lan_broadcast_targets(char targets[ANDROID_LAN_TARGETS_MA
     return count;
 }
 
-// What GameActivity.lanNetworkHandle() answers when it names no network.
-#define LAN_NO_WIFI_NETWORK 0
-#define LAN_WIFI_IS_DEFAULT (-1)
-#define LAN_NETWORKS_UNKNOWN (-2)
-
 static jlong lan_network_handle(void)
 {
     JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
@@ -312,29 +307,55 @@ static jlong lan_network_handle(void)
     return handle;
 }
 
-extern "C" void android_lan_bind_socket(int fd, const char *what)
+/**
+ * Puts a socket where the answer says. Setting what is already set changes nothing, nor
+ * does taking a binding off a socket that has none, so a new socket and one that has
+ * been through a network change take the same path.
+ */
+static void lan_place_socket(int fd, jlong answer, const char *what, bool say)
 {
-    const jlong handle = lan_network_handle();
-    switch (handle)
+    const int64_t network = lan_socket_network(answer);
+    if ((network != LAN_NETWORKS_UNKNOWN) && (android_setsocknetwork(static_cast<net_handle_t>(network), fd) != 0))
     {
-    case LAN_NO_WIFI_NETWORK:
-        LbNetLog("LAN: %s socket left unbound, no Wi-Fi network: this phone owns the hotspot or has none\n", what);
-        return;
-    case LAN_WIFI_IS_DEFAULT:
-        LbNetLog("LAN: %s socket left unbound, Wi-Fi is the default network\n", what);
-        return;
-    case LAN_NETWORKS_UNKNOWN:
-        LbNetLog("LAN: %s socket left unbound, could not ask for the networks\n", what);
+        if (say)
+            LbNetLog("LAN: %s socket stays as it was, putting it on network %lld failed: %s\n",
+                what, static_cast<long long>(network), strerror(errno));
         return;
     }
-    if (android_setsocknetwork(static_cast<net_handle_t>(handle), fd) != 0)
+    if (!say)
+        return;
+    switch (answer)
     {
-        LbNetLog("LAN: %s socket left unbound, binding to Wi-Fi network %lld failed: %s\n",
-            what, static_cast<long long>(handle), strerror(errno));
+    case LAN_NO_WIFI_NETWORK:
+        LbNetLog("LAN: %s socket not bound, no Wi-Fi network: this phone owns the hotspot or has none\n", what);
+        return;
+    case LAN_WIFI_IS_DEFAULT:
+        LbNetLog("LAN: %s socket not bound, Wi-Fi is the default network\n", what);
+        return;
+    case LAN_NETWORKS_UNKNOWN:
+        LbNetLog("LAN: %s socket stays as it was, could not ask for the networks\n", what);
         return;
     }
     LbNetLog("LAN: %s socket bound to Wi-Fi network %lld, which is not the default network\n",
-        what, static_cast<long long>(handle));
+        what, static_cast<long long>(answer));
+}
+
+extern "C" void android_lan_bind_socket(int fd, const char *what)
+{
+    lan_place_socket(fd, lan_network_handle(), what, true);
+}
+
+extern "C" void android_lan_follow_network(int fd)
+{
+    static Uint64 asked_at = 0;
+    static jlong last_said = LAN_NETWORKS_UNKNOWN;
+    const Uint64 now = SDL_GetTicks();
+    if ((now - asked_at) < 1000)
+        return;
+    asked_at = now;
+    const jlong answer = lan_network_handle();
+    lan_place_socket(fd, answer, "quiet game", answer != last_said);
+    last_said = answer;
 }
 
 /**

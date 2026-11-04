@@ -280,7 +280,8 @@ public class GameActivity extends SDLActivity {
 
     /**
      * Which network a local game's socket belongs on, asked by the engine when it
-     * makes one (android_lan_bind_socket).
+     * makes one (android_lan_bind_socket), and again once a second while a peer of a
+     * running game is not answering (android_lan_follow_network).
      *
      * A hotspot without internet leaves the Wi-Fi unvalidated with cellular as the
      * default network, and a socket that is not told otherwise then sends its
@@ -292,7 +293,7 @@ public class GameActivity extends SDLActivity {
      *     is the default network.
      */
     @SuppressWarnings("deprecation") // getAllNetworks: the callback that replaces it would
-    // have to keep up with the networks all the time, for an answer needed once per socket.
+    // have to keep up with the networks all the time, for an answer that is rarely needed.
     private long lanNetworkHandle() {
         final ConnectivityManager connectivity = getSystemService(ConnectivityManager.class);
         final NetworkCapabilities active =

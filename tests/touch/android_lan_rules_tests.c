@@ -32,8 +32,22 @@ static void expect(const char *what, uint32_t address, uint32_t netmask, uint32_
     }
 }
 
+static void expect_network(const char *what, int64_t answer, int64_t wanted)
+{
+    const int64_t got = lan_socket_network(answer);
+    checks++;
+    if (got != wanted) {
+        failures++;
+        printf("FAILED %s: got %lld, wanted %lld\n", what, (long long)got, (long long)wanted);
+    }
+}
+
 int android_lan_rules_tests(int *total_checks)
 {
+    expect_network("a network's handle is where the socket belongs", 600406151181LL, 600406151181LL);
+    expect_network("Wi-Fi as the default takes a binding off", LAN_WIFI_IS_DEFAULT, 0);
+    expect_network("so does no Wi-Fi at all, the network it named is gone", LAN_NO_WIFI_NETWORK, 0);
+    expect_network("no answer leaves the socket as it is", LAN_NETWORKS_UNKNOWN, LAN_NETWORKS_UNKNOWN);
     expect("a hotspot's /24 as the kernel reports it", IP(10, 202, 11, 234), IP(255, 255, 255, 0), IP(10, 202, 11, 255), IP(10, 202, 11, 255));
     expect("a /24 with no reported address", IP(192, 168, 43, 1), IP(255, 255, 255, 0), 0, IP(192, 168, 43, 255));
     expect("a /16 with no reported address", IP(172, 20, 10, 7), IP(255, 255, 0, 0), 0, IP(172, 20, 255, 255));

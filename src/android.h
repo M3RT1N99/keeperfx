@@ -58,11 +58,18 @@ int android_lan_broadcast_targets(char targets[ANDROID_LAN_TARGETS_MAX][ANDROID_
 
 /**
  * Puts a local game's socket on the Wi-Fi network if Wi-Fi is there but is not the
- * default network, and leaves it alone otherwise. Logs which it was and why. A socket
+ * default network, and on no network otherwise. Logs which it was and why. A socket
  * that cannot be bound stays usable as it was.
  * @param what What the socket is for, for the log.
  */
 void android_lan_bind_socket(int fd, const char *what);
+
+/**
+ * The same for a local game's socket whose peer has gone quiet, for the network service
+ * path to call as often as it likes: at most once a second it asks where the socket
+ * belongs now and puts it there. Logs when that answer changes.
+ */
+void android_lan_follow_network(int fd);
 
 /** Implemented in bflib_sndlib.cpp, called when the activity goes away and comes back. */
 void android_audio_enter_background(int engine_keeps_running);
