@@ -397,8 +397,7 @@ public class DownloadService extends Service {
         @Override
         public void onBytes(long done, long total) {
             report(stage, (total > 0) ? (int) (done * 100 / total) : -1,
-                new Message(R.string.progress_bytes,
-                    GameData.describeBytes(done), GameData.describeBytes(total)));
+                GameData.describeProgress(done, total));
         }
 
         @Override

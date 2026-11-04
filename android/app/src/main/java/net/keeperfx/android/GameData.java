@@ -427,6 +427,13 @@ public final class GameData {
         return new Message(units[unit], value);
     }
 
+    /** How far a transfer has got. A total nobody has said stays out of it, rather than being 0. */
+    static Message describeProgress(long done, long total) {
+        return (total > 0)
+            ? new Message(R.string.progress_bytes, describeBytes(done), describeBytes(total))
+            : describeBytes(done);
+    }
+
     private static long directorySize(File dir) {
         File[] children = dir.listFiles();
         if (children == null) {

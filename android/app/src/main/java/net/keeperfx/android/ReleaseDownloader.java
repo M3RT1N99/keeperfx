@@ -344,8 +344,7 @@ public final class ReleaseDownloader {
             public void onBytes(long done, long total) {
                 final long known = (total > 0) ? total : expectedSize;
                 final int percent = (known > 0) ? (int) (done * 100 / known) : -1;
-                listener.onStage(stage, percent, new Message(R.string.progress_bytes,
-                    GameData.describeBytes(done), GameData.describeBytes(known)));
+                listener.onStage(stage, percent, GameData.describeProgress(done, known));
             }
 
             @Override

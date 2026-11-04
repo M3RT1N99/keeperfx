@@ -218,7 +218,7 @@ final class PhoneTransfer {
          * whether the file comes from this very build.
          */
         String describe(Message.Strings strings, String thisApp, int thisEngine) {
-            final Message whatBecomesOfThisPhone = !installedHere
+            final Message whatBecomesOfThisDevice = !installedHere
                 ? new Message(R.string.import_bundle_nothing_here)
                 : (savesHere > 0)
                     ? new Message(R.string.import_bundle_replaces, savesHere)
@@ -227,7 +227,7 @@ final class PhoneTransfer {
                 .append(new Message(R.string.import_bundle_offer,
                     GameData.describeVersion(marker.release, marker.alpha), marker.saves,
                     GameData.describeBytes(marker.bytes)).text(strings))
-                .append("\n\n").append(whatBecomesOfThisPhone.text(strings))
+                .append("\n\n").append(whatBecomesOfThisDevice.text(strings))
                 .append("\n\n").append(new Message(R.string.import_bundle_room,
                     GameData.describeBytes(marker.bytes), GameData.describeBytes(free)).text(strings))
                 .append("\n\n").append(new Message(R.string.import_bundle_trust).text(strings));

@@ -147,21 +147,19 @@ public class StringResourcesTest {
     /** Whatever nothing shows is work for twenty translators and no use to anyone. */
     @Test
     public void everyStringIsUsed() throws Exception {
-        final StringBuilder sources = new StringBuilder();
+        final Set<String> used = new TreeSet<>();
+        final Pattern reference = Pattern.compile("(?:R\\.string\\.|@string/)(\\w+)");
         try (Stream<java.nio.file.Path> files = Files.walk(new File("src/main").toPath())) {
             for (java.nio.file.Path file : files.filter(StringResourcesTest::canUseStrings)
                     .collect(Collectors.toList())) {
-                sources.append(new String(Files.readAllBytes(file), StandardCharsets.UTF_8));
+                final Matcher matcher = reference.matcher(
+                    new String(Files.readAllBytes(file), StandardCharsets.UTF_8));
+                while (matcher.find()) {
+                    used.add(matcher.group(1));
+                }
             }
         }
-        final List<String> unused = new ArrayList<>();
-        for (String name : StringResources.english().strings.keySet()) {
-            if (!sources.toString().contains("R.string." + name)
-                    && !sources.toString().contains("@string/" + name)) {
-                unused.add(name);
-            }
-        }
-        assertEquals(Collections.emptyList(), unused);
+        assertEquals(Collections.emptySet(), difference(StringResources.english().strings.keySet(), used));
     }
 
     private static boolean canUseStrings(java.nio.file.Path file) {
@@ -185,6 +183,8 @@ public class StringResourcesTest {
             StringResources.text(new Message(R.string.stage_unpacked_files, 3)));
         assertEquals("1.5 MB", StringResources.text(GameData.describeBytes(1024 * 1024 * 3 / 2)));
         assertEquals("0 B", StringResources.text(GameData.describeBytes(0)));
+        assertEquals("1.0 KB of 2.0 KB", StringResources.text(GameData.describeProgress(1024, 2048)));
+        assertEquals("1.0 KB", StringResources.text(GameData.describeProgress(1024, -1)));
         assertEquals("1023 B", StringResources.text(GameData.describeBytes(1023)));
         assertEquals("1.0 KB", StringResources.text(GameData.describeBytes(1024)));
         assertEquals("2.0 GB", StringResources.text(GameData.describeBytes(2L * 1024 * 1024 * 1024)));
