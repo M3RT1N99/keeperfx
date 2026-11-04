@@ -42,6 +42,7 @@ import java.nio.file.Files;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -267,7 +268,7 @@ public final class ReleaseDownloader {
             // which is a lot to pay for changing one's mind.
             listener.onStage("Saving the files being replaced", -1, "");
             backupBeforePatch(archive);
-            final List<String> unpacked = extract(archive);
+            final List<String> unpacked = extract(archive, alphaBackupDirectory());
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
                 return;
@@ -316,9 +317,8 @@ public final class ReleaseDownloader {
         return new File(dir, "alpha-" + version + ".7z");
     }
 
-    /** Where the release's own copies of the patched files are kept. */
     private File alphaBackupDirectory() {
-        return new File(context.getFilesDir(), "alpha-backup");
+        return GameData.alphaBackupDirectory(context);
     }
 
     /** Paths the patch added, which a revert deletes rather than restores. */
@@ -486,7 +486,7 @@ public final class ReleaseDownloader {
         final Prefs prefs = new Prefs(context);
         prefs.setInstalledVersion("");
         prefs.setInstalledAlphaVersion("");
-        deleteTree(new File(context.getFilesDir(), "alpha-backup"));
+        deleteTree(GameData.alphaBackupDirectory(context));
         deleteTree(new File(context.getFilesDir(), "alpha-cache"));
         //noinspection ResultOfMethodCallIgnored
         GameData.stableManifest(context).delete();
@@ -534,7 +534,7 @@ public final class ReleaseDownloader {
                 return;
             }
 
-            final List<String> unpacked = extract(archive);
+            final List<String> unpacked = extract(archive, null);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
                 return;
@@ -631,8 +631,12 @@ public final class ReleaseDownloader {
         return dir;
     }
 
-    /** @return the relative paths of every file written, for the manifest. */
-    private List<String> extract(File archive) throws IOException {
+    /**
+     * @param patchBackup the alpha backup when this archive is a patch, otherwise
+     *        null; see removeRetiredFiles().
+     * @return the relative paths of every file written, for the manifest.
+     */
+    private List<String> extract(File archive, File patchBackup) throws IOException {
         final File destination = GameData.gameDirectory(context);
         // Unpacked over whatever is already there rather than replacing it, the
         // way the desktop launcher installs a release. Everything the archive
@@ -697,7 +701,7 @@ public final class ReleaseDownloader {
         listener.onStage("Applying configuration", -1, "");
         BundledConfig.install(context, true);
 
-        removeRetiredFiles(destination);
+        removeRetiredFiles(destination, patchBackup);
         return written;
     }
 
@@ -747,12 +751,19 @@ public final class ReleaseDownloader {
      * Installing over the top leaves files behind that newer releases no longer
      * contain; this is the mechanism the desktop launcher uses for them, and it
      * is why not wiping the directory is safe.
+     *
+     * A patch retires files of the release underneath it as well. Those go into
+     * its backup instead, so that taking the patch off brings them back and the
+     * release's manifest, which still lists them, comes true again.
      */
-    private void removeRetiredFiles(File root) {
+    private void removeRetiredFiles(File root, File patchBackup) {
         final File list = new File(root, "launcher-auto-file-removal.txt");
         if (!list.isFile()) {
             return;
         }
+        final Set<String> releaseFiles = (patchBackup != null)
+            ? GameData.stableManifestPaths(context)
+            : Collections.emptySet();
         int removed = 0;
         try (java.io.BufferedReader reader = new java.io.BufferedReader(
                 new java.io.InputStreamReader(new java.io.FileInputStream(list), "UTF-8"))) {
@@ -776,7 +787,10 @@ public final class ReleaseDownloader {
                 final File victim = new File(root, relative);
                 if (victim.isFile() && victim.getCanonicalPath()
                         .startsWith(root.getCanonicalPath() + File.separator)) {
-                    if (victim.delete()) {
+                    final boolean gone = releaseFiles.contains(relative)
+                        ? moveIntoBackup(victim, new File(patchBackup, relative))
+                        : victim.delete();
+                    if (gone) {
                         removed++;
                     }
                 }
@@ -788,6 +802,15 @@ public final class ReleaseDownloader {
         if (removed > 0) {
             Log.i(TAG, "Removed " + removed + " files retired by this release");
         }
+    }
+
+    /** A copy already in the backup is the release's own and is left alone. */
+    private static boolean moveIntoBackup(File file, File kept) {
+        if (kept.isFile()) {
+            return file.delete();
+        }
+        final File parent = kept.getParentFile();
+        return parent != null && (parent.isDirectory() || parent.mkdirs()) && file.renameTo(kept);
     }
 
     private static boolean isSkipped(String name) {

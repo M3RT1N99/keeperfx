@@ -151,7 +151,8 @@ public final class UpdateManager {
         // the last stable release, so anything the engine gained since then is
         // missing - a device log showed exactly that for fxdata/font12.fxfont,
         // font16.fxfont and sounds.cfg, all three of which the alpha patch
-        // carries. It is only meaningful once the release it patches is there.
+        // carries. It is only meaningful once the release it patches is there,
+        // and that check must never ask for a file only this patch brings.
         if (GameData.isKeeperfxInstalled(context) && prefs.isAlphaEnabled()) {
             try {
                 final ReleaseDownloader.ReleaseInfo alpha = ReleaseDownloader.queryLatestAlpha();

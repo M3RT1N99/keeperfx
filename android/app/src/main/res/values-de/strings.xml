@@ -86,7 +86,7 @@ Die Zurück-Taste und die Zurück-Geste verlassen ein Menü ebenfalls. Auf dem B
 
     <string name="settings_data">Spieldaten</string>
     <string name="option_use_alpha">Auch den neuesten Alpha-Patch installieren</string>
-    <string name="option_use_alpha_hint">Die Engine dieser App wird aus dem aktuellen Quellstand gebaut, und die Stable bringt nicht alles mit, was sie erwartet — unter anderem Schriften und Klangdefinitionen. Der Alpha-Patch ergänzt das, rund 33 MB zusätzlich. Ausschalten, um strikt auf 1.4.0 zu bleiben; der Rückweg erfordert einen erneuten Download der Stable.</string>
+    <string name="option_use_alpha_hint">Die Engine dieser App wird aus dem aktuellen Quellstand gebaut, und die Stable bringt nicht alles mit, was sie erwartet — unter anderem die Schriften für Japanisch, Chinesisch und Koreanisch. Der Alpha-Patch ergänzt das, ein kleiner Download zusätzlich zur Stable. Ausschalten, um strikt auf 1.4.0 zu bleiben; der Patch kommt dabei ohne Download wieder herunter.</string>
 
     <string name="settings_language">Sprache</string>
     <string name="settings_language_hint">Legt fest, in welcher Sprache das Spiel läuft. Beginnt mit der des Geräts. Sprachausgabe und Texte erscheinen nur dann darin, wenn die Installation diese Sprache mitbringt.</string>

@@ -76,6 +76,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     private DataImporter runningImport;
     private boolean busy = false;
+    private boolean downloadWasRunning = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -389,6 +390,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         // the moment it attaches, which is also every onResume().
         setBusy(state.running || runningImport != null);
         if (state.running) {
+            downloadWasRunning = true;
             keeperfxStatus.setText(state.stage);
             detailView.setText(state.detail);
             if (state.percent >= 0) {
@@ -402,6 +404,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         refreshStatus();
         if (state.error != null) {
             showError(R.string.install_failed, state.error);
+        }
+        // One finished download can open the way to the next: the alpha patch and
+        // the music are only offered once the release is in place, and on a fresh
+        // install nothing else would tell the player there is more to fetch.
+        if (downloadWasRunning) {
+            downloadWasRunning = false;
+            checkForUpdateInBackground();
         }
     }
 

@@ -58,16 +58,19 @@ public final class GameData {
      * Content the engine asks for by name, so an install that is merely present
      * is told apart from one that is usable.
      *
-     * The four videos are the intro sequence; without them the game opens on a
-     * black screen and the log is the only clue. sounds.cfg and the fonts came
-     * after the 1.4.0 release, so their absence also means the alpha patch has
-     * not been laid over it.
+     * The videos are the intro sequence; without them the game opens on a black
+     * screen and the log is the only clue.
+     *
+     * Only what the stable release itself ships belongs here, because a gap in
+     * this list is answered by offering that release again. A file only the alpha
+     * patch brings, such as fxdata/font12.fxfont, would keep an install "not
+     * installed" for good, since the patch is not offered before the release is
+     * in place. The patch's own files are checked through its manifest once it has
+     * been applied, and the engine runs without them until then.
      */
     private static final String[] KEEPERFX_CONTENT_FILES = {
         "ldata/intromix.smk",
         "ldata/bullfrog.smk",
-        "fxdata/sounds.cfg",
-        "fxdata/font12.fxfont",
         // The English campaign speech, which is what every other language falls
         // back to. Without it the land view and the campaign menu are silent
         // and the log only says a file could not be loaded.
@@ -254,6 +257,21 @@ public final class GameData {
         return stableManifest(context).isFile();
     }
 
+    /** Every file the release was recorded unpacking, by relative path. */
+    public static Set<String> stableManifestPaths(Context context) {
+        final Map<String, Long> stable = new LinkedHashMap<>();
+        readManifest(stableManifest(context), stable);
+        return stable.keySet();
+    }
+
+    /**
+     * Where the alpha patch keeps the release's own copies of the files it
+     * replaced or retired, so that taking it off again needs no download.
+     */
+    public static File alphaBackupDirectory(Context context) {
+        return new File(context.getFilesDir(), "alpha-backup");
+    }
+
     /** What a verification found, split by which download repairs it. */
     public static final class VerifyReport {
         public final List<String> stableProblems = new ArrayList<>();
@@ -276,7 +294,10 @@ public final class GameData {
      * damage to it is alpha damage, because re-applying the patch is what fixes
      * it. Files the bundled configuration overlay owns are checked for
      * existence only; they are deliberately replaced with the APK's own copies,
-     * so their size says nothing about the health of the unpacked release.
+     * so their size says nothing about the health of the unpacked release. A
+     * release file the patch retired is meant to be gone: reporting it would offer
+     * the release again, and that download clears the patch, which retires the
+     * same files the next time it is applied.
      */
     public static VerifyReport verifyInstalledFiles(Context context) {
         final Map<String, Long> stable = new LinkedHashMap<>();
@@ -297,7 +318,8 @@ public final class GameData {
             final File f = new File(root, path);
             boolean damaged;
             if (!f.isFile()) {
-                damaged = true;
+                damaged = alpha.containsKey(path)
+                    || !new File(alphaBackupDirectory(context), path).isFile();
             } else {
                 final String lower = path.toLowerCase(Locale.US).replace('\\', '/');
                 damaged = f.length() != want.getValue()
