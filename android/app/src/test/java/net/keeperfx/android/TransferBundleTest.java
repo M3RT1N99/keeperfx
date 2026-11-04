@@ -865,6 +865,50 @@ public class TransferBundleTest {
     }
 
     @Test
+    public void theExportOfferSaysWhatGoesAlong() throws IOException {
+        final TransferBundle.Plan plan = TransferBundle.plan(a.install, a.manifests, a.backup,
+            a.prefs.transferableSettings());
+        final String withMusic = new PhoneTransfer.ExportOffer(Message.plain("1.4.0"), true, plan, 1024)
+            .describe(StringResources.ENGLISH);
+        assertTrue(withMusic, withMusic.contains("\u2022 KeeperFX 1.4.0 and the original Dungeon Keeper files\n"
+            + "\u2022 The music\n\u2022 Your saved games (2), "));
+        assertTrue(withMusic, withMusic.contains("Free now: 1.0 KB."));
+        final String without = new PhoneTransfer.ExportOffer(Message.plain("1.4.0"), false, plan, 1024)
+            .describe(StringResources.ENGLISH);
+        assertFalse(without, without.contains("The music"));
+    }
+
+    /** What would be lost is the one thing the player has to read before tapping on. */
+    @Test
+    public void theImportOfferSaysWhatBecomesOfThisDevice() {
+        final TransferBundle.Marker marker = new TransferBundle.Marker("1.60", 5591, "1.4.0", "", 1, 1024, 2);
+        final String fresh = new PhoneTransfer.ImportOffer(marker, 0, false, 1024)
+            .describe(StringResources.ENGLISH, "1.60", 5591);
+        assertTrue(fresh, fresh.contains("Nothing is installed on this device yet."));
+        assertFalse(fresh, fresh.contains("It comes from app"));
+
+        final String noSaves = new PhoneTransfer.ImportOffer(marker, 0, true, 1024)
+            .describe(StringResources.ENGLISH, "1.60", 5591);
+        assertTrue(noSaves, noSaves.contains("no saved games here to lose"));
+
+        final String saves = new PhoneTransfer.ImportOffer(marker, 3, true, 1024)
+            .describe(StringResources.ENGLISH, "1.60", 5591);
+        assertTrue(saves, saves.contains("would be lost: 3."));
+        assertTrue(saves, saves.startsWith("This file holds KeeperFX 1.4.0, "));
+    }
+
+    @Test
+    public void theImportOfferSaysWhenTheFileIsFromAnotherBuild() {
+        final TransferBundle.Marker marker = new TransferBundle.Marker("1.60", 5591, "1.4.0", "", 1, 1024, 2);
+        for (String[] here : new String[][] {{"1.61", "5591"}, {"1.60", "5592"}}) {
+            final String text = new PhoneTransfer.ImportOffer(marker, 0, true, 1024)
+                .describe(StringResources.ENGLISH, here[0], Integer.parseInt(here[1]));
+            assertTrue(text, text.contains("It comes from app 1.60 with engine build 5591, and this is app "
+                + here[0] + " with engine build " + here[1] + "."));
+        }
+    }
+
+    @Test
     public void thereIsAlwaysSomethingToSayAboutWhereAFileIs() {
         assertEquals(Message.plain("Download/Inbox/x.zip"), PhoneTransfer.whereIs("primary:Download/Inbox/x.zip", "x.zip"));
         assertEquals(Message.plain("x.zip"), PhoneTransfer.whereIs("msf:1234", "x.zip"));

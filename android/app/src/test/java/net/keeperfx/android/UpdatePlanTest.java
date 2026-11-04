@@ -311,6 +311,76 @@ public class UpdatePlanTest {
             + "    Currently 1.57\n", dialogText(UpdateManager.plan(facts)));
     }
 
+    private static String problems(boolean hasKeeperfx, List<String> missing, String alpha, int engine) {
+        return GameData.describeProblems(StringResources.ENGLISH, hasKeeperfx, missing, alpha, engine, "/the/folder");
+    }
+
+    @Test
+    public void withNothingInTheWayTheLauncherSaysWhereItAllIs() {
+        assertEquals("/the/folder", problems(true, Collections.<String>emptyList(), "1.4.0.5591", 5591));
+    }
+
+    @Test
+    public void theLauncherSaysWhatIsInTheWayOfPlaying() {
+        assertEquals("Tap \"Install KeeperFX\" to download the current release, or import a folder you already have.\n\n"
+            + "Still missing from an original Dungeon Keeper:\n  \u2022 data/a.dat",
+            problems(false, Arrays.asList("data/a.dat"), "", 5591));
+    }
+
+    @Test
+    public void aLongListOfMissingFilesStopsAtEight() {
+        final String text = problems(true, Arrays.asList("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"), "", 5591);
+        assertTrue(text, text.endsWith("\u2022 8\n  \u2026 and 2 more"));
+        assertEquals(text, 8, text.split("\u2022", -1).length - 1);
+        final String exactly = problems(true, Arrays.asList("1", "2", "3", "4", "5", "6", "7", "8"), "", 5591);
+        assertFalse(exactly, exactly.contains("more"));
+    }
+
+    @Test
+    public void aPatchThatDoesNotFitTheEngineIsMentionedWhateverElseIsSaid() {
+        assertTrue(problems(true, Collections.<String>emptyList(), "1.4.0.5700", 5591).startsWith("The alpha patch is build 5700 and this app's engine is build 5591"));
+        assertFalse("not knowing its number, the engine cannot say",
+            problems(true, Collections.<String>emptyList(), "1.4.0.5700", 0).contains("alpha patch"));
+    }
+
+    @Test
+    public void theDialogAddsWhatThePlayerShouldKnowAboutTheList() {
+        facts.stableVersion = "1.3.2";
+        final String updating = UpdateManager.describe(
+            new UpdateManager.Result(UpdateManager.plan(facts), false), StringResources.ENGLISH);
+        assertTrue(updating, updating.contains("anything you added are kept.\nBest done on Wi-Fi."));
+        assertFalse(updating, updating.contains("did not answer"));
+
+        facts.stableVersion = "1.4.0";
+        facts.hasMusic = false;
+        final String partial = UpdateManager.describe(
+            new UpdateManager.Result(UpdateManager.plan(facts), true), StringResources.ENGLISH);
+        assertFalse(partial, partial.contains("anything you added"));
+        assertTrue(partial, partial.contains("so there may be more than this.\nBest done on Wi-Fi."));
+    }
+
+    /** Android 11, where granting this ends every process of the app. */
+    @Test
+    public void thePermissionOnlyWaitsWhereGrantingItWouldEndTheDownloads() {
+        assertTrue(UpdateManager.installPermissionHasToWait(true, 30));
+        assertFalse(UpdateManager.installPermissionHasToWait(false, 30));
+        assertFalse(UpdateManager.installPermissionHasToWait(true, 29));
+        assertFalse(UpdateManager.installPermissionHasToWait(true, 31));
+    }
+
+    @Test
+    public void theDialogForTheAppAloneListsChangesWhenThereAreAny() {
+        final AppRelease plain = new AppRelease("1.60", "https://example.test/a", 1,
+            Collections.<String>emptyList());
+        assertEquals("Version 1.60 is available.\n\nYou are on 1.57.\n\n"
+            + "The update installs over this one. Game data and settings are kept.",
+            plain.describe("1.57", StringResources.ENGLISH));
+        final AppRelease listed = new AppRelease("1.60", "https://example.test/a", 1,
+            Arrays.asList("one", "two"));
+        assertTrue(listed.describe("1.57", StringResources.ENGLISH).endsWith(
+            "are kept.\n\nWhat changed:\n\u2022 one\n\u2022 two"));
+    }
+
     @Test
     public void beingOfflineHidesOnlyWhatNeedsTheNetwork() {
         facts.latestStable = null;

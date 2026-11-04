@@ -358,6 +358,41 @@ public final class GameData {
     }
 
     /**
+     * What the launcher says under its two status lines: what is in the way of playing,
+     * or where the installation is when nothing is. A patch that is not the engine's own
+     * gets mentioned either way, since it explains a lot of strange behaviour.
+     *
+     * @param missingOriginal files from the original game that are not there
+     * @param alphaVersion the patch laid over the release, or empty
+     */
+    static String describeProblems(Message.Strings strings, boolean hasKeeperfx,
+            List<String> missingOriginal, String alphaVersion, int engineBuild, String directory) {
+        final StringBuilder text = new StringBuilder();
+        if (!alphaVersion.isEmpty() && engineBuild > 0
+                && !ReleaseApi.fitsEngine(alphaVersion, engineBuild)) {
+            text.append(new Message(R.string.status_engine_mismatch,
+                ReleaseApi.buildOf(alphaVersion), engineBuild).text(strings)).append("\n\n");
+        }
+        if (hasKeeperfx && missingOriginal.isEmpty()) {
+            return text.append(directory).toString();
+        }
+        if (!hasKeeperfx) {
+            text.append(new Message(R.string.hint_install_keeperfx).text(strings)).append("\n\n");
+        }
+        if (!missingOriginal.isEmpty()) {
+            text.append(new Message(R.string.hint_import_original).text(strings)).append('\n');
+            for (String entry : missingOriginal.subList(0, Math.min(8, missingOriginal.size()))) {
+                text.append("  \u2022 ").append(entry).append('\n');
+            }
+            if (missingOriginal.size() > 8) {
+                text.append("  ").append(new Message(R.string.status_missing_more,
+                    missingOriginal.size() - 8).text(strings)).append('\n');
+            }
+        }
+        return text.toString().trim();
+    }
+
+    /**
      * Whether the data fits the engine, for the header of a shared log. A mismatch
      * explains a lot of strange reports, and nothing else would reveal it.
      */

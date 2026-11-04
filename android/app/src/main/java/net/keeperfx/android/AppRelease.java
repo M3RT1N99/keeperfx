@@ -92,6 +92,14 @@ final class AppRelease {
         return changes;
     }
 
+    /** What the dialog for this release alone says. */
+    String describe(String installed, Message.Strings strings) {
+        final String offer = new Message(R.string.app_update_available, versionName, installed).text(strings);
+        return changes.isEmpty()
+            ? offer
+            : offer + "\n\n" + new Message(R.string.app_update_changes).text(strings) + '\n' + changelog();
+    }
+
     /** Ready to drop into a dialog; empty when the notes carried no list. */
     String changelog() {
         if (changes.isEmpty()) {

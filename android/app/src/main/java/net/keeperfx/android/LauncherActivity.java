@@ -48,8 +48,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class LauncherActivity extends Activity implements DownloadService.Observer {
 
@@ -80,14 +82,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private TextView exportStatus;
     private Button exportShareButton;
     private Button exportDeleteButton;
-    private RadioGroup inputModeGroup;
     private CheckBox useAlphaBox;
     private Spinner languageSpinner;
     private TextView languageNote;
-    private CheckBox backButtonBox;
-    private CheckBox noIntroBox;
-    private CheckBox noSoundBox;
-    private EditText extraArgsField;
 
     private DataImporter runningImport;
     private boolean busy = false;
@@ -117,6 +114,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
         prefs = new Prefs(this);
 
+        findViews();
+        bindSettings();
+        bindButtons();
+    }
+
+    private void findViews() {
         keeperfxStatus = findViewById(R.id.keeperfxStatus);
         originalDkStatus = findViewById(R.id.originalDkStatus);
         detailView = findViewById(R.id.detail);
@@ -127,8 +130,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         playButton = findViewById(R.id.play);
         removeDataButton = findViewById(R.id.removeData);
         updateAppButton = findViewById(R.id.updateApp);
-        updateAppButton.setText(getString(R.string.button_update_app,
-            BuildConfig.VERSION_NAME));
+        updateAppButton.setText(getString(R.string.button_update_app, BuildConfig.VERSION_NAME));
         exportButton = findViewById(R.id.exportInstallation);
         importButton = findViewById(R.id.importInstallation);
         cancelJobButton = findViewById(R.id.cancelJob);
@@ -136,14 +138,18 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         exportStatus = findViewById(R.id.exportStatus);
         exportShareButton = findViewById(R.id.exportShare);
         exportDeleteButton = findViewById(R.id.exportDelete);
-        inputModeGroup = findViewById(R.id.inputMode);
         useAlphaBox = findViewById(R.id.useAlpha);
         languageSpinner = findViewById(R.id.language);
         languageNote = findViewById(R.id.languageNote);
-        backButtonBox = findViewById(R.id.backButton);
-        noIntroBox = findViewById(R.id.noIntro);
-        noSoundBox = findViewById(R.id.noSound);
-        extraArgsField = findViewById(R.id.extraArgs);
+    }
+
+    /** Every setting from what is stored, and every change back into it. */
+    private void bindSettings() {
+        final RadioGroup inputModeGroup = findViewById(R.id.inputMode);
+        final CheckBox backButtonBox = findViewById(R.id.backButton);
+        final CheckBox noIntroBox = findViewById(R.id.noIntro);
+        final CheckBox noSoundBox = findViewById(R.id.noSound);
+        final EditText extraArgsField = findViewById(R.id.extraArgs);
 
         switch (prefs.getInputMode()) {
             case Prefs.INPUT_TOUCH:
@@ -226,12 +232,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 prefs.setExtraArguments(s.toString());
             }
         });
+    }
 
+    private void bindButtons() {
         installButton.setOnClickListener(v -> confirmInstallOrUpdate());
         importKeeperfxButton.setOnClickListener(v -> {
             if (!refuseWhileGameOpen()) {
-                pickFolder(REQUEST_PICK_KEEPERFX,
-                    R.string.import_keeperfx_title, R.string.import_keeperfx_explanation);
+                askKeeperfxFolder();
             }
         });
         importOriginalButton.setOnClickListener(v -> {
@@ -318,7 +325,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     private void refreshStatus() {
         final boolean hasKeeperfx = GameData.isKeeperfxInstalled(this);
-        final boolean hasOriginal = GameData.hasOriginalDkFiles(this);
+        final List<String> missingOriginal = GameData.findMissingOriginalDkFiles(this);
+        final boolean hasOriginal = missingOriginal.isEmpty();
 
         if (hasKeeperfx) {
             keeperfxStatus.setText(getString(R.string.status_keeperfx_ready,
@@ -332,8 +340,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         if (hasOriginal) {
             originalDkStatus.setText(R.string.status_original_ready);
         } else {
-            final int missing = GameData.findMissingOriginalDkFiles(this).size();
-            originalDkStatus.setText(getString(R.string.status_original_missing, missing));
+            originalDkStatus.setText(getString(R.string.status_original_missing, missingOriginal.size()));
         }
         originalDkStatus.setTextColor(getColor(hasOriginal ? R.color.kfx_ok : R.color.kfx_warn));
 
@@ -341,34 +348,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             ? getString(R.string.button_update_keeperfx)
             : getString(R.string.button_install_keeperfx));
 
-        final StringBuilder sb = new StringBuilder();
-        final String alphaVersion = prefs.getInstalledAlphaVersion();
-        if (!alphaVersion.isEmpty() && BuildConfig.ENGINE_BUILD > 0
-                && !ReleaseApi.fitsEngine(alphaVersion, BuildConfig.ENGINE_BUILD)) {
-            sb.append(getString(R.string.status_engine_mismatch,
-                ReleaseApi.buildOf(alphaVersion), BuildConfig.ENGINE_BUILD)).append("\n\n");
-        }
-        if (hasKeeperfx && hasOriginal) {
-            sb.append(GameData.gameDirectory(this).getAbsolutePath());
-        } else {
-            if (!hasKeeperfx) {
-                sb.append(getString(R.string.hint_install_keeperfx)).append("\n\n");
-            }
-            if (!hasOriginal) {
-                sb.append(getString(R.string.hint_import_original)).append('\n');
-                final List<String> missing = GameData.findMissingOriginalDkFiles(this);
-                int shown = 0;
-                for (String entry : missing) {
-                    if (shown++ >= 8) {
-                        sb.append("  ").append(getString(R.string.status_missing_more,
-                            missing.size() - 8)).append('\n');
-                        break;
-                    }
-                    sb.append("  • ").append(entry).append('\n');
-                }
-            }
-        }
-        detailView.setText(sb.toString().trim());
+        detailView.setText(GameData.describeProblems(Message.strings(this), hasKeeperfx, missingOriginal,
+            prefs.getInstalledAlphaVersion(), BuildConfig.ENGINE_BUILD,
+            GameData.gameDirectory(this).getAbsolutePath()));
         refreshLanguageNote();
         refreshExportPanel();
 
@@ -423,48 +405,27 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
      * the background music and a newer build of this app.
      */
     private void confirmInstallOrUpdate() {
-        if (DownloadService.isRunning()) {
-            Toast.makeText(this, R.string.updates_running, Toast.LENGTH_SHORT).show();
+        if (refuseWhileJobRuns()) {
             return;
         }
-        setBusy(true);
-        progressBar.setIndeterminate(true);
+        whileBusy("kfx-update-scan", () -> UpdateManager.check(this), found -> {
+            if (!found.items.isEmpty()) {
+                showUpdateDialog(found);
+            } else if (found.unanswered) {
+                showMessage(R.string.updates_unanswered_title, getString(R.string.updates_unanswered));
+            } else {
+                showMessage(R.string.updates_none_title, getString(R.string.updates_none));
+            }
+        });
         keeperfxStatus.setText(R.string.status_checking_updates);
-
-        new Thread(() -> {
-            final UpdateManager.Result found = UpdateManager.check(this);
-            postIfAlive(() -> {
-                setBusy(false);
-                refreshStatus();
-                if (!found.items.isEmpty()) {
-                    showUpdateDialog(found);
-                } else if (found.unanswered) {
-                    showMessage(R.string.updates_unanswered_title,
-                        getString(R.string.updates_unanswered));
-                } else {
-                    showMessage(R.string.updates_none_title, getString(R.string.updates_none));
-                }
-            });
-        }, "kfx-update-scan").start();
     }
 
     private void showUpdateDialog(UpdateManager.Result found) {
-        final List<UpdateManager.Item> items = found.items;
-        final StringBuilder body =
-            new StringBuilder(UpdateManager.describe(items, Message.strings(this))).append('\n');
-        if (UpdateManager.contains(items, UpdateManager.Kind.GAME_DATA)) {
-            body.append('\n').append(getString(R.string.updates_replaces_data));
-        }
-        if (found.unanswered) {
-            body.append('\n').append(getString(R.string.updates_unanswered_more));
-        }
-        body.append('\n').append(getString(R.string.updates_use_wifi));
-
         new AlertDialog.Builder(this)
-            .setTitle(getString(R.string.updates_available_title, items.size()))
-            .setMessage(body.toString().trim())
+            .setTitle(getString(R.string.updates_available_title, found.items.size()))
+            .setMessage(UpdateManager.describe(found, Message.strings(this)))
             .setPositiveButton(R.string.updates_download_all,
-                (dialog, which) -> runUpdates(items))
+                (dialog, which) -> runUpdates(found.items))
             .setNegativeButton(android.R.string.cancel, null)
             .show();
     }
@@ -496,15 +457,10 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         }
     }
 
-    /**
-     * Android 11 ends every process of an app when this permission is granted to it, and
-     * the downloads that were just started would go with them. There the settings wait
-     * until the next tap, when the app update is all that is left and nothing is running.
-     */
     private void askForInstallPermission(boolean othersRunning) {
         final AlertDialog.Builder dialog = new AlertDialog.Builder(this)
             .setTitle(R.string.updates_permission_title);
-        if (othersRunning && Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
+        if (UpdateManager.installPermissionHasToWait(othersRunning, Build.VERSION.SDK_INT)) {
             dialog.setMessage(R.string.updates_permission_rest_running_later)
                 .setPositiveButton(android.R.string.ok, null);
         } else {
@@ -582,20 +538,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     // ----------------------------------------------------------------- export
 
     private void confirmExport() {
-        if (DownloadService.isRunning()) {
-            Toast.makeText(this, R.string.updates_running, Toast.LENGTH_SHORT).show();
-            return;
+        if (!refuseWhileJobRuns()) {
+            whileBusy("kfx-export-check", () -> PhoneTransfer.checkExport(this), this::showExportDialog);
         }
-        setBusy(true);
-        progressBar.setIndeterminate(true);
-        new Thread(() -> {
-            final PhoneTransfer.ExportOffer offer = PhoneTransfer.checkExport(this);
-            postIfAlive(() -> {
-                setBusy(false);
-                refreshStatus();
-                showExportDialog(offer);
-            });
-        }, "kfx-export-check").start();
     }
 
     private void showExportDialog(PhoneTransfer.ExportOffer offer) {
@@ -603,22 +548,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             showMessage(R.string.export_title, offer.refusal.in(this));
             return;
         }
-        final StringBuilder body = new StringBuilder(getString(R.string.export_offer_intro))
-            .append("\n\n").append(getString(R.string.export_offer_game, offer.version.in(this)))
-            .append('\n');
-        if (offer.music) {
-            body.append(getString(R.string.export_offer_music)).append('\n');
-        }
-        body.append(getString(R.string.export_offer_saves, offer.saves)).append("\n\n")
-            .append(getString(R.string.export_offer_size,
-                GameData.describeBytes(offer.bytes).in(this),
-                offer.files,
-                GameData.describeBytes(offer.needed).in(this),
-                GameData.describeBytes(offer.free).in(this)))
-            .append("\n\n").append(getString(R.string.export_offer_own_devices));
         new AlertDialog.Builder(this)
             .setTitle(R.string.export_title)
-            .setMessage(body.toString())
+            .setMessage(offer.describe(Message.strings(this)))
             .setPositiveButton(R.string.export_confirm, (dialog, which) -> {
                 requestNotificationPermission();
                 setBusy(true);
@@ -634,29 +566,15 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         new AlertDialog.Builder(this)
             .setTitle(R.string.import_bundle_title)
             .setMessage(R.string.import_bundle_explanation)
-            .setPositiveButton(R.string.import_bundle_choose, (dialog, which) -> {
-                final Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                // As with the original game's zip: the reader decides, not the label.
-                intent.setType("*/*");
-                intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, PhoneTransfer.downloadsUri());
-                startActivityForResult(intent, REQUEST_PICK_BUNDLE);
-            })
+            .setPositiveButton(R.string.import_bundle_choose, (dialog, which) ->
+                openFilePicker(REQUEST_PICK_BUNDLE, PhoneTransfer.downloadsUri()))
             .setNegativeButton(android.R.string.cancel, null)
             .show();
     }
 
     private void inspectPickedFile(Uri file) {
-        setBusy(true);
-        progressBar.setIndeterminate(true);
-        new Thread(() -> {
-            final PhoneTransfer.ImportOffer offer = PhoneTransfer.inspect(this, file);
-            postIfAlive(() -> {
-                setBusy(false);
-                refreshStatus();
-                showImportDialog(file, offer);
-            });
-        }, "kfx-import-check").start();
+        whileBusy("kfx-import-check", () -> PhoneTransfer.inspect(this, file),
+            offer -> showImportDialog(file, offer));
     }
 
     private void showImportDialog(Uri file, PhoneTransfer.ImportOffer offer) {
@@ -664,28 +582,10 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             showMessage(R.string.import_bundle_title, offer.refusal.in(this));
             return;
         }
-        final TransferBundle.Marker marker = offer.marker;
-        final StringBuilder body = new StringBuilder(getString(R.string.import_bundle_offer,
-            GameData.describeVersion(marker.release, marker.alpha).in(this),
-            marker.saves,
-            GameData.describeBytes(marker.bytes).in(this)));
-        final int savesHere = offer.savesHere;
-        body.append("\n\n").append(!offer.installedHere
-            ? getString(R.string.import_bundle_nothing_here)
-            : savesHere > 0
-                ? getString(R.string.import_bundle_replaces, savesHere)
-                : getString(R.string.import_bundle_replaces_no_saves));
-        body.append("\n\n").append(getString(R.string.import_bundle_room,
-            GameData.describeBytes(marker.bytes).in(this), GameData.describeBytes(offer.free).in(this)));
-        body.append("\n\n").append(getString(R.string.import_bundle_trust));
-        final String thisApp = BuildConfig.VERSION_NAME;
-        if (!marker.app.equals(thisApp) || marker.engine != BuildConfig.ENGINE_BUILD) {
-            body.append("\n\n").append(getString(R.string.import_bundle_other_build,
-                marker.app, marker.engine, thisApp, BuildConfig.ENGINE_BUILD));
-        }
         new AlertDialog.Builder(this)
             .setTitle(R.string.import_bundle_title)
-            .setMessage(body.toString())
+            .setMessage(offer.describe(Message.strings(this), BuildConfig.VERSION_NAME,
+                BuildConfig.ENGINE_BUILD))
             .setPositiveButton(R.string.import_bundle_confirm, (dialog, which) -> {
                 requestNotificationPermission();
                 setBusy(true);
@@ -720,8 +620,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
      * gets an entry of its own that also shows which build is running.
      */
     private void checkAppUpdate() {
-        if (DownloadService.isRunning()) {
-            Toast.makeText(this, R.string.updates_running, Toast.LENGTH_SHORT).show();
+        if (refuseWhileJobRuns()) {
             return;
         }
         updateAppButton.setEnabled(false);
@@ -739,8 +638,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             final boolean online = reachable;
             postIfAlive(() -> {
                 updateAppButton.setEnabled(true);
-                updateAppButton.setText(getString(R.string.button_update_app,
-                    BuildConfig.VERSION_NAME));
+                updateAppButton.setText(getString(R.string.button_update_app, BuildConfig.VERSION_NAME));
                 if (!online) {
                     showMessage(R.string.app_update_title,
                         getString(R.string.app_update_offline));
@@ -751,25 +649,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                         BuildConfig.VERSION_NAME));
                     return;
                 }
-                final StringBuilder text = new StringBuilder(
-                    getString(R.string.app_update_available, found.versionName,
-                        BuildConfig.VERSION_NAME));
-                final String changelog = found.changelog();
-                if (!changelog.isEmpty()) {
-                    text.append("\n\n")
-                        .append(getString(R.string.app_update_changes))
-                        .append('\n')
-                        .append(changelog);
-                }
                 new AlertDialog.Builder(this)
                     .setTitle(R.string.app_update_title)
-                    .setMessage(text.toString())
-                    .setPositiveButton(R.string.app_update_install, (d, w) -> {
-                        final List<UpdateManager.Item> only = new ArrayList<>();
-                        only.add(new UpdateManager.Item(UpdateManager.Kind.APP,
-                            Message.plain(found.versionName), found));
-                        runUpdates(only);
-                    })
+                    .setMessage(found.describe(BuildConfig.VERSION_NAME, Message.strings(this)))
+                    .setPositiveButton(R.string.app_update_install, (d, w) ->
+                        runUpdates(Collections.singletonList(new UpdateManager.Item(
+                            UpdateManager.Kind.APP, Message.plain(found.versionName), found))))
                     .setNegativeButton(android.R.string.cancel, null)
                     .show();
             });
@@ -791,27 +676,36 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             .setMessage(R.string.import_original_explanation)
             .setPositiveButton(R.string.import_choose_folder,
                 (dialog, which) -> openFolderPicker(REQUEST_PICK_ORIGINAL_DK))
-            .setNeutralButton(R.string.import_choose_zip, (dialog, which) -> {
-                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                // Not every provider labels a zip with the same type, so the
-                // filter is widened and the reader decides.
-                intent.setType("*/*");
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivityForResult(intent, REQUEST_PICK_ORIGINAL_DK_ZIP);
-            })
+            .setNeutralButton(R.string.import_choose_zip, (dialog, which) ->
+                openFilePicker(REQUEST_PICK_ORIGINAL_DK_ZIP, null))
             .setNegativeButton(android.R.string.cancel, null)
             .show();
     }
 
-    private void pickFolder(int requestCode, int titleRes, int explanationRes) {
+    private void askKeeperfxFolder() {
         new AlertDialog.Builder(this)
-            .setTitle(titleRes)
-            .setMessage(explanationRes)
+            .setTitle(R.string.import_keeperfx_title)
+            .setMessage(R.string.import_keeperfx_explanation)
             .setPositiveButton(R.string.import_choose,
-                (dialog, which) -> openFolderPicker(requestCode))
+                (dialog, which) -> openFolderPicker(REQUEST_PICK_KEEPERFX))
             .setNegativeButton(android.R.string.cancel, null)
             .show();
+    }
+
+    /**
+     * Any type: not every provider labels a zip with the same one, so the filter is wide
+     * and whatever reads the file decides.
+     *
+     * @param startAt where the picker opens, or null for where it was last
+     */
+    private void openFilePicker(int requestCode, Uri startAt) {
+        final Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        if (startAt != null) {
+            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, startAt);
+        }
+        startActivityForResult(intent, requestCode);
     }
 
     private void openFolderPicker(int requestCode) {
@@ -823,28 +717,17 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK || data == null) {
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
             return;
         }
         if (requestCode == REQUEST_PICK_BUNDLE) {
-            if (data.getData() != null) {
-                inspectPickedFile(data.getData());
-            }
-            return;
+            inspectPickedFile(data.getData());
+        } else {
+            startImport(requestCode, data.getData());
         }
-        if (requestCode != REQUEST_PICK_KEEPERFX && requestCode != REQUEST_PICK_ORIGINAL_DK
-         && requestCode != REQUEST_PICK_ORIGINAL_DK_ZIP) {
-            return;
-        }
-        final Uri treeUri = data.getData();
-        if (treeUri == null) {
-            return;
-        }
-        startImport(treeUri, requestCode == REQUEST_PICK_KEEPERFX,
-            requestCode == REQUEST_PICK_ORIGINAL_DK_ZIP);
     }
 
-    private void startImport(Uri treeUri, boolean keeperfxRelease, boolean fromZip) {
+    private void startImport(int requestCode, Uri picked) {
         // Again: the picker can take a while, and the recent apps can bring the game back.
         if (refuseWhileGameOpen()) {
             return;
@@ -852,7 +735,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         setBusy(true);
         progressBar.setIndeterminate(true);
         detailView.setText("");
-        if (keeperfxRelease) {
+        if (requestCode == REQUEST_PICK_KEEPERFX) {
             keeperfxStatus.setText(R.string.status_importing);
         } else {
             originalDkStatus.setText(R.string.status_searching_original);
@@ -879,12 +762,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         });
         runningImport = importer;
         new Thread(() -> {
-            if (keeperfxRelease) {
-                importer.importKeeperfxTree(treeUri);
-            } else if (fromZip) {
-                importer.importOriginalDkZip(treeUri);
+            if (requestCode == REQUEST_PICK_KEEPERFX) {
+                importer.importKeeperfxTree(picked);
+            } else if (requestCode == REQUEST_PICK_ORIGINAL_DK_ZIP) {
+                importer.importOriginalDkZip(picked);
             } else {
-                importer.importOriginalDkTree(treeUri);
+                importer.importOriginalDkTree(picked);
             }
         }, "kfx-import").start();
     }
@@ -911,6 +794,32 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         importButton.setEnabled(!value);
         exportShareButton.setEnabled(!value);
         exportDeleteButton.setEnabled(!value);
+    }
+
+    /** @return whether a job is running, in which case the player has been told so. */
+    private boolean refuseWhileJobRuns() {
+        if (!DownloadService.isRunning()) {
+            return false;
+        }
+        Toast.makeText(this, R.string.updates_running, Toast.LENGTH_SHORT).show();
+        return true;
+    }
+
+    /**
+     * Does what would hold up the screen on a thread of its own, with the buttons locked,
+     * and then what follows from it, if the player is still here.
+     */
+    private <T> void whileBusy(String threadName, Supplier<T> work, Consumer<T> then) {
+        setBusy(true);
+        progressBar.setIndeterminate(true);
+        new Thread(() -> {
+            final T result = work.get();
+            postIfAlive(() -> {
+                setBusy(false);
+                refreshStatus();
+                then.accept(result);
+            });
+        }, threadName).start();
     }
 
     /**
@@ -959,20 +868,16 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 if (refuseWhileGameOpen()) {
                     return;
                 }
-                setBusy(true);
                 // Thousands of files, which is more than the main thread may spend.
-                new Thread(() -> {
+                whileBusy("kfx-reset", () -> {
                     FileUtil.deleteTree(GameData.gameDirectory(this));
                     // Not only the version: the alpha backup, the archive cache
                     // and the manifests all describe the installation that was
                     // just deleted, and an alpha backup that survives a reset
                     // would "restore" pieces of it into the next one.
                     ReleaseDownloader.wipeInstallState(this);
-                    postIfAlive(() -> {
-                        setBusy(false);
-                        refreshStatus();
-                    });
-                }, "kfx-reset").start();
+                    return null;
+                }, nothing -> { });
             })
             .setNegativeButton(android.R.string.cancel, null)
             .show();

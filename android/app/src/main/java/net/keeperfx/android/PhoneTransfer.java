@@ -83,6 +83,23 @@ final class PhoneTransfer {
             this.needed = plan.fileSizeAtMost();
             this.free = free;
         }
+
+        /** What the confirmation says. */
+        String describe(Message.Strings strings) {
+            final StringBuilder body = new StringBuilder()
+                .append(new Message(R.string.export_offer_intro).text(strings)).append("\n\n")
+                .append(new Message(R.string.export_offer_game, version).text(strings)).append('\n');
+            if (music) {
+                body.append(new Message(R.string.export_offer_music).text(strings)).append('\n');
+            }
+            return body
+                .append(new Message(R.string.export_offer_saves, saves).text(strings)).append("\n\n")
+                .append(new Message(R.string.export_offer_size, GameData.describeBytes(bytes), files,
+                    GameData.describeBytes(needed), GameData.describeBytes(free)).text(strings))
+                .append("\n\n")
+                .append(new Message(R.string.export_offer_own_devices).text(strings))
+                .toString();
+        }
     }
 
     /**
@@ -194,6 +211,31 @@ final class PhoneTransfer {
             this.savesHere = savesHere;
             this.installedHere = installedHere;
             this.free = free;
+        }
+
+        /**
+         * What the confirmation says, which depends on what would be lost here and on
+         * whether the file comes from this very build.
+         */
+        String describe(Message.Strings strings, String thisApp, int thisEngine) {
+            final Message whatBecomesOfThisPhone = !installedHere
+                ? new Message(R.string.import_bundle_nothing_here)
+                : (savesHere > 0)
+                    ? new Message(R.string.import_bundle_replaces, savesHere)
+                    : new Message(R.string.import_bundle_replaces_no_saves);
+            final StringBuilder body = new StringBuilder()
+                .append(new Message(R.string.import_bundle_offer,
+                    GameData.describeVersion(marker.release, marker.alpha), marker.saves,
+                    GameData.describeBytes(marker.bytes)).text(strings))
+                .append("\n\n").append(whatBecomesOfThisPhone.text(strings))
+                .append("\n\n").append(new Message(R.string.import_bundle_room,
+                    GameData.describeBytes(marker.bytes), GameData.describeBytes(free)).text(strings))
+                .append("\n\n").append(new Message(R.string.import_bundle_trust).text(strings));
+            if (!marker.app.equals(thisApp) || marker.engine != thisEngine) {
+                body.append("\n\n").append(new Message(R.string.import_bundle_other_build,
+                    marker.app, marker.engine, thisApp, thisEngine).text(strings));
+            }
+            return body.toString();
         }
     }
 

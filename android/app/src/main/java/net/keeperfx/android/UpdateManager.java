@@ -115,6 +115,28 @@ public final class UpdateManager {
         return body.toString();
     }
 
+    /** What the dialog says about what a check found. */
+    static String describe(Result found, Message.Strings strings) {
+        final StringBuilder body = new StringBuilder(describe(found.items, strings));
+        if (contains(found.items, Kind.GAME_DATA)) {
+            body.append('\n').append(new Message(R.string.updates_replaces_data).text(strings));
+        }
+        if (found.unanswered) {
+            body.append('\n').append(new Message(R.string.updates_unanswered_more).text(strings));
+        }
+        return body.append('\n').append(new Message(R.string.updates_use_wifi).text(strings)).toString();
+    }
+
+    /**
+     * Android 11 ends every process of an app when the permission to install apps is
+     * granted to it, and downloads that are running would go with them. There the settings
+     * wait until the next tap, when the app update is all that is left and nothing is
+     * running. Not tried on such a device: from reading the platform's source.
+     */
+    static boolean installPermissionHasToWait(boolean othersRunning, int sdk) {
+        return othersRunning && sdk == android.os.Build.VERSION_CODES.R;
+    }
+
     /** What a check found. */
     public static final class Result {
         public final List<Item> items;
