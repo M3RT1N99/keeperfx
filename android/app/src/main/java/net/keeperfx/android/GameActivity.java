@@ -84,6 +84,8 @@ public class GameActivity extends SDLActivity {
                 || ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0)
                 || PhoneTransfer.importUnfinished(this)) {
             startActivity(getPackageManager().getLaunchIntentForPackage(getPackageName()));
+            // Or the system would keep this record and its saved state for the next start.
+            finishAndRemoveTask();
             Process.killProcess(Process.myPid());
             return;
         }

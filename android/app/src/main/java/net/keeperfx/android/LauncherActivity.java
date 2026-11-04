@@ -974,7 +974,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                     showMessage(R.string.config_failed, message);
                     return;
                 }
-                Intent intent = new Intent(this, GameActivity.class);
+                // The process is gone, but the system may have kept the record of a game it
+                // took from the background. Without the flags this start would bring that
+                // back, with the arguments of its own start and a saved state, which
+                // GameActivity sends to the launcher: Play would seem to have done nothing.
+                Intent intent = new Intent(this, GameActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 intent.putExtra(GameActivity.EXTRA_ARGUMENTS, prefs.buildArguments(this));
                 startActivity(intent);
             });
