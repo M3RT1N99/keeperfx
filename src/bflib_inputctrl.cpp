@@ -311,6 +311,14 @@ static TbKeyCode mousebutton_to_keycode(const Uint8 *button)
    poll, so its release waits for the next poll. */
 static TbBool back_pressed_this_poll = false;
 static TbBool back_release_waiting = false;
+
+/* The system back and the arrow on the screen are what a phone with no keyboard has for
+   leaving a menu. Taken as keyboard use, they would turn automatic mode away from the
+   fingers, and an edge scroll on for a pointer that is not a mouse. */
+static TbBool key_is_used_with_fingers(const SDL_KeyboardEvent *key)
+{
+    return (key->key == SDLK_AC_BACK) || (key->key == SDLK_ESCAPE);
+}
 #endif
 
 static void process_event(const SDL_Event *ev)
@@ -350,6 +358,10 @@ static void process_event(const SDL_Event *ev)
         {
             keyboardControl(KActn_KEYDOWN,x,keyboard_mods_mapping(&ev->key), ev->key.key);
         }
+#ifdef __ANDROID__
+        if (key_is_used_with_fingers(&ev->key))
+            break;
+#endif
         last_used_input_device = ID_Keyboard_Mouse;
         break;
 
@@ -368,6 +380,10 @@ static void process_event(const SDL_Event *ev)
         {
             keyboardControl(KActn_KEYUP,x,keyboard_mods_mapping(&ev->key), ev->key.key);
         }
+#ifdef __ANDROID__
+        if (key_is_used_with_fingers(&ev->key))
+            break;
+#endif
         last_used_input_device = ID_Keyboard_Mouse;
         break;
 
