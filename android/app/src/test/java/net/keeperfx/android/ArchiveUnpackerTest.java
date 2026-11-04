@@ -212,6 +212,16 @@ public class ArchiveUnpackerTest {
     }
 
     @Test
+    public void runningOutOfRoomIsItsOwnFailure() {
+        try {
+            FileUtil.requireRoom(root, Long.MAX_VALUE, "this");
+            fail("no disk has that much");
+        } catch (FileUtil.NoRoomException expected) {
+            assertTrue(expected.getMessage().contains("this needs"));
+        }
+    }
+
+    @Test
     public void onlyWhatAnUnpackAddsCountsAgainstTheFreeSpace() throws IOException {
         TestArchives.write(new File(root, "fxdata/replaced.cfg"), "1234567890");
         final File archive = TestArchives.sevenZ(folder.newFile("a.7z"), TestArchives.entries(

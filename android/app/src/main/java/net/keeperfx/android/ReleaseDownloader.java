@@ -147,6 +147,7 @@ public final class ReleaseDownloader {
                 return;
             }
 
+            ArchiveUnpacker.requireRoomFor(archive, GameData.gameDirectory(context));
             listener.onStage("Saving the files being replaced", -1, "");
             alphaBackup().extendFor(archive);
             final List<String> unpacked = unpack(archive);
@@ -161,6 +162,8 @@ public final class ReleaseDownloader {
 
             new Prefs(context).setInstalledAlphaVersion(version);
             finish(true, "KeeperFX alpha " + version + " applied");
+        } catch (FileUtil.NoRoomException e) {
+            finish(false, e.getMessage());
         } catch (Exception e) {
             Log.e(TAG, "Alpha download failed", e);
             // Kept on success, see above. After a failure it may be what failed,
@@ -274,6 +277,9 @@ public final class ReleaseDownloader {
                 return;
             }
 
+            // Everything before this point leaves the installation as it was.
+            ArchiveUnpacker.requireRoomFor(archive, GameData.gameDirectory(context));
+
             // A partial install must not look complete, so forget the recorded
             // version until the new one is fully unpacked. Not any earlier: a
             // download that fails has not touched what is installed.
@@ -301,6 +307,11 @@ public final class ReleaseDownloader {
             //noinspection ResultOfMethodCallIgnored
             GameData.installInProgress(context).delete();
             finish(true, "KeeperFX " + version + " installed");
+        } catch (FileUtil.NoRoomException e) {
+            // The archive is fine and free storage is all that is missing, so the
+            // next attempt should not have to fetch it again.
+            archive = null;
+            finish(false, e.getMessage());
         } catch (Exception e) {
             Log.e(TAG, "Release download failed", e);
             finish(false, "Failed: " + e.getMessage());

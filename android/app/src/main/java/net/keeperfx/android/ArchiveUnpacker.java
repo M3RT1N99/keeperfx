@@ -83,7 +83,6 @@ final class ArchiveUnpacker {
         FileUtil.ensureDirectory(destination);
         final List<String> written = new ArrayList<>();
         try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
-            requireRoom(sevenZ, destination);
             // A process dying during a patch leaves the game playable, on the release
             // with some files replaced, as long as each of them is whole.
             final InputStream currentEntry = new InputStream() {
@@ -131,16 +130,14 @@ final class ArchiveUnpacker {
     }
 
     /**
-     * Fails before the first file is touched when the rest cannot fit. Running into
-     * a full disk half way leaves a torso of what used to be a working installation.
+     * For before anything gets touched. Running into a full disk half way leaves a
+     * torso of what used to be a working installation.
      */
-    private static void requireRoom(SevenZFile sevenZ, File destination) throws IOException {
-        final long needed = bytesNeeded(sevenZ.getEntries(), destination);
-        final long usable = destination.getUsableSpace();
-        if (needed > usable) {
-            throw new IOException("Not enough free storage: unpacking needs "
-                + GameData.describeBytes(needed) + " and " + GameData.describeBytes(usable)
-                + " are free");
+    static void requireRoomFor(File archive, File destination) throws IOException {
+        FileUtil.ensureDirectory(destination);
+        try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
+            FileUtil.requireRoom(destination, bytesNeeded(sevenZ.getEntries(), destination),
+                "unpacking");
         }
     }
 

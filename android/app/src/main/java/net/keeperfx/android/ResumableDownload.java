@@ -138,7 +138,7 @@ public final class ResumableDownload {
             final long remaining = connection.getContentLengthLong();
             final long total = (remaining >= 0) ? existing + remaining : -1;
             final long expected = (total > 0) ? total : expectedSize;
-            requireRoom(partial, expected - existing);
+            FileUtil.requireRoom(target.getParentFile(), expected - existing, "this download");
             long done = existing;
 
             try (InputStream in = new BufferedInputStream(connection.getInputStream());
@@ -202,16 +202,6 @@ public final class ResumableDownload {
         }
         return expectedSize <= 0 || match.group(2).equals("*")
             || Long.parseLong(match.group(2)) == expectedSize;
-    }
-
-    /** Says so before a 360 MB transfer runs into the wall at the far end. */
-    private static void requireRoom(File partial, long bytes) throws IOException {
-        final long usable = partial.getParentFile().getUsableSpace();
-        if (bytes > usable) {
-            throw new IOException("Not enough free storage: this needs "
-                + GameData.describeBytes(bytes) + " and " + GameData.describeBytes(usable)
-                + " are free");
-        }
     }
 
     private static void moveIntoPlace(File partial, File target) throws IOException {

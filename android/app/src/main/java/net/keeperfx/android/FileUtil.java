@@ -25,7 +25,24 @@ import java.io.OutputStream;
 
 final class FileUtil {
 
+    /** Nothing is wrong with what was being installed, there is just no room for it. */
+    static final class NoRoomException extends IOException {
+        NoRoomException(String message) {
+            super(message);
+        }
+    }
+
     private FileUtil() {
+    }
+
+    /** Says so up front, rather than after running into a full disk half way. */
+    static void requireRoom(File directory, long bytes, String what) throws NoRoomException {
+        final long usable = directory.getUsableSpace();
+        if (bytes > usable) {
+            throw new NoRoomException("Not enough free storage: " + what + " needs "
+                + GameData.describeBytes(bytes) + " and " + GameData.describeBytes(usable)
+                + " are free");
+        }
     }
 
     static void ensureDirectory(File dir) throws IOException {
