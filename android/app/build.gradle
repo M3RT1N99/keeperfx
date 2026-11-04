@@ -31,7 +31,9 @@ if (commitsSinceBase < 0) {
     // history for the release notes and publishes nothing older than its last.
     logger.warn("No git history to count from, the port version stays at ${portBaseMinor}")
 }
-def portVersion = "${portMajor}.${portBaseMinor + Math.max(0, commitsSinceBase)}"
+// The commit after the base is the first of the count, so that a release commit which
+// names its parent as the base comes out as exactly the minor written next to it.
+def portVersion = "${portMajor}.${portBaseMinor + Math.max(0, commitsSinceBase - 1)}"
 // The KeeperFX build this engine is: the merge base with dkfans/keeperfx, not
 // the number of commits in this fork. It becomes VER_BUILD, which is what the
 // multiplayer handshake compares - net_versions_match() requires all four
