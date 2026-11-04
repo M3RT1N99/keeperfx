@@ -208,13 +208,13 @@ static void draw_circle(long cx, long cy, long outer, long inner, TbPixel colour
     }
 }
 
-/** An arrow pointing up or down: direction -1 is up, 1 is down. */
+/** An arrow pointing up or down: direction -1 is up, 1 is down. It widens away from its tip. */
 static void draw_arrow(long cx, long cy, long size, int direction, TbPixel colour)
 {
     for (long row = 0; row <= size; row++)
     {
         const long half = row * 2 / 3 + 1;
-        const long y = cy + direction * (row - size / 2);
+        const long y = cy + direction * (size / 2 - row);
         UIRenderer_SubmitSolidBox(cx - half, y, 2 * half + 1, 1, colour);
     }
 }
