@@ -14,6 +14,8 @@
     <string name="log_copy">Kopieren</string>
     <string name="log_refresh">Neu laden</string>
     <string name="log_copied">Protokoll in die Zwischenablage kopiert</string>
+    <string name="log_copied_end">Nur das Ende des Protokolls passt in die Zwischenablage. Teilen schickt mehr davon.</string>
+    <string name="log_copy_failed">Das Protokoll konnte nicht kopiert werden. Nimm stattdessen Teilen.</string>
     <string name="button_log">Protokoll</string>
 
     <string name="version_unknown">importierter Ordner</string>
@@ -49,14 +51,14 @@
     <string name="updates_download_all">Alle laden</string>
     <string name="updates_replaces_data">Die Spieldaten werden dabei ersetzt. Spielstände, importierte Originaldateien, Musik und eigene Karten bleiben erhalten.</string>
     <string name="updates_use_wifi">Am besten im WLAN. Der Download läuft weiter, wenn du die App verlässt.</string>
-    <string name="notification_install_update">Update geladen. Zum Installieren tippen.</string>
-    <string name="updates_running">Es läuft bereits ein Download.</string>
 
     <string name="updates_permission_title">Berechtigung nötig</string>
     <string name="updates_permission">Um sich selbst zu aktualisieren, braucht KeeperFX die Berechtigung, Apps zu installieren. Erteile sie einmal in den folgenden Einstellungen und starte das Update dann noch einmal.</string>
     <string name="updates_permission_rest_running">Die anderen Downloads laufen. Das App-Update wurde ausgelassen: Um sich selbst zu aktualisieren, braucht KeeperFX die Berechtigung, Apps zu installieren. Erteile sie einmal in den folgenden Einstellungen und starte das Update dann noch einmal.</string>
     <string name="updates_permission_open">Einstellungen öffnen</string>
 
+    <string name="notification_install_update">Update geladen. Zum Installieren tippen.</string>
+    <string name="updates_running">Es läuft bereits ein Download.</string>
     <string name="notification_channel_network_game">Netzwerkspiel</string>
     <string name="notification_network_game">Netzwerkspiel läuft. Tippen, um zurückzukehren, die anderen warten.</string>
 

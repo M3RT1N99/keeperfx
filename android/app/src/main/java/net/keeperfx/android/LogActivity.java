@@ -48,6 +48,12 @@ public class LogActivity extends Activity {
 
     /** Reading the whole file would be pointless on screen and slow to share. */
     private static final int MAX_BYTES = 512 * 1024;
+    /**
+     * A clip goes to the system in one binder transaction, about 1 MB shared with
+     * whatever else is under way, at two bytes a character. All of MAX_BYTES does not
+     * fit, and the failure comes back on the main thread and ends the app.
+     */
+    static final int MAX_CLIPBOARD_CHARS = 200 * 1024;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -118,16 +124,16 @@ public class LogActivity extends Activity {
             raf.seek(from);
             final byte[] buffer = new byte[(int) Math.min(length - from, maxBytes)];
             raf.readFully(buffer);
-            String text = new String(buffer, StandardCharsets.UTF_8);
-            if (from > 0) {
-                final int nl = text.indexOf('\n');
-                if (nl >= 0 && nl + 1 < text.length()) {
-                    text = text.substring(nl + 1);
-                }
-                text = "… earlier lines omitted …\n\n" + text;
-            }
-            return text;
+            final String text = new String(buffer, StandardCharsets.UTF_8);
+            return (from > 0) ? fromWholeLine(text) : text;
         }
+    }
+
+    /** For text cut off at the front: starts on a whole line and says something is missing. */
+    private static String fromWholeLine(String cut) {
+        final int nl = cut.indexOf('\n');
+        final String whole = (nl >= 0 && nl + 1 < cut.length()) ? cut.substring(nl + 1) : cut;
+        return "… earlier lines omitted …\n\n" + whole;
     }
 
     // ----------------------------------------------------------------- share
@@ -217,8 +223,25 @@ public class LogActivity extends Activity {
         if (clipboard == null) {
             return;
         }
-        clipboard.setPrimaryClip(ClipData.newPlainText(
-            "KeeperFX log", diagnosticsHeader() + currentLog));
-        Toast.makeText(this, R.string.log_copied, Toast.LENGTH_SHORT).show();
+        try {
+            clipboard.setPrimaryClip(ClipData.newPlainText("KeeperFX log",
+                diagnosticsHeader() + clipboardPart(currentLog, MAX_CLIPBOARD_CHARS)));
+        } catch (RuntimeException e) {
+            // Share goes through a file, so this limit is not one it has.
+            Toast.makeText(this, R.string.log_copy_failed, Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (currentLog.length() > MAX_CLIPBOARD_CHARS) {
+            Toast.makeText(this, R.string.log_copied_end, Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, R.string.log_copied, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /** The end of a report is where a problem shows, so that is the part that goes along. */
+    static String clipboardPart(String log, int maxChars) {
+        return (log.length() <= maxChars)
+            ? log
+            : fromWholeLine(log.substring(log.length() - maxChars));
     }
 }
