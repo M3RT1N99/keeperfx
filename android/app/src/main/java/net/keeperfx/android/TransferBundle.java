@@ -3,10 +3,10 @@
 /******************************************************************************/
 /**
  * @file TransferBundle.java
- *     The one file a whole installation travels to another phone in.
+ *     The one file a whole installation is exported into and imported from.
  * @par Purpose:
- *     Writes that file on one phone and reads it on the other. A received file is
- *     untrusted, since nothing proves it came from the player's own phone, so the
+ *     Writes that file on one device and reads it on another. An imported file is
+ *     untrusted, since nothing proves it came from the player's own device, so the
  *     reader decides on its own where each entry may go and how much of it there
  *     may be, and it writes into a staging folder only. TransferSwap is what puts
  *     the result in place.
@@ -92,10 +92,10 @@ final class TransferBundle {
     private static final Pattern PLAIN_VERSION = Pattern.compile("[0-9A-Za-z._-]{0,64}");
 
     private static final String NOT_A_BUNDLE =
-        "This is not a KeeperFX installation from another phone. Nothing was changed.";
+        "This is not an exported KeeperFX installation. Nothing was changed.";
     private static final String DAMAGED =
         "This file is incomplete or damaged, probably cut off on its way here. "
-            + "Nothing was changed. Send it again.";
+            + "Nothing was changed. Export it again.";
 
     /** Why a file will not be installed, in words for the player. */
     static final class RefusedException extends IOException {
@@ -686,7 +686,7 @@ final class TransferBundle {
         final Map<String, Long> alpha =
             InstallManifest.read(new File(staging.manifests, ALPHA_MANIFEST));
         if (stable.isEmpty()) {
-            // Sending is only offered for an installation that has one.
+            // An export is only offered for an installation that has one.
             throw new RefusedException(DAMAGED);
         }
         if (sameApp && !InstallManifest.verify(staging.install, stable, alpha, staging.backup,

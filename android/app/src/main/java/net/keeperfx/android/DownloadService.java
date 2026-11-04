@@ -99,7 +99,7 @@ public class DownloadService extends Service {
     /** Counts the imports that replaced the settings under the launcher's views. */
     private static volatile int settingsGeneration = 0;
     /** The file the last import read, until the launcher has offered to delete it. */
-    private static volatile PhoneTransfer.ReceivedFile receivedFile = null;
+    private static volatile PhoneTransfer.ImportedFile importedFile = null;
 
     public static void addObserver(Observer observer) {
         observers.add(observer);
@@ -118,9 +118,9 @@ public class DownloadService extends Service {
         return settingsGeneration;
     }
 
-    static PhoneTransfer.ReceivedFile takeReceivedFile() {
-        final PhoneTransfer.ReceivedFile file = receivedFile;
-        receivedFile = null;
+    static PhoneTransfer.ImportedFile takeImportedFile() {
+        final PhoneTransfer.ImportedFile file = importedFile;
+        importedFile = null;
         return file;
     }
 
@@ -272,9 +272,9 @@ public class DownloadService extends Service {
             }
             final UpdateManager.Kind kind = UpdateManager.Kind.values()[ordinal];
             if (kind == UpdateManager.Kind.BUNDLE_EXPORT) {
-                failureTitle = R.string.send_title;
+                failureTitle = R.string.export_title;
             } else if (kind == UpdateManager.Kind.BUNDLE_IMPORT) {
-                failureTitle = R.string.receive_title;
+                failureTitle = R.string.import_bundle_title;
             }
             failure = runJob(kind, file);
             if (failure != null) {
@@ -390,17 +390,17 @@ public class DownloadService extends Service {
 
     private String runBundleImport(Uri file) {
         try {
-            PhoneTransfer.runImport(this, file, transferProgress("Unpacking the received file"));
-            receivedFile = PhoneTransfer.describeReceived(this, file);
+            PhoneTransfer.runImport(this, file, transferProgress("Unpacking the imported file"));
+            importedFile = PhoneTransfer.describeImported(this, file);
             settingsGeneration++;
-            doneMessage = R.string.receive_done_notification;
+            doneMessage = R.string.import_bundle_done_notification;
             return null;
         } catch (TransferBundle.CancelledException e) {
             return "Import cancelled. Nothing was changed.";
         } catch (TransferBundle.RefusedException | FileUtil.NoRoomException e) {
             return e.getMessage();
         } catch (Exception e) {
-            Log.e(TAG, "Could not import the received file", e);
+            Log.e(TAG, "Could not import the picked file", e);
             return "Import failed: " + e.getMessage();
         }
     }
@@ -509,7 +509,7 @@ public class DownloadService extends Service {
             // player's patience with looking at the launcher.
             manager.notify(NOTIFICATION_ID, new Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle(getString(R.string.app_name))
-                .setContentText(getString(R.string.send_ready_notification))
+                .setContentText(getString(R.string.export_ready_notification))
                 .setSmallIcon(android.R.drawable.stat_sys_upload_done)
                 .setContentIntent(PendingIntent.getActivity(this, 2,
                     PhoneTransfer.shareSheet(this, exported)

@@ -3,13 +3,14 @@
 /******************************************************************************/
 /**
  * @file PhoneTransfer.java
- *     Sends a whole installation to another phone, as far as Android is involved.
+ *     Exports a whole installation and imports one, as far as Android is involved.
  * @par Purpose:
- *     Quick Share has no way into another app's storage: what it receives lands on
- *     the phone first, normally under Download, and the player then imports that
- *     file here. This class connects the launcher and the service to TransferBundle
- *     and TransferSwap, which do the actual work and know nothing about Android, and
- *     holds what has to know about content URIs and the share sheet.
+ *     An export goes into one file and from there to the system's share sheet, which
+ *     offers whatever this device has. No target has a way into another app's storage:
+ *     whatever receives the file decides where it lands, and the player then picks it
+ *     in the import here. This class connects the launcher and the service to
+ *     TransferBundle and TransferSwap, which do the actual work and know nothing about
+ *     Android, and holds what has to know about content URIs and the share sheet.
  * @author   KeeperFX Team
  * @date     04 Nov 2026
  * @par  Copying and copyrights:
@@ -47,10 +48,10 @@ final class PhoneTransfer {
         return new File(context.getFilesDir(), "exports");
     }
 
-    // ----------------------------------------------------------------- sending
+    // ----------------------------------------------------------------- export
 
-    /** What the confirmation names, or why sending is not offered. */
-    static final class SendOffer {
+    /** What the confirmation names, or why an export is not offered. */
+    static final class ExportOffer {
         /** Null when it can go ahead. */
         final String refusal;
         final String version;
@@ -61,7 +62,7 @@ final class PhoneTransfer {
         final long needed;
         final long free;
 
-        SendOffer(String refusal) {
+        ExportOffer(String refusal) {
             this.refusal = refusal;
             this.version = "";
             this.music = false;
@@ -72,7 +73,7 @@ final class PhoneTransfer {
             this.free = 0;
         }
 
-        SendOffer(String version, boolean music, TransferBundle.Plan plan, long free) {
+        ExportOffer(String version, boolean music, TransferBundle.Plan plan, long free) {
             this.refusal = null;
             this.version = version;
             this.music = music;
@@ -85,24 +86,24 @@ final class PhoneTransfer {
     }
 
     /**
-     * Only an installation known to be whole gets sent: the other phone replaces what
+     * Only an installation known to be whole gets exported: the other device replaces what
      * it has with this, so a damaged one would spread the damage.
      */
     private static TransferBundle.Plan planExport(Context context) throws IOException {
         if (!GameData.isComplete(context)) {
             throw new TransferBundle.RefusedException(
-                "The game is not completely installed yet, so there is nothing to send.");
+                "The game is not completely installed yet, so there is nothing to export.");
         }
         if (!GameData.hasManifest(context)) {
-            throw new TransferBundle.RefusedException("This installation came from a folder or "
-                + "an older build, so nothing can tell whether it is whole. \"Check for "
-                + "downloads\" offers the official release, then it can be sent.");
+            throw new TransferBundle.RefusedException("This installation came from a folder, "
+                + "so nothing can tell whether it is whole. \"Check for downloads\" offers "
+                + "the official release, then it can be exported.");
         }
         final InstallManifest.Report report = GameData.verifyInstalledFiles(context);
         if (!report.isClean()) {
             final int damaged = report.stableProblems.size() + report.alphaProblems.size();
             throw new TransferBundle.RefusedException(damaged + " files are missing or damaged. "
-                + "\"Check for downloads\" repairs them, then it can be sent.");
+                + "\"Check for downloads\" repairs them, then it can be exported.");
         }
         return TransferBundle.plan(GameData.gameDirectory(context),
             GameData.manifestDirectory(context), GameData.alphaBackupDirectory(context),
@@ -110,7 +111,7 @@ final class PhoneTransfer {
     }
 
     /** Blocking, it looks at every file; call from a background thread. */
-    static SendOffer checkExport(Context context) {
+    static ExportOffer checkExport(Context context) {
         try {
             final TransferBundle.Plan plan = planExport(context);
             final File directory = context.getFilesDir();
@@ -118,13 +119,13 @@ final class PhoneTransfer {
             final long reclaimable = (previous == null) ? 0 : previous.length();
             FileUtil.requireRoom(directory, plan.fileSizeAtMost(), reclaimable,
                 "packing everything");
-            return new SendOffer(GameData.describeInstalledVersion(context),
+            return new ExportOffer(GameData.describeInstalledVersion(context),
                 GameData.hasMusic(context), plan, directory.getUsableSpace() + reclaimable);
         } catch (TransferBundle.RefusedException | FileUtil.NoRoomException e) {
-            return new SendOffer(e.getMessage());
+            return new ExportOffer(e.getMessage());
         } catch (IOException e) {
             Log.e(TAG, "Could not look at the installation", e);
-            return new SendOffer("Could not look at the installation: " + e.getMessage());
+            return new ExportOffer("Could not look at the installation: " + e.getMessage());
         }
     }
 
@@ -156,7 +157,7 @@ final class PhoneTransfer {
             .putExtra(Intent.EXTRA_SUBJECT, file.getName())
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         send.setClipData(ClipData.newRawUri(file.getName(), uri));
-        return Intent.createChooser(send, context.getString(R.string.send_share_title));
+        return Intent.createChooser(send, context.getString(R.string.export_share_title));
     }
 
     /** Removes the finished file and whatever points at it. */
@@ -165,16 +166,16 @@ final class PhoneTransfer {
         DownloadService.cancelFinishedNotification(context);
     }
 
-    // --------------------------------------------------------------- receiving
+    // ----------------------------------------------------------------- import
 
-    /** Where Quick Share puts what it receives, which is where the picker should open. */
+    /** Where the picker starts. Whatever received the file decides where it really is. */
     static Uri downloadsUri() {
         return DocumentsContract.buildDocumentUri(
             "com.android.externalstorage.documents", "primary:Download");
     }
 
     /** What the confirmation names, or why this file will not be imported. */
-    static final class ReceiveOffer {
+    static final class ImportOffer {
         /** Null when it can go ahead. */
         final String refusal;
         final TransferBundle.Marker marker;
@@ -182,7 +183,7 @@ final class PhoneTransfer {
         final boolean installedHere;
         final long free;
 
-        ReceiveOffer(String refusal) {
+        ImportOffer(String refusal) {
             this.refusal = refusal;
             this.marker = null;
             this.savesHere = 0;
@@ -190,7 +191,7 @@ final class PhoneTransfer {
             this.free = 0;
         }
 
-        ReceiveOffer(TransferBundle.Marker marker, int savesHere, boolean installedHere,
+        ImportOffer(TransferBundle.Marker marker, int savesHere, boolean installedHere,
                 long free) {
             this.refusal = null;
             this.marker = marker;
@@ -201,25 +202,25 @@ final class PhoneTransfer {
     }
 
     /** Blocking, it reads from a content provider; call from a background thread. */
-    static ReceiveOffer inspect(Context context, Uri file) {
+    static ImportOffer inspect(Context context, Uri file) {
         if (GameProcess.isAlive(context)) {
-            return new ReceiveOffer(context.getString(R.string.game_still_open));
+            return new ImportOffer(context.getString(R.string.game_still_open));
         }
         try (InputStream in = context.getContentResolver().openInputStream(file)) {
             if (in == null) {
-                return new ReceiveOffer("Cannot read this file.");
+                return new ImportOffer("Cannot read this file.");
             }
             final TransferBundle.Marker marker = TransferBundle.readMarker(in);
             final File directory = context.getFilesDir();
             FileUtil.requireRoom(directory, marker.bytes, "unpacking this file");
             final File install = GameData.gameDirectory(context);
-            return new ReceiveOffer(marker, TransferBundle.countSaves(install),
+            return new ImportOffer(marker, TransferBundle.countSaves(install),
                 install.isDirectory(), directory.getUsableSpace());
         } catch (TransferBundle.RefusedException | FileUtil.NoRoomException e) {
-            return new ReceiveOffer(e.getMessage());
+            return new ImportOffer(e.getMessage());
         } catch (IOException | RuntimeException e) {
             Log.e(TAG, "Could not read the picked file", e);
-            return new ReceiveOffer("Cannot read this file: " + e.getMessage());
+            return new ImportOffer("Cannot read this file: " + e.getMessage());
         }
     }
 
@@ -287,19 +288,19 @@ final class PhoneTransfer {
     // ---------------------------------------------------- after an import
 
     /** The file an import read, for offering to delete it afterwards. */
-    static final class ReceivedFile {
+    static final class ImportedFile {
         final Uri uri;
         final String where;
 
-        ReceivedFile(Uri uri, String where) {
+        ImportedFile(Uri uri, String where) {
             this.uri = uri;
             this.where = where;
         }
     }
 
     /** Asked while the job still holds its grant, which ends with it. */
-    static ReceivedFile describeReceived(Context context, Uri file) {
-        return new ReceivedFile(file, whereIs(documentIdOf(file), displayName(context, file)));
+    static ImportedFile describeImported(Context context, Uri file) {
+        return new ImportedFile(file, whereIs(documentIdOf(file), displayName(context, file)));
     }
 
     private static String displayName(Context context, Uri file) {
@@ -325,15 +326,14 @@ final class PhoneTransfer {
     /**
      * Words for where a picked file is. Android's own storage spells the path out in
      * its document ids ("primary:Download/x.zip"), other providers use opaque numbers,
-     * and for those the name and the usual place is the best anyone can say.
+     * and for those the name is all anyone can say.
      */
     static String whereIs(String documentId, String displayName) {
         final int colon = documentId.indexOf(':');
         if (colon > 0 && documentId.indexOf('/', colon) > 0) {
             return documentId.substring(colon + 1);
         }
-        final String name = displayName.isEmpty() ? "The received file" : displayName;
-        return name + ", normally under Download (Samsung: Download/Quick Share)";
+        return displayName.isEmpty() ? "The file you picked" : displayName;
     }
 
     /**
@@ -343,7 +343,7 @@ final class PhoneTransfer {
      *
      * @return whether the file is gone
      */
-    static boolean deleteReceived(Context context, Uri file) {
+    static boolean deleteImported(Context context, Uri file) {
         try {
             return DocumentsContract.deleteDocument(context.getContentResolver(), file);
         } catch (Exception e) {

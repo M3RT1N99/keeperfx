@@ -261,11 +261,11 @@ public final class Prefs {
         prefs.edit().putString(KEY_EXTRA_ARGS, value == null ? "" : value.trim()).apply();
     }
 
-    // ------------------------------------------- moving to another phone
+    // --------------------------------------------------- export and import
 
     /**
-     * What may come along from another phone. A received file may not be from the
-     * player's own, so this keeps what it knows, in the form it knows it in, and
+     * What may come along in an imported file. It may not be from the player's own
+     * device, so this keeps what it knows, in the form it knows it in, and
      * drops the rest. The extra arguments stay out above all: they would hand
      * someone else's file the engine's command line.
      */
@@ -325,7 +325,7 @@ public final class Prefs {
         }
     }
 
-    /** The player's settings as they go into a file for another phone. */
+    /** The player's settings as they go into an exported file. */
     Map<String, String> transferableSettings() {
         final Map<String, String> all = new TreeMap<>();
         for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
@@ -337,8 +337,8 @@ public final class Prefs {
     /**
      * Replaces the settings that travel and the versions the swap just put in place.
      * In one write that is on disk when this returns, since the next process has to
-     * find the versions matching the files. What the other phone left at its default
-     * goes back to the default here too. Whatever does not travel stays this phone's.
+     * find the versions matching the files. What the other device left at its default
+     * goes back to the default here too. Whatever does not travel stays this device's.
      *
      * @param accepted what acceptTransferred() let through
      * @return false when it could not be written

@@ -9,8 +9,8 @@
     -->
     <files-path name="updates" path="updates/" />
     <!--
-      And an installation packed for another phone, which is read by whatever the
-      player shares it with, long after the share sheet has closed again.
+      And an exported installation, which is read by whatever the player shares it
+      with, long after the share sheet has closed again.
     -->
     <files-path name="exports" path="exports/" />
 </paths>

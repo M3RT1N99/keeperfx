@@ -432,14 +432,14 @@ public class TransferBundleTest {
     public void somethingThatIsNotAZipIsRefused() throws IOException {
         final File html = folder.newFile();
         TestArchives.write(html, "<html>503 Service Unavailable</html>");
-        assertRefused(html, "not a KeeperFX installation");
-        assertRefused(folder.newFile(), "not a KeeperFX installation");
+        assertRefused(html, "not an exported KeeperFX installation");
+        assertRefused(folder.newFile(), "not an exported KeeperFX installation");
     }
 
     @Test
     public void anUnrelatedZipIsRefused() throws IOException {
         assertRefused(TestArchives.zip(folder.newFile("holiday.zip"), TestArchives.entries(
-            "photo.jpg", "x", "install/keeperfx.cfg", "x")), "not a KeeperFX installation");
+            "photo.jpg", "x", "install/keeperfx.cfg", "x")), "not an exported KeeperFX installation");
     }
 
     @Test
@@ -447,7 +447,7 @@ public class TransferBundleTest {
         final Map<String, byte[]> entries = readBundle(a.export());
         final byte[] marker = entries.remove(TransferBundle.MARKER_ENTRY);
         entries.put(TransferBundle.MARKER_ENTRY, marker);
-        assertRefused(writeBundle(entries), "not a KeeperFX installation");
+        assertRefused(writeBundle(entries), "not an exported KeeperFX installation");
     }
 
     @Test
@@ -473,7 +473,7 @@ public class TransferBundleTest {
         }) {
             final Map<String, byte[]> entries = readBundle(a.export());
             setMarker(entries, change[0], change[1]);
-            assertRefused(writeBundle(entries), "not a KeeperFX installation");
+            assertRefused(writeBundle(entries), "not an exported KeeperFX installation");
         }
     }
 
@@ -481,7 +481,7 @@ public class TransferBundleTest {
     public void aMarkerIsNotAllowedToBeHuge() throws IOException {
         final Map<String, byte[]> entries = new LinkedHashMap<>();
         entries.put(TransferBundle.MARKER_ENTRY, new byte[1024 * 1024]);
-        assertRefused(writeBundle(entries), "not a KeeperFX installation");
+        assertRefused(writeBundle(entries), "not an exported KeeperFX installation");
     }
 
     // ------------------------------------------------------- not what it says it is
@@ -854,11 +854,8 @@ public class TransferBundleTest {
 
     @Test
     public void thereIsAlwaysSomethingToSayAboutWhereAFileIs() {
-        assertEquals("Download/Quick Share/x.zip",
-            PhoneTransfer.whereIs("primary:Download/Quick Share/x.zip", "x.zip"));
-        assertEquals("x.zip, normally under Download (Samsung: Download/Quick Share)",
-            PhoneTransfer.whereIs("msf:1234", "x.zip"));
-        assertEquals("The received file, normally under Download (Samsung: Download/Quick Share)",
-            PhoneTransfer.whereIs("", ""));
+        assertEquals("Download/Inbox/x.zip", PhoneTransfer.whereIs("primary:Download/Inbox/x.zip", "x.zip"));
+        assertEquals("x.zip", PhoneTransfer.whereIs("msf:1234", "x.zip"));
+        assertEquals("The file you picked", PhoneTransfer.whereIs("", ""));
     }
 }

@@ -154,7 +154,7 @@
                 android:textColor="@color/btn_text"
                 android:textSize="15sp" />
 
-            <!-- Moving the whole installation between two phones -->
+            <!-- A whole installation as one file, out and in -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -162,19 +162,19 @@
                 android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/sendToPhone"
+                    android:id="@+id/exportInstallation"
                     android:layout_width="0dp"
                     android:layout_height="56dp"
                     android:layout_weight="1"
                     android:background="@drawable/btn_slate"
                     android:paddingStart="10dp"
                     android:paddingEnd="10dp"
-                    android:text="@string/button_send_phone"
+                    android:text="@string/button_export"
                     android:textColor="@color/btn_text"
                     android:textSize="12sp" />
 
                 <Button
-                    android:id="@+id/receiveFromPhone"
+                    android:id="@+id/importInstallation"
                     android:layout_width="0dp"
                     android:layout_height="56dp"
                     android:layout_marginStart="8dp"
@@ -182,7 +182,7 @@
                     android:background="@drawable/btn_slate"
                     android:paddingStart="10dp"
                     android:paddingEnd="10dp"
-                    android:text="@string/button_receive_phone"
+                    android:text="@string/button_import"
                     android:textColor="@color/btn_text"
                     android:textSize="12sp" />
             </LinearLayout>
