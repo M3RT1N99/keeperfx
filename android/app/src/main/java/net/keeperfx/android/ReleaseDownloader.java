@@ -94,7 +94,7 @@ public final class ReleaseDownloader {
 
             listener.onStage("Unpacking the music", -1, "");
             final File musicDir = new File(GameData.gameDirectory(context), "music");
-            final int files = ArchiveUnpacker.unzipInstead(archive, musicDir,
+            final int files = ArchiveUnpacker.unzipAllOrNothing(archive, musicDir,
                 new File(downloadDirectory(), "music-unpacking"), unpackProgress);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");

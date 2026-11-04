@@ -96,7 +96,7 @@ public final class Prefs {
     /**
      * Version of the KeeperFX release currently unpacked, or an empty string.
      * Only set by the downloader; a manually imported folder carries no version
-     * we could trust, so it stays empty and update checks stay silent for it.
+     * we could trust, so it stays empty and the real release keeps being offered.
      */
     public String getInstalledVersion() {
         return prefs.getString(KEY_INSTALLED_VERSION, "");

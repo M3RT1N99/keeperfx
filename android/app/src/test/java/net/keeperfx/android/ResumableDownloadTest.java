@@ -2,6 +2,7 @@ package net.keeperfx.android;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -279,6 +280,62 @@ public class ResumableDownloadTest {
         } catch (IOException expected) {
             assertFalse(target.exists());
         }
+    }
+
+    /** How the launcher tells that the API has no patch for a build from it being down. */
+    @Test
+    public void aMissingDocumentIsAnAnswerAndAnyOtherErrorIsNot() throws Exception {
+        serve((range, out) -> answer(out, "404 Not Found", length(""), ""));
+        try {
+            Http.getJson(url);
+            fail("a 404 has to throw");
+        } catch (Http.NotFoundException expected) {
+            assertTrue(expected.getMessage().contains("404"));
+        }
+        server.close();
+        serverThread.join(2000);
+        serve((range, out) -> answer(out, "500 Internal Server Error", length(""), ""));
+        try {
+            Http.getJson(url);
+            fail("a 500 has to throw");
+        } catch (Http.NotFoundException wrong) {
+            fail("a 500 does not say the document does not exist");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().contains("500"));
+        }
+    }
+
+    @Test
+    public void jsonComesBackParsed() throws Exception {
+        final String json = "{\"alpha_build\":{\"version\":\"1.4.0.5591\",\"download_url\":\"https://x/a.7z\",\"size_in_bytes\":23838887}}";
+        serve((range, out) -> answer(out, "200 OK", length(json), json));
+        final ReleaseApi.ReleaseInfo info =
+            ReleaseApi.ReleaseInfo.fromJson(Http.getJson(url).getJSONObject("alpha_build"));
+        assertEquals("1.4.0.5591", info.version);
+        assertEquals("https://x/a.7z", info.downloadUrl);
+        assertEquals(23838887, info.sizeInBytes);
+    }
+
+    @Test
+    public void aReleaseWithoutAVersionedTagOrAnApkIsNotAnUpdate() throws Exception {
+        assertNull(AppRelease.fromGithub(new org.json.JSONObject(
+            "{\"tag_name\":\"android-latest\",\"assets\":[{\"name\":\"keeperfx-android-arm64.apk\",\"browser_download_url\":\"https://x/a.apk\"}]}")));
+        assertNull(AppRelease.fromGithub(new org.json.JSONObject(
+            "{\"tag_name\":\"android-v\",\"assets\":[]}")));
+        assertNull(AppRelease.fromGithub(new org.json.JSONObject(
+            "{\"tag_name\":\"android-v1.60\",\"assets\":[{\"name\":\"other.apk\"}]}")));
+    }
+
+    @Test
+    public void aReleaseCarriesItsVersionSizeAndChanges() throws Exception {
+        final AppRelease release = AppRelease.fromGithub(new org.json.JSONObject(
+            "{\"tag_name\":\"android-v1.60\",\"body\":\"intro - not a bullet\\n- one\\n  - two\\n\\nend\","
+                + "\"assets\":[{\"name\":\"version.json\"},{\"name\":\"keeperfx-android-arm64.apk\",\"size\":123,\"browser_download_url\":\"https://x/a.apk\"}]}"));
+        assertEquals("1.60", release.versionName);
+        assertEquals("https://x/a.apk", release.apkUrl);
+        assertEquals(123, release.apkSize);
+        assertEquals(java.util.Arrays.asList("one", "two"), release.changes);
+        assertEquals("\u2022 one\n\u2022 two", release.changelog());
     }
 
     @Test

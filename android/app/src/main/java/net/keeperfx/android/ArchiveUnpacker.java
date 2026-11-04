@@ -171,7 +171,7 @@ final class ArchiveUnpacker {
      * @param staging somewhere on the same file system that can be emptied
      * @return how many files it installed; 0 when cancelled.
      */
-    static int unzipInstead(File archive, File target, File staging, Progress progress)
+    static int unzipAllOrNothing(File archive, File target, File staging, Progress progress)
             throws IOException {
         FileUtil.deleteTree(staging);
         FileUtil.ensureDirectory(staging);
