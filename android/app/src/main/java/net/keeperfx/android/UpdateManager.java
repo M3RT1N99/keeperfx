@@ -256,8 +256,10 @@ public final class UpdateManager {
             } else if (!ReleaseApi.fitsEngine(current, f.engineBuild)) {
                 // What is installed stays if it fits, even when the API has lost
                 // that build and has only something newer to suggest.
+                // An imported folder carries no version to name here.
+                final String base = f.stableVersion.isEmpty() ? "this installation" : f.stableVersion;
                 final StringBuilder detail = new StringBuilder(current.isEmpty()
-                    ? "Files the current engine needs and " + f.stableVersion + " does not have, "
+                    ? "Files the current engine needs and " + base + " does not have, "
                     : "Replaces " + current + ", ").append(cost);
                 if (!ReleaseApi.fitsEngine(alpha.version, f.engineBuild)) {
                     detail.append("\n    The newest one: there is no patch for engine build ")

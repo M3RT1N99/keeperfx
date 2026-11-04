@@ -59,6 +59,16 @@ public class UpdatePlanTest {
         return UpdateManager.plan(facts).get(index).detail;
     }
 
+    /** An imported folder has no version, and the sentence used to have a hole there. */
+    @Test
+    public void theAlphaOfferOnAnImportedFolderReadsLikeASentence() {
+        facts.stableVersion = "";
+        facts.alphaVersion = "";
+        final String text = UpdateManager.describe(UpdateManager.plan(facts));
+        assertTrue(text, text.contains("needs and this installation does not have"));
+        assertFalse(text, text.contains("needs and  does"));
+    }
+
     @Test
     public void nothingIsOfferedWhenEverythingIsCurrent() {
         assertEquals(Collections.emptyList(), plannedKinds());
