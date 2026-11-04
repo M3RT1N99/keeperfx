@@ -44,7 +44,7 @@ void touch_possess_reset(void);
 
 void touch_possess_finger_down(unsigned long long id, long x, long y, long long ms);
 void touch_possess_finger_move(unsigned long long id, long x, long y, long long ms);
-void touch_possess_finger_up(unsigned long long id, long x, long y, long long ms);
+void touch_possess_finger_up(unsigned long long id, long long ms);
 void touch_possess_finger_cancel(unsigned long long id);
 
 /** Called once per poll, after the fingers were pumped: hands over what they asked for. */

@@ -95,12 +95,7 @@ void ts_finger_down(struct TsSteer *s, unsigned long long id, float x, float y, 
     const struct TsScreen *screen, int on_menu);
 void ts_finger_move(struct TsSteer *s, unsigned long long id, float x, float y, long long ms,
     const struct TsScreen *screen);
-/**
- * A finger lifted, at this position. The last move may have been Android's guess at where
- * a fast finger would be by the next frame; this is where it really was.
- */
-void ts_finger_up(struct TsSteer *s, unsigned long long id, float x, float y, long long ms,
-    const struct TsScreen *screen);
+void ts_finger_up(struct TsSteer *s, unsigned long long id, long long ms);
 /** The system took a finger away, which nobody meant as a tap. */
 void ts_finger_cancel(struct TsSteer *s, unsigned long long id);
 

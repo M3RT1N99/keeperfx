@@ -101,11 +101,9 @@ void touch_possess_finger_move(unsigned long long id, long x, long y, long long 
     ts_finger_move(&steer, id, (float)x, (float)y, ms, &screen);
 }
 
-void touch_possess_finger_up(unsigned long long id, long x, long y, long long ms)
+void touch_possess_finger_up(unsigned long long id, long long ms)
 {
-    struct TsScreen screen;
-    current_screen(&screen);
-    ts_finger_up(&steer, id, (float)x, (float)y, ms, &screen);
+    ts_finger_up(&steer, id, ms);
 }
 
 void touch_possess_finger_cancel(unsigned long long id)

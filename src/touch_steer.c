@@ -200,10 +200,8 @@ void ts_finger_cancel(struct TsSteer *s, unsigned long long id)
     f->role = TsR_Free;
 }
 
-void ts_finger_up(struct TsSteer *s, unsigned long long id, float x, float y, long long ms,
-    const struct TsScreen *screen)
+void ts_finger_up(struct TsSteer *s, unsigned long long id, long long ms)
 {
-    ts_finger_move(s, id, x, y, ms, screen);
     struct TsFinger *f = ts_find(s, id);
     if (f == NULL)
         return;
