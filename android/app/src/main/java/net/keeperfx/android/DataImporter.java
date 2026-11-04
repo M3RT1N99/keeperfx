@@ -36,10 +36,8 @@ import android.provider.DocumentsContract;
 import android.util.Log;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -99,6 +97,9 @@ public final class DataImporter {
         final File destination = GameData.gameDirectory(context);
         try {
             FileUtil.ensureDirectory(destination);
+            // Stays in place unless the whole folder made it; the launcher's wipe of
+            // the install records takes it away after a success.
+            GameData.markInstallInProgress(context);
 
             final String rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri);
             final Uri rootUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId);
@@ -198,12 +199,10 @@ public final class DataImporter {
                         if (!wanted.contains(key) || found.contains(key)) {
                             continue;
                         }
-                        final File targetDir = new File(destination,
-                            GameData.targetSubdirectoryFor(name));
-                        FileUtil.ensureDirectory(targetDir);
-                        try (OutputStream out = new FileOutputStream(new File(targetDir, key))) {
-                            FileUtil.copy(zip, out);
-                        }
+                        // Whole or not at all: only presence is checked later, and half
+                        // a palette passes for one.
+                        FileUtil.writeAtomically(new File(new File(destination,
+                            GameData.targetSubdirectoryFor(name)), key), zip);
                         found.add(key);
                         filesCopied++;
                         listener.onProgress(filesCopied, name);
@@ -288,10 +287,8 @@ public final class DataImporter {
                     if (!wanted.contains(key) || found.contains(key)) {
                         continue;
                     }
-                    final File targetDir = new File(GameData.gameDirectory(context),
-                        GameData.targetSubdirectoryFor(displayName));
-                    FileUtil.ensureDirectory(targetDir);
-                    copyFile(childUri, new File(targetDir, key));
+                    copyFile(childUri, new File(new File(GameData.gameDirectory(context),
+                        GameData.targetSubdirectoryFor(displayName)), key));
                     found.add(key);
                     listener.onProgress(filesCopied, displayName);
                 }
@@ -397,12 +394,11 @@ public final class DataImporter {
     }
 
     private void copyFile(Uri source, File target) throws IOException {
-        try (InputStream in = context.getContentResolver().openInputStream(source);
-             OutputStream out = new FileOutputStream(target)) {
+        try (InputStream in = context.getContentResolver().openInputStream(source)) {
             if (in == null) {
                 throw new IOException("Cannot read " + source);
             }
-            FileUtil.copy(in, out);
+            FileUtil.writeAtomically(target, in);
         }
         filesCopied++;
         if ((filesCopied % 25) == 0) {

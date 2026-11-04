@@ -99,8 +99,12 @@ public final class ReleaseDownloader {
 
             listener.onStage("Unpacking the music", -1, "");
             final File musicDir = new File(GameData.gameDirectory(context), "music");
-            FileUtil.ensureDirectory(musicDir);
-            final int files = ArchiveUnpacker.unzipFlat(archive, musicDir, unpackProgress);
+            final int files = ArchiveUnpacker.unzipInstead(archive, musicDir,
+                new File(context.getFilesDir(), "music-unpacking"), unpackProgress);
+            if (isCancelled()) {
+                finish(false, "Cancelled while unpacking");
+                return;
+            }
             finish(true, "Installed " + files + " music tracks");
         } catch (Exception e) {
             Log.e(TAG, "Music download failed", e);
@@ -251,6 +255,8 @@ public final class ReleaseDownloader {
         GameData.stableManifest(context).delete();
         //noinspection ResultOfMethodCallIgnored
         GameData.alphaManifest(context).delete();
+        //noinspection ResultOfMethodCallIgnored
+        GameData.installInProgress(context).delete();
     }
 
     /** Runs synchronously; the caller provides the thread. */
@@ -276,7 +282,18 @@ public final class ReleaseDownloader {
             // A partial install must not look complete, so forget the recorded
             // version until the new one is fully unpacked. Not any earlier: a
             // download that fails has not touched what is installed.
-            new Prefs(context).setInstalledVersion("");
+            final Prefs prefs = new Prefs(context);
+            GameData.markInstallInProgress(context);
+            prefs.setInstalledVersion("");
+            // A full release replaces the patched files with its own, so the patch
+            // is no longer applied and has to be offered again. What only the patch
+            // brought goes first: left behind it would pass for the release's own
+            // when the patch comes back, and a revert would then restore it.
+            alphaBackup().discard();
+            prefs.setInstalledAlphaVersion("");
+            //noinspection ResultOfMethodCallIgnored
+            GameData.alphaManifest(context).delete();
+
             final List<String> unpacked = unpack(archive);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
@@ -285,17 +302,9 @@ public final class ReleaseDownloader {
             ArchiveUnpacker.removeRetiredFiles(GameData.gameDirectory(context), null,
                 Collections.<String>emptySet());
             writeManifest(GameData.stableManifest(context), unpacked);
-
-            // A full release overwrites whatever the alpha patch had put there,
-            // so it is no longer applied and has to be offered again.
-            final Prefs prefs = new Prefs(context);
             prefs.setInstalledVersion(version);
-            // A full release replaces the patched files with its own, so the
-            // saved copies describe nothing that is still installed.
-            prefs.setInstalledAlphaVersion("");
-            FileUtil.deleteTree(GameData.alphaBackupDirectory(context));
             //noinspection ResultOfMethodCallIgnored
-            GameData.alphaManifest(context).delete();
+            GameData.installInProgress(context).delete();
             finish(true, "KeeperFX " + version + " installed");
         } catch (Exception e) {
             Log.e(TAG, "Release download failed", e);

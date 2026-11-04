@@ -128,7 +128,24 @@ public final class GameData {
 
     /** Entries of the KeeperFX release that are still missing. */
     public static List<String> findMissingKeeperfxEntries(Context context) {
+        if (installInProgress(context).exists()) {
+            return Collections.singletonList("(the last install did not finish)");
+        }
         return findMissingKeeperfxEntries(gameDirectory(context));
+    }
+
+    /**
+     * Stands from the moment files of a release start to be overwritten until the
+     * whole of it is in place. Whatever ended the install in between - a full disk,
+     * a cancel, Android killing the process - what is left is a torso that no spot
+     * check can tell from an installation, and that the player would then play.
+     */
+    static File installInProgress(Context context) {
+        return new File(new File(context.getFilesDir(), "manifests"), "install-in-progress");
+    }
+
+    static void markInstallInProgress(Context context) throws IOException {
+        FileUtil.writeAtomically(installInProgress(context), new byte[0]);
     }
 
     static List<String> findMissingKeeperfxEntries(File root) {

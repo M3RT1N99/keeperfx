@@ -202,6 +202,20 @@ public class AlphaPatchTest {
         assertTrue(settings.exists());
     }
 
+    /**
+     * What a full reinstall does first. Left behind, the patch's own file would pass
+     * for the release's when the patch comes back, and a revert would restore it.
+     */
+    @Test
+    public void discardingTheBackupTakesWhatOnlyThePatchBroughtWithIt() throws IOException {
+        applyPatch();
+        new AlphaBackup(root, backupDir).discard();
+        assertFalse(new File(root, "fxdata/font12.fxfont").exists());
+        assertFalse(backupDir.exists());
+        assertEquals("nothing else is touched",
+            "patched, and longer than before", contents("fxdata/shared.cfg"));
+    }
+
     /** A process dying in the middle of the copy leaves this behind. */
     @Test
     public void halfACopyInTheBackupIsNotRestored() throws IOException {

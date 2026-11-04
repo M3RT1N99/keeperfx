@@ -107,29 +107,22 @@ final class ReleaseApi {
         return engineBuild > 0 && buildOf(alphaVersion) == engineBuild;
     }
 
-    /**
-     * Where the music archive can be fetched. Blocking; empty when the workshop
-     * lists none. The zip is preferred over the 7z: java.util.zip reads it
-     * directly.
-     */
+    /** Where the music archive can be fetched. Blocking; empty when the workshop lists none. */
     static String musicArchiveUrl() throws IOException, JSONException {
         return musicArchiveUrl(Http.getJson(API_MUSIC));
     }
 
+    /** The zip: that is what java.util.zip reads, and the item carries one next to a 7z. */
     static String musicArchiveUrl(JSONObject workshopResponse) throws JSONException {
         final JSONArray files = workshopResponse.getJSONObject("workshop_item").optJSONArray("files");
-        String sevenZip = "";
         if (files != null) {
             for (int i = 0; i < files.length(); i++) {
                 final String url = files.getJSONObject(i).optString("url", "");
                 if (url.toLowerCase(Locale.US).endsWith(".zip")) {
                     return url;
                 }
-                if (url.toLowerCase(Locale.US).endsWith(".7z")) {
-                    sevenZip = url;
-                }
             }
         }
-        return sevenZip;
+        return "";
     }
 }

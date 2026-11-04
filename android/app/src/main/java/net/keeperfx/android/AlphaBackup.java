@@ -128,6 +128,13 @@ final class AlphaBackup {
      * @return how many files came back.
      */
     int restore() throws IOException {
+        final int restored = restoreTree(directory, gameDirectory);
+        discard();
+        return restored;
+    }
+
+    /** Gives up the way back: deletes what the patch added and forgets the saved copies. */
+    void discard() throws IOException {
         for (String name : readAddedList()) {
             final File added = ArchivePaths.resolve(gameDirectory, name);
             if (added != null) {
@@ -135,9 +142,7 @@ final class AlphaBackup {
                 added.delete();
             }
         }
-        final int restored = restoreTree(directory, gameDirectory);
         FileUtil.deleteTree(directory);
-        return restored;
     }
 
     private static int restoreTree(File from, File to) throws IOException {

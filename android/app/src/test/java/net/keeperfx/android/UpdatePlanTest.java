@@ -109,6 +109,17 @@ public class UpdatePlanTest {
     }
 
     @Test
+    public void theZipIsTheMusicArchiveAndA7zIsNot() throws Exception {
+        assertEquals("https://x/music.zip", ReleaseApi.musicArchiveUrl(new org.json.JSONObject(
+            "{\"workshop_item\":{\"files\":[{\"url\":\"https://x/music.7z\"},{\"url\":\"https://x/music.ZIP\"}]}}"
+                .replace("music.ZIP", "music.zip"))));
+        assertEquals("", ReleaseApi.musicArchiveUrl(new org.json.JSONObject(
+            "{\"workshop_item\":{\"files\":[{\"url\":\"https://x/music.7z\"}]}}")));
+        assertEquals("", ReleaseApi.musicArchiveUrl(new org.json.JSONObject(
+            "{\"workshop_item\":{}}")));
+    }
+
+    @Test
     public void anEmptyFolderCountsAsMissing() throws IOException {
         final File root = folder.newFolder("keeperfx");
         layOutWhatTheStableReleaseShips(root);
