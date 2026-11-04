@@ -881,8 +881,8 @@ namespace
             }
         }
     }
-#endif
 
+#endif
     /**
      * Checks for new connections.
      * @param new_user Call back if a new user has connected.
