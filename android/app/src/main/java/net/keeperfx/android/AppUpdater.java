@@ -6,10 +6,9 @@
  *     Self update for the sideloaded APK.
  * @par Purpose:
  *     The app is not distributed through a store, so nothing else will ever
- *     offer it a newer build. CI publishes each build to a rolling GitHub
- *     release under a fixed tag, which gives a permanent download URL; this
- *     class reads the small version.json next to it, compares against the
- *     running build and hands a downloaded APK to the system installer.
+ *     offer it a newer build. CI publishes each build as a GitHub release; this
+ *     class asks the API for the newest one, compares it against the running
+ *     build and hands a downloaded APK to the system installer.
  * @par Comment:
  *     Installing needs REQUEST_INSTALL_PACKAGES and the per-app "install
  *     unknown apps" switch. Both are checked before anything is downloaded, so
@@ -35,18 +34,8 @@ import android.util.Log;
 
 import androidx.core.content.FileProvider;
 
-import org.json.JSONObject;
-
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 public final class AppUpdater {
@@ -62,48 +51,10 @@ public final class AppUpdater {
     private static final String LATEST_RELEASE_URL =
         "https://api.github.com/repos/M3RT1N99/keeperfx/releases/latest";
 
-    private static final String TAG_PREFIX = "android-v";
-    private static final String APK_ASSET = "keeperfx-android-arm64.apk";
-
-    private static final int CONNECT_TIMEOUT_MS = 15000;
-    private static final int READ_TIMEOUT_MS = 60000;
-
     public interface Listener {
         void onProgress(int percent, String detail);
 
         void onFinished(boolean success, String message);
-    }
-
-    /** What the newest release offers. */
-    public static final class Available {
-        public final String versionName;
-        public final int buildNumber;
-        public final String apkUrl;
-        /** Size of the APK as the release lists it, or -1; guards the download. */
-        public final long apkSize;
-        /** Changelog lines from the release notes, without their bullets. */
-        public final List<String> changes;
-
-        Available(String versionName, int buildNumber, String apkUrl, long apkSize,
-                List<String> changes) {
-            this.versionName = versionName;
-            this.buildNumber = buildNumber;
-            this.apkUrl = apkUrl;
-            this.apkSize = apkSize;
-            this.changes = changes;
-        }
-
-        /** Ready to drop into a dialog; empty when the notes carried no list. */
-        public String changelog() {
-            if (changes.isEmpty()) {
-                return "";
-            }
-            final StringBuilder sb = new StringBuilder();
-            for (String line : changes) {
-                sb.append("• ").append(line).append('\n');
-            }
-            return sb.toString().trim();
-        }
     }
 
     private final Context context;
@@ -125,16 +76,6 @@ public final class AppUpdater {
 
     // ------------------------------------------------------------ version check
 
-    /** Build number of the running app, taken from the last part of the version name. */
-    public static int installedBuildNumber(Context context) {
-        try {
-            return buildNumberOf(context.getPackageManager()
-                .getPackageInfo(context.getPackageName(), 0).versionName);
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-
     public static String installedVersionName(Context context) {
         try {
             return context.getPackageManager()
@@ -145,99 +86,17 @@ public final class AppUpdater {
     }
 
     /** Blocking; call from a background thread. Returns null when up to date. */
-    public static Available checkForUpdate(Context context) throws IOException,
-            org.json.JSONException {
-        final HttpURLConnection connection = openFollowingRedirects(LATEST_RELEASE_URL);
-        final StringBuilder body = new StringBuilder();
-        try (InputStream in = connection.getInputStream()) {
-            final byte[] buffer = new byte[8192];
-            int read;
-            while ((read = in.read(buffer)) > 0) {
-                body.append(new String(buffer, 0, read, "UTF-8"));
-            }
-        } finally {
-            connection.disconnect();
-        }
-
-        final JSONObject release = new JSONObject(body.toString());
-        final String tag = release.optString("tag_name", "");
-        // Only a versioned tag carries a version. The android-latest pointer,
-        // which exists so older builds can still find an update, is a
-        // prerelease and should never turn up here, but if it does its name
-        // must not be mistaken for a version number.
-        if (!tag.startsWith(TAG_PREFIX)) {
-            Log.w(TAG, "Ignoring release with unexpected tag " + tag);
+    static AppRelease checkForUpdate(Context context) throws IOException, org.json.JSONException {
+        final AppRelease release = AppRelease.fromGithub(Http.getJson(LATEST_RELEASE_URL));
+        if (release == null) {
+            Log.w(TAG, "The newest release carries no version or no APK");
             return null;
         }
-        final String version = tag.substring(TAG_PREFIX.length());
-        if (version.isEmpty()) {
+        if (!AppVersion.isNewer(release.versionName, installedVersionName(context))) {
             return null;
         }
-
-        String apkUrl = "";
-        long apkSize = -1;
-        final org.json.JSONArray assets = release.optJSONArray("assets");
-        if (assets != null) {
-            for (int i = 0; i < assets.length(); i++) {
-                final JSONObject asset = assets.getJSONObject(i);
-                if (APK_ASSET.equals(asset.optString("name"))) {
-                    apkUrl = asset.optString("browser_download_url", "");
-                    apkSize = asset.optLong("size", -1);
-                    break;
-                }
-            }
-        }
-        if (apkUrl.isEmpty()) {
-            return null;
-        }
-
-        final Available available = new Available(version, buildNumberOf(version), apkUrl, apkSize,
-            parseChangelog(release.optString("body", "")));
-        if (available.buildNumber <= installedBuildNumber(context)) {
-            return null;
-        }
-        Log.i(TAG, "Update available: " + available.versionName);
-        return available;
-    }
-
-    /**
-     * Pulls the bullet list out of the release notes. The workflow writes one
-     * line per commit subject, so this is the changelog without having to
-     * understand the rest of the markdown around it.
-     */
-    private static List<String> parseChangelog(String notes) {
-        final List<String> changes = new ArrayList<>();
-        for (String raw : notes.split("\n")) {
-            final String line = raw.trim();
-            if (line.startsWith("- ") && line.length() > 2) {
-                changes.add(line.substring(2).trim());
-            }
-        }
-        return changes;
-    }
-
-    /**
-     * Orders two app versions against each other.
-     *
-     * A version is the port's own "major.minor" and nothing else - which
-     * KeeperFX the engine is has its own place and moves for entirely separate
-     * reasons. The major is weighted so that a bump still comes out above every
-     * minor below it. Anything that does not parse sorts lowest, which is what
-     * the versions from before this scheme did.
-     */
-    private static int buildNumberOf(String versionName) {
-        try {
-            final String port = versionName.trim();
-            final int dot = port.indexOf('.');
-            if (dot < 0) {
-                return Integer.parseInt(port) * 100000;
-            }
-            final int major = Integer.parseInt(port.substring(0, dot).trim());
-            final int minor = Integer.parseInt(port.substring(dot + 1).trim());
-            return major * 100000 + minor;
-        } catch (NumberFormatException e) {
-            return 0;
-        }
+        Log.i(TAG, "Update available: " + release.versionName);
+        return release;
     }
 
     // ------------------------------------------------------------ download
@@ -248,7 +107,7 @@ public final class AppUpdater {
     }
 
     /** Runs synchronously; the caller provides the thread. */
-    public void downloadAndInstall(Available available) {
+    void downloadAndInstall(AppRelease available) {
         try {
             final File dir = new File(context.getFilesDir(), "updates");
             //noinspection ResultOfMethodCallIgnored
@@ -301,35 +160,5 @@ public final class AppUpdater {
                 return AppUpdater.this.isCancelled();
             }
         });
-    }
-
-    /**
-     * HttpURLConnection refuses to follow a redirect that changes protocol, and
-     * release downloads hop from github.com to the asset CDN.
-     */
-    private static HttpURLConnection openFollowingRedirects(String url) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        connection.setReadTimeout(READ_TIMEOUT_MS);
-        int status = connection.getResponseCode();
-        int hops = 0;
-        while ((status == HttpURLConnection.HTTP_MOVED_PERM
-             || status == HttpURLConnection.HTTP_MOVED_TEMP
-             || status == HttpURLConnection.HTTP_SEE_OTHER
-             || status == 307 || status == 308) && hops++ < 5) {
-            final String next = connection.getHeaderField("Location");
-            connection.disconnect();
-            if (next == null) {
-                throw new IOException("Redirect without a Location header");
-            }
-            connection = (HttpURLConnection) new URL(next).openConnection();
-            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            connection.setReadTimeout(READ_TIMEOUT_MS);
-            status = connection.getResponseCode();
-        }
-        if (status != HttpURLConnection.HTTP_OK) {
-            throw new IOException("Server returned HTTP " + status);
-        }
-        return connection;
     }
 }

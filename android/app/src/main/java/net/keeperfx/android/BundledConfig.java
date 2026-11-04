@@ -76,9 +76,7 @@ public final class BundledConfig {
      */
     public static int install(Context context, boolean replaceUserSettings) throws IOException {
         final File destination = GameData.gameDirectory(context);
-        if (!destination.isDirectory() && !destination.mkdirs()) {
-            throw new IOException("Cannot create " + destination.getAbsolutePath());
-        }
+        FileUtil.ensureDirectory(destination);
         final int written = copyDirectory(
             context.getAssets(), ASSET_ROOT, destination, replaceUserSettings);
         Log.i(TAG, "Applied " + written + " bundled configuration files"
@@ -92,9 +90,7 @@ public final class BundledConfig {
         if (entries == null || entries.length == 0) {
             return 0;
         }
-        if (!target.isDirectory() && !target.mkdirs()) {
-            throw new IOException("Cannot create " + target.getAbsolutePath());
-        }
+        FileUtil.ensureDirectory(target);
 
         int written = 0;
         for (String entry : entries) {
@@ -159,11 +155,7 @@ public final class BundledConfig {
             throws IOException {
         try (InputStream in = assets.open(assetPath);
              OutputStream out = new FileOutputStream(target)) {
-            final byte[] buffer = new byte[64 * 1024];
-            int read;
-            while ((read = in.read(buffer)) > 0) {
-                out.write(buffer, 0, read);
-            }
+            FileUtil.copy(in, out);
         }
     }
 }

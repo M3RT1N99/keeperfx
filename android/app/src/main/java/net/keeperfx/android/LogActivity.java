@@ -137,7 +137,7 @@ public class LogActivity extends Activity {
         final Prefs prefs = new Prefs(this);
         final StringBuilder sb = new StringBuilder();
         sb.append("KeeperFX for Android\n");
-        sb.append("app version    : ").append(appVersion()).append('\n');
+        sb.append("app version    : ").append(AppUpdater.installedVersionName(this)).append('\n');
         sb.append("KeeperFX data  : ")
           .append(GameData.describeInstalledVersion(this))
           .append('\n');
@@ -151,7 +151,7 @@ public class LogActivity extends Activity {
           .append('\n');
         sb.append("language       : ").append(prefs.getLanguage()).append('\n');
         sb.append("data complete  : ").append(GameData.isComplete(this)).append('\n');
-        final GameData.VerifyReport verified = GameData.verifyInstalledFiles(this);
+        final InstallManifest.Report verified = GameData.verifyInstalledFiles(this);
         sb.append("verified       : ");
         if (!GameData.hasManifest(this)) {
             sb.append("no manifest yet");
@@ -175,14 +175,6 @@ public class LogActivity extends Activity {
             case Prefs.INPUT_TOUCH: return "touch";
             case Prefs.INPUT_POINTER: return "mouse & keyboard";
             default: return "automatic";
-        }
-    }
-
-    private String appVersion() {
-        try {
-            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-        } catch (Exception e) {
-            return "unknown";
         }
     }
 

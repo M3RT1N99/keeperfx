@@ -57,6 +57,12 @@ public final class DataImporter {
     private static final int DK_SEARCH_MAX_DEPTH = 6;
     private static final int DK_SEARCH_MAX_DIRECTORIES = 4000;
 
+    private static final String[] CHILD_COLUMNS = {
+        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        DocumentsContract.Document.COLUMN_MIME_TYPE,
+    };
+
     /** Reported back to the launcher; always called on a background thread. */
     public interface Listener {
         void onProgress(int filesCopied, String currentPath);
@@ -92,10 +98,7 @@ public final class DataImporter {
     public void importKeeperfxTree(Uri treeUri) {
         final File destination = GameData.gameDirectory(context);
         try {
-            if (!destination.isDirectory() && !destination.mkdirs()) {
-                finish(false, "Cannot create " + destination.getAbsolutePath());
-                return;
-            }
+            FileUtil.ensureDirectory(destination);
 
             final String rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri);
             final Uri rootUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId);
@@ -134,17 +137,10 @@ public final class DataImporter {
      * are upper case on the CD and lower case in most re-releases.
      */
     public void importOriginalDkTree(Uri treeUri) {
-        final File destination = GameData.gameDirectory(context);
         try {
-            if (!destination.isDirectory() && !destination.mkdirs()) {
-                finish(false, "Cannot create " + destination.getAbsolutePath());
-                return;
-            }
+            FileUtil.ensureDirectory(GameData.gameDirectory(context));
 
-            final Set<String> wanted = new HashSet<>();
-            for (String name : GameData.allOriginalDkFileNames()) {
-                wanted.add(name.toLowerCase(Locale.US));
-            }
+            final Set<String> wanted = wantedOriginalFiles();
             final Set<String> found = new HashSet<>();
 
             final String rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri);
@@ -156,18 +152,7 @@ public final class DataImporter {
                 return;
             }
 
-            final List<String> stillMissing = GameData.findMissingOriginalDkFiles(context);
-            if (stillMissing.isEmpty()) {
-                finish(true, "Copied " + filesCopied + " files from the original game");
-            } else {
-                final StringBuilder sb = new StringBuilder();
-                sb.append("Copied ").append(filesCopied).append(" files, but these are still missing:\n\n");
-                for (String name : stillMissing) {
-                    sb.append("  ").append(name).append('\n');
-                }
-                sb.append("\nPick the folder that holds the original game's DATA and SOUND folders.");
-                finish(false, sb.toString());
-            }
+            finishOriginalImport("Pick the folder that holds the original game's DATA and SOUND folders.");
         } catch (Exception e) {
             Log.e(TAG, "Original game import failed", e);
             finish(false, "Import failed: " + e.getMessage());
@@ -187,15 +172,9 @@ public final class DataImporter {
     public void importOriginalDkZip(Uri zipUri) {
         final File destination = GameData.gameDirectory(context);
         try {
-            if (!destination.isDirectory() && !destination.mkdirs()) {
-                finish(false, "Cannot create " + destination.getAbsolutePath());
-                return;
-            }
+            FileUtil.ensureDirectory(destination);
 
-            final Set<String> wanted = new HashSet<>();
-            for (String name : GameData.allOriginalDkFileNames()) {
-                wanted.add(name.toLowerCase(Locale.US));
-            }
+            final Set<String> wanted = wantedOriginalFiles();
             final Set<String> found = new HashSet<>();
 
             try (InputStream raw = context.getContentResolver().openInputStream(zipUri)) {
@@ -206,7 +185,6 @@ public final class DataImporter {
                 try (java.util.zip.ZipInputStream zip =
                          new java.util.zip.ZipInputStream(new java.io.BufferedInputStream(raw))) {
                     java.util.zip.ZipEntry entry;
-                    final byte[] buffer = new byte[64 * 1024];
                     while (((entry = zip.getNextEntry()) != null) && !cancelled) {
                         if (entry.isDirectory()) {
                             continue;
@@ -222,14 +200,9 @@ public final class DataImporter {
                         }
                         final File targetDir = new File(destination,
                             GameData.targetSubdirectoryFor(name));
-                        if (!targetDir.isDirectory() && !targetDir.mkdirs()) {
-                            throw new IOException("Cannot create " + targetDir.getAbsolutePath());
-                        }
+                        FileUtil.ensureDirectory(targetDir);
                         try (OutputStream out = new FileOutputStream(new File(targetDir, key))) {
-                            int read;
-                            while ((read = zip.read(buffer)) > 0) {
-                                out.write(buffer, 0, read);
-                            }
+                            FileUtil.copy(zip, out);
                         }
                         found.add(key);
                         filesCopied++;
@@ -242,23 +215,34 @@ public final class DataImporter {
                 finish(false, "Import cancelled");
                 return;
             }
-            final List<String> stillMissing = GameData.findMissingOriginalDkFiles(context);
-            if (stillMissing.isEmpty()) {
-                finish(true, "Copied " + filesCopied + " files from the original game");
-            } else {
-                final StringBuilder sb = new StringBuilder();
-                sb.append("Copied ").append(filesCopied)
-                  .append(" files, but these are still missing:\n\n");
-                for (String n : stillMissing) {
-                    sb.append("  ").append(n).append('\n');
-                }
-                sb.append("\nThe archive has to hold the original game's DATA and SOUND files.");
-                finish(false, sb.toString());
-            }
+            finishOriginalImport("The archive has to hold the original game's DATA and SOUND files.");
         } catch (Exception e) {
             Log.e(TAG, "Original game import from a zip failed", e);
             finish(false, "Import failed: " + e.getMessage());
         }
+    }
+
+    private static Set<String> wantedOriginalFiles() {
+        final Set<String> wanted = new HashSet<>();
+        for (String name : GameData.allOriginalDkFileNames()) {
+            wanted.add(name.toLowerCase(Locale.US));
+        }
+        return wanted;
+    }
+
+    private void finishOriginalImport(String hintWhenIncomplete) {
+        final List<String> stillMissing = GameData.findMissingOriginalDkFiles(context);
+        if (stillMissing.isEmpty()) {
+            finish(true, "Copied " + filesCopied + " files from the original game");
+            return;
+        }
+        final StringBuilder sb = new StringBuilder();
+        sb.append("Copied ").append(filesCopied).append(" files, but these are still missing:\n\n");
+        for (String name : stillMissing) {
+            sb.append("  ").append(name).append('\n');
+        }
+        sb.append('\n').append(hintWhenIncomplete);
+        finish(false, sb.toString());
     }
 
     private void searchAndCopy(Uri treeUri, Uri rootUri, Set<String> wanted, Set<String> found)
@@ -279,11 +263,7 @@ public final class DataImporter {
             final Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId);
             final List<SearchDir> subdirectories = new ArrayList<>();
 
-            try (Cursor cursor = resolver.query(childrenUri, new String[] {
-                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                    DocumentsContract.Document.COLUMN_MIME_TYPE,
-            }, null, null, null)) {
+            try (Cursor cursor = resolver.query(childrenUri, CHILD_COLUMNS, null, null, null)) {
                 if (cursor == null) {
                     continue;
                 }
@@ -310,9 +290,7 @@ public final class DataImporter {
                     }
                     final File targetDir = new File(GameData.gameDirectory(context),
                         GameData.targetSubdirectoryFor(displayName));
-                    if (!targetDir.isDirectory() && !targetDir.mkdirs()) {
-                        throw new IOException("Cannot create " + targetDir.getAbsolutePath());
-                    }
+                    FileUtil.ensureDirectory(targetDir);
                     copyFile(childUri, new File(targetDir, key));
                     found.add(key);
                     listener.onProgress(filesCopied, displayName);
@@ -353,11 +331,7 @@ public final class DataImporter {
         String onlyDirectoryId = null;
         boolean sawExpectedEntry = false;
 
-        try (Cursor cursor = resolver.query(children, new String[] {
-                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                DocumentsContract.Document.COLUMN_MIME_TYPE,
-        }, null, null, null)) {
+        try (Cursor cursor = resolver.query(children, CHILD_COLUMNS, null, null, null)) {
             if (cursor == null) {
                 return new PendingDir(rootUri, destination);
             }
@@ -393,18 +367,12 @@ public final class DataImporter {
 
         while (!queue.isEmpty() && !cancelled) {
             final PendingDir current = queue.pop();
-            if (!current.target.isDirectory() && !current.target.mkdirs()) {
-                throw new IOException("Cannot create " + current.target.getAbsolutePath());
-            }
+            FileUtil.ensureDirectory(current.target);
 
             final String parentId = DocumentsContract.getDocumentId(current.documentUri);
             final Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId);
 
-            try (Cursor cursor = resolver.query(childrenUri, new String[] {
-                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                    DocumentsContract.Document.COLUMN_MIME_TYPE,
-            }, null, null, null)) {
+            try (Cursor cursor = resolver.query(childrenUri, CHILD_COLUMNS, null, null, null)) {
                 if (cursor == null) {
                     continue;
                 }
@@ -434,11 +402,7 @@ public final class DataImporter {
             if (in == null) {
                 throw new IOException("Cannot read " + source);
             }
-            final byte[] buffer = new byte[128 * 1024];
-            int read;
-            while ((read = in.read(buffer)) > 0) {
-                out.write(buffer, 0, read);
-            }
+            FileUtil.copy(in, out);
         }
         filesCopied++;
         if ((filesCopied % 25) == 0) {
@@ -449,22 +413,5 @@ public final class DataImporter {
     private void finish(boolean success, String message) {
         listener.onProgress(filesCopied, "");
         listener.onFinished(success, message);
-    }
-
-    static void deleteRecursively(File file) {
-        if (file == null || !file.exists()) {
-            return;
-        }
-        if (file.isDirectory()) {
-            File[] children = file.listFiles();
-            if (children != null) {
-                for (File child : children) {
-                    deleteRecursively(child);
-                }
-            }
-        }
-        // Nothing sensible to do on failure; the caller reports the end state.
-        //noinspection ResultOfMethodCallIgnored
-        file.delete();
     }
 }

@@ -209,7 +209,6 @@ public class DownloadService extends Service {
     /** @return null on success, otherwise the failure message. */
     private String runJob(UpdateManager.Kind kind) {
         final String[] failure = new String[1];
-        final Object done = new Object();
 
         switch (kind) {
             case GAME_DATA:
@@ -226,12 +225,8 @@ public class DownloadService extends Service {
                         @Override
                         public void onFinished(boolean success, String message) {
                             failure[0] = success ? null : message;
-                            synchronized (done) {
-                                done.notifyAll();
-                            }
                         }
                     });
-                // The downloader is synchronous; run it here and wait on nothing.
                 if (kind == UpdateManager.Kind.GAME_DATA) {
                     downloader.run();
                 } else if (kind == UpdateManager.Kind.GAME_ALPHA) {
@@ -256,7 +251,7 @@ public class DownloadService extends Service {
                     }
                 });
                 try {
-                    final AppUpdater.Available available = AppUpdater.checkForUpdate(this);
+                    final AppRelease available = AppUpdater.checkForUpdate(this);
                     if (available == null) {
                         return null; // someone else already installed it
                     }

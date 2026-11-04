@@ -138,6 +138,14 @@ android {
     lint {
         abortOnError false
     }
+
+    testOptions {
+        unitTests {
+            // The logic under test logs through android.util.Log, which only
+            // exists as a stub off the device.
+            returnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -151,6 +159,11 @@ dependencies {
     implementation "org.tukaani:xz:1.10"
 
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.3"
+
+    testImplementation "junit:junit:4.13.2"
+    // android.jar only carries stubs of org.json, and the API parsers are worth
+    // testing against the real thing.
+    testImplementation "org.json:json:20240303"
 }
 
 // ---------------------------------------------------------------------------

@@ -10,8 +10,9 @@
  *     storage. That leaves the player only having to supply the handful of
  *     files an original Dungeon Keeper must provide.
  * @par Comment:
- *     The release is a 7z archive of roughly 360 MB. Windows binaries in it are
- *     skipped, they are dead weight here.
+ *     The release is a 7z archive of roughly 360 MB. This class runs the jobs and
+ *     keeps the records; ReleaseApi asks what is current, ArchiveUnpacker writes
+ *     the files and AlphaBackup keeps the way back from the patch.
  * @author   KeeperFX Team
  * @date     04 Aug 2026
  * @par  Copying and copyrights:
@@ -26,52 +27,15 @@ package net.keeperfx.android;
 import android.content.Context;
 import android.util.Log;
 
-import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
-import org.apache.commons.compress.archivers.sevenz.SevenZFile;
-import org.json.JSONObject;
-
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 public final class ReleaseDownloader {
 
-    private static final String LINE_END = "\n";
     private static final String TAG = "KeeperFX";
-    private static final String API_LATEST = "https://keeperfx.net/api/v1/release/stable/latest";
-    /**
-     * The newest alpha patch, a ~33 MB archive that is laid over the stable
-     * release rather than replacing it.
-     *
-     * This port matters more than it does on the desktop: the engine here is
-     * built from master, while the data comes from the last stable release, and
-     * anything the engine gained since then is simply absent. That is what made
-     * a device log complain about missing fxdata/font12.fxfont, font16.fxfont
-     * and sounds.cfg - all three are in the alpha patch and none are in 1.4.0.
-     */
-    private static final String API_ALPHA = "https://keeperfx.net/api/v1/release/alpha/latest";
-
-    private static final int CONNECT_TIMEOUT_MS = 20000;
-    private static final int READ_TIMEOUT_MS = 60000;
-
-    /** Extensions that only matter to the Windows build. */
-    private static final String[] SKIPPED_SUFFIXES = {
-        ".exe", ".dll", ".map", ".pdb", ".bat",
-    };
 
     public interface Listener {
         /** @param percent 0..100, or -1 when the total size is unknown. */
@@ -80,34 +44,21 @@ public final class ReleaseDownloader {
         void onFinished(boolean success, String message);
     }
 
-    /** What the release API says is current. */
-    public static final class ReleaseInfo {
-        public final String version;
-        public final String downloadUrl;
-        public final long sizeInBytes;
-
-        ReleaseInfo(String version, String downloadUrl, long sizeInBytes) {
-            this.version = version;
-            this.downloadUrl = downloadUrl;
-            this.sizeInBytes = sizeInBytes;
-        }
-    }
-
-    /**
-     * Asks the API which release is current. Blocking; call from a background
-     * thread. Used both by the installer and by the update check.
-     */
-    public static ReleaseInfo queryLatestRelease() throws IOException, org.json.JSONException {
-        final JSONObject release = requestLatestRelease();
-        return new ReleaseInfo(
-            release.optString("version", ""),
-            release.optString("download_url", ""),
-            release.optLong("size_in_bytes", -1));
-    }
-
     private final Context context;
     private final Listener listener;
     private volatile boolean cancelled = false;
+
+    private final ArchiveUnpacker.Progress unpackProgress = new ArchiveUnpacker.Progress() {
+        @Override
+        public void onFiles(int unpacked) {
+            listener.onStage("Unpacking", -1, unpacked + " files");
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return ReleaseDownloader.this.isCancelled();
+        }
+    };
 
     public ReleaseDownloader(Context context, Listener listener) {
         this.context = context.getApplicationContext();
@@ -133,7 +84,7 @@ public final class ReleaseDownloader {
         File archive = null;
         try {
             listener.onStage("Looking up the music archive", -1, "");
-            final String url = queryMusicUrl();
+            final String url = ReleaseApi.musicArchiveUrl();
             if (url.isEmpty()) {
                 finish(false, "The workshop API returned no music download");
                 return;
@@ -148,10 +99,8 @@ public final class ReleaseDownloader {
 
             listener.onStage("Unpacking the music", -1, "");
             final File musicDir = new File(GameData.gameDirectory(context), "music");
-            if (!musicDir.isDirectory() && !musicDir.mkdirs()) {
-                throw new IOException("Cannot create " + musicDir.getAbsolutePath());
-            }
-            final int files = unzipInto(archive, musicDir);
+            FileUtil.ensureDirectory(musicDir);
+            final int files = ArchiveUnpacker.unzipFlat(archive, musicDir, unpackProgress);
             finish(true, "Installed " + files + " music tracks");
         } catch (Exception e) {
             Log.e(TAG, "Music download failed", e);
@@ -167,78 +116,17 @@ public final class ReleaseDownloader {
     }
 
     /**
-     * The music lives in workshop item 393, the same one the desktop launcher
-     * uses. The zip is preferred over the 7z: java.util.zip reads it directly.
-     */
-    private static String queryMusicUrl() throws IOException, org.json.JSONException {
-        final JSONObject item = requestJson(
-            "https://keeperfx.net/api/v1/workshop/item/393").getJSONObject("workshop_item");
-        final org.json.JSONArray files = item.optJSONArray("files");
-        String sevenZip = "";
-        if (files != null) {
-            for (int i = 0; i < files.length(); i++) {
-                final String url = files.getJSONObject(i).optString("url", "");
-                if (url.toLowerCase(Locale.US).endsWith(".zip")) {
-                    return url;
-                }
-                if (url.toLowerCase(Locale.US).endsWith(".7z")) {
-                    sevenZip = url;
-                }
-            }
-        }
-        return sevenZip;
-    }
-
-    private int unzipInto(File archive, File target) throws IOException {
-        final String canonicalRoot = target.getCanonicalPath() + File.separator;
-        int files = 0;
-        try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(
-                new BufferedInputStream(new java.io.FileInputStream(archive)))) {
-            java.util.zip.ZipEntry entry;
-            final byte[] buffer = new byte[128 * 1024];
-            while ((entry = zip.getNextEntry()) != null) {
-                if (isCancelled()) {
-                    return files;
-                }
-                // The archive carries a music/ prefix on some releases; flatten
-                // it so the tracks always land directly in the music folder.
-                String name = entry.getName().replace('\\', '/');
-                final int slash = name.lastIndexOf('/');
-                if (slash >= 0) {
-                    name = name.substring(slash + 1);
-                }
-                if (entry.isDirectory() || name.isEmpty()) {
-                    continue;
-                }
-                final File out = new File(target, name);
-                if (!out.getCanonicalPath().startsWith(canonicalRoot)) {
-                    continue;
-                }
-                try (OutputStream os = new FileOutputStream(out)) {
-                    int read;
-                    while ((read = zip.read(buffer)) > 0) {
-                        os.write(buffer, 0, read);
-                    }
-                }
-                files++;
-            }
-        }
-        return files;
-    }
-
-    /**
      * Downloads the newest alpha patch and lays it over the installation.
      *
      * Deliberately the same unpacking path as a full release: the archive has
-     * the same layout, only fewer files, and extract() already merges rather
-     * than replaces. The recorded version is left alone, because what is
-     * installed is still the stable release with a patch on top.
+     * the same layout, only fewer files, and it merges rather than replaces. The
+     * recorded version is left alone, because what is installed is still the
+     * stable release with a patch on top.
      */
     public void runAlpha() {
-        File archive = null;
         try {
             listener.onStage("Checking for the current alpha", -1, "");
-            final ReleaseInfo alpha = queryLatestAlpha();
+            final ReleaseApi.ReleaseInfo alpha = ReleaseApi.latestAlpha();
             if (alpha.downloadUrl.isEmpty()) {
                 finish(false, "The alpha API returned no download URL");
                 return;
@@ -249,12 +137,10 @@ public final class ReleaseDownloader {
             // Kept between switches. Turning the patch off restores the files
             // it replaced from a local copy, so turning it back on should not
             // cost 33 MB again just because it went away in between.
-            final File cache = alphaArchiveCache(version);
-            if (cache.isFile() && cache.length() > 0) {
-                archive = cache;
+            final File archive = alphaArchiveCache(version);
+            if (archive.isFile() && archive.length() > 0) {
                 listener.onStage("Using the archive already downloaded", -1, "");
             } else {
-                archive = cache;
                 download(alpha.downloadUrl, archive, alpha.sizeInBytes, version);
                 if (isCancelled()) {
                     finish(false, "Download cancelled");
@@ -262,17 +148,16 @@ public final class ReleaseDownloader {
                 }
             }
 
-            // Everything the patch is about to replace is copied aside first, so
-            // that going back to the plain release later costs nothing. Without
-            // it the only way back would be the 374 MB release all over again,
-            // which is a lot to pay for changing one's mind.
             listener.onStage("Saving the files being replaced", -1, "");
-            backupBeforePatch(archive);
-            final List<String> unpacked = extract(archive, alphaBackupDirectory());
+            alphaBackup().extendFor(archive);
+            final List<String> unpacked = unpack(archive);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
                 return;
             }
+            final File root = GameData.gameDirectory(context);
+            ArchiveUnpacker.removeRetiredFiles(root, GameData.alphaBackupDirectory(context),
+                GameData.stableManifestPaths(context));
             writeManifest(GameData.alphaManifest(context), unpacked);
 
             new Prefs(context).setInstalledAlphaVersion(version);
@@ -317,122 +202,28 @@ public final class ReleaseDownloader {
         return new File(dir, "alpha-" + version + ".7z");
     }
 
-    private File alphaBackupDirectory() {
-        return GameData.alphaBackupDirectory(context);
-    }
-
-    /** Paths the patch added, which a revert deletes rather than restores. */
-    private File alphaAddedList() {
-        return new File(alphaBackupDirectory(), "added.txt");
-    }
-
-    /**
-     * Copies aside every installed file the archive would overwrite, and notes
-     * the ones it only adds.
-     *
-     * Only the entry names are read, so nothing is unpacked twice. A backup
-     * from an earlier patch is extended file by file, never retaken: a copy
-     * already in it is the plain release's and taking it again after a patch
-     * had been applied would capture the patched file and make the way back a
-     * fiction. A newer patch can touch files the earlier one did not, though,
-     * and those are still the release's own at this moment - this is the only
-     * chance to save them, and the files it merely adds have to reach the
-     * added list or a revert would leave them behind forever.
-     */
-    private void backupBeforePatch(File archive) throws IOException {
-        final File destination = GameData.gameDirectory(context);
-        final File backup = alphaBackupDirectory();
-        if (!backup.isDirectory() && !backup.mkdirs()) {
-            throw new IOException("Cannot create " + backup.getAbsolutePath());
-        }
-        final Set<String> added = new LinkedHashSet<>();
-        final File addedList = alphaAddedList();
-        if (addedList.isFile()) {
-            for (String line : Files.readAllLines(addedList.toPath(), Charset.forName("UTF-8"))) {
-                final String name = line.trim();
-                if (!name.isEmpty()) {
-                    added.add(name);
-                }
-            }
-        }
-        int saved = 0;
-        try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
-            SevenZArchiveEntry entry;
-            final byte[] buffer = new byte[64 * 1024];
-            while ((entry = sevenZ.getNextEntry()) != null) {
-                final String name = entry.getName();
-                if (name == null || name.isEmpty() || entry.isDirectory() || isSkipped(name)) {
-                    continue;
-                }
-                final File installed = new File(destination, name);
-                // A file the earlier patch added is on disk in the patch's own
-                // version; backing that up as if it were the release's would
-                // make a revert restore it. It stays on the added list instead.
-                if (!installed.isFile() || added.contains(name)) {
-                    added.add(name);
-                    continue;
-                }
-                final File target = new File(backup, name);
-                if (target.isFile()) {
-                    continue;
-                }
-                final File parent = target.getParentFile();
-                if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-                    // Skipping would silently cost this file its way back.
-                    throw new IOException("Cannot create " + parent.getAbsolutePath());
-                }
-                try (InputStream in = new FileInputStream(installed);
-                     OutputStream out = new FileOutputStream(target)) {
-                    int read;
-                    while ((read = in.read(buffer)) > 0) {
-                        out.write(buffer, 0, read);
-                    }
-                }
-                saved++;
-            }
-        }
-        final StringBuilder lines = new StringBuilder();
-        for (String name : added) {
-            lines.append(name).append(LINE_END);
-        }
-        try (OutputStream out = new FileOutputStream(addedList)) {
-            out.write(lines.toString().getBytes("UTF-8"));
-        }
-        Log.i(TAG, "Saved " + saved + " files before applying the alpha patch");
+    private AlphaBackup alphaBackup() {
+        return new AlphaBackup(GameData.gameDirectory(context),
+            GameData.alphaBackupDirectory(context));
     }
 
     /**
      * Puts the installation back to the plain release without downloading it.
      *
-     * Restores what the patch replaced and deletes what it added. Runs
-     * synchronously and is quick: the backup is a few megabytes of
+     * Runs synchronously and is quick: the backup is a few megabytes of
      * configuration and data files, not the 374 MB release.
      */
     public void revertAlpha() {
         try {
             final Prefs prefs = new Prefs(context);
-            final File backup = alphaBackupDirectory();
-            if (!backup.isDirectory()) {
+            final AlphaBackup backup = alphaBackup();
+            if (!backup.exists()) {
                 prefs.setInstalledAlphaVersion("");
                 finish(true, "No alpha patch to remove");
                 return;
             }
-            final File destination = GameData.gameDirectory(context);
             listener.onStage("Restoring the release", -1, "");
-
-            final File addedList = alphaAddedList();
-            if (addedList.isFile()) {
-                for (String line : Files.readAllLines(addedList.toPath(),
-                        Charset.forName("UTF-8"))) {
-                    final String name = line.trim();
-                    if (!name.isEmpty()) {
-                        //noinspection ResultOfMethodCallIgnored
-                        new File(destination, name).delete();
-                    }
-                }
-            }
-            final int restored = restoreTree(backup, destination);
-            deleteTree(backup);
+            final int restored = backup.restore();
             prefs.setInstalledAlphaVersion("");
             // The restored files are the stable release's own copies again, so
             // the stable manifest describes them and the patch's does not.
@@ -443,33 +234,6 @@ public final class ReleaseDownloader {
             Log.e(TAG, "Could not remove the alpha patch", e);
             finish(false, "Failed: " + e.getMessage());
         }
-    }
-
-    private int restoreTree(File from, File to) throws IOException {
-        final File[] entries = from.listFiles();
-        if (entries == null) {
-            return 0;
-        }
-        int restored = 0;
-        final byte[] buffer = new byte[64 * 1024];
-        for (File entry : entries) {
-            final File target = new File(to, entry.getName());
-            if (entry.isDirectory()) {
-                //noinspection ResultOfMethodCallIgnored
-                target.mkdirs();
-                restored += restoreTree(entry, target);
-            } else if (!entry.getName().equals("added.txt")) {
-                try (InputStream in = new FileInputStream(entry);
-                     OutputStream out = new FileOutputStream(target)) {
-                    int read;
-                    while ((read = in.read(buffer)) > 0) {
-                        out.write(buffer, 0, read);
-                    }
-                }
-                restored++;
-            }
-        }
-        return restored;
     }
 
     /**
@@ -486,28 +250,12 @@ public final class ReleaseDownloader {
         final Prefs prefs = new Prefs(context);
         prefs.setInstalledVersion("");
         prefs.setInstalledAlphaVersion("");
-        deleteTree(GameData.alphaBackupDirectory(context));
-        deleteTree(new File(context.getFilesDir(), "alpha-cache"));
+        FileUtil.deleteTree(GameData.alphaBackupDirectory(context));
+        FileUtil.deleteTree(new File(context.getFilesDir(), "alpha-cache"));
         //noinspection ResultOfMethodCallIgnored
         GameData.stableManifest(context).delete();
         //noinspection ResultOfMethodCallIgnored
         GameData.alphaManifest(context).delete();
-    }
-
-    private static void deleteTree(File root) {
-        final File[] entries = root.listFiles();
-        if (entries != null) {
-            for (File entry : entries) {
-                if (entry.isDirectory()) {
-                    deleteTree(entry);
-                } else {
-                    //noinspection ResultOfMethodCallIgnored
-                    entry.delete();
-                }
-            }
-        }
-        //noinspection ResultOfMethodCallIgnored
-        root.delete();
     }
 
     /** Runs synchronously; the caller provides the thread. */
@@ -515,7 +263,7 @@ public final class ReleaseDownloader {
         File archive = null;
         try {
             listener.onStage("Checking for the current release", -1, "");
-            final ReleaseInfo release = queryLatestRelease();
+            final ReleaseApi.ReleaseInfo release = ReleaseApi.latestStable();
             final String version = release.version.isEmpty() ? "unknown" : release.version;
             if (release.downloadUrl.isEmpty()) {
                 finish(false, "The release API returned no download URL");
@@ -534,11 +282,13 @@ public final class ReleaseDownloader {
                 return;
             }
 
-            final List<String> unpacked = extract(archive, null);
+            final List<String> unpacked = unpack(archive);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
                 return;
             }
+            ArchiveUnpacker.removeRetiredFiles(GameData.gameDirectory(context), null,
+                Collections.<String>emptySet());
             writeManifest(GameData.stableManifest(context), unpacked);
 
             // A full release overwrites whatever the alpha patch had put there,
@@ -548,7 +298,7 @@ public final class ReleaseDownloader {
             // A full release replaces the patched files with its own, so the
             // saved copies describe nothing that is still installed.
             prefs.setInstalledAlphaVersion("");
-            deleteTree(alphaBackupDirectory());
+            FileUtil.deleteTree(GameData.alphaBackupDirectory(context));
             //noinspection ResultOfMethodCallIgnored
             GameData.alphaManifest(context).delete();
             finish(true, "KeeperFX " + version + " installed");
@@ -560,43 +310,6 @@ public final class ReleaseDownloader {
                 //noinspection ResultOfMethodCallIgnored
                 archive.delete();
             }
-        }
-    }
-
-    private static JSONObject requestLatestRelease() throws IOException, org.json.JSONException {
-        return requestJson(API_LATEST).getJSONObject("release");
-    }
-
-    /** Asks the API which alpha patch is current. Blocking. */
-    public static ReleaseInfo queryLatestAlpha() throws IOException, org.json.JSONException {
-        final JSONObject build = requestJson(API_ALPHA).getJSONObject("alpha_build");
-        return new ReleaseInfo(
-            build.optString("version", ""),
-            build.optString("download_url", ""),
-            build.optLong("size_in_bytes", -1));
-    }
-
-    private static JSONObject requestJson(String url) throws IOException, org.json.JSONException {
-        final HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        try {
-            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            connection.setReadTimeout(READ_TIMEOUT_MS);
-            connection.setRequestProperty("Accept", "application/json");
-            final int status = connection.getResponseCode();
-            if (status != HttpURLConnection.HTTP_OK) {
-                throw new IOException("API returned HTTP " + status + " for " + url);
-            }
-            final StringBuilder body = new StringBuilder();
-            try (InputStream in = connection.getInputStream()) {
-                final byte[] buffer = new byte[8192];
-                int read;
-                while ((read = in.read(buffer)) > 0) {
-                    body.append(new String(buffer, 0, read, "UTF-8"));
-                }
-            }
-            return new JSONObject(body.toString());
-        } finally {
-            connection.disconnect();
         }
     }
 
@@ -625,202 +338,27 @@ public final class ReleaseDownloader {
         // Not the cache directory: Android may clear that while a 360 MB
         // transfer is in flight, throwing away everything fetched so far.
         final File dir = new File(context.getFilesDir(), "downloads");
-        if (!dir.isDirectory() && !dir.mkdirs()) {
-            throw new IOException("Cannot create " + dir.getAbsolutePath());
-        }
+        FileUtil.ensureDirectory(dir);
         return dir;
     }
 
-    /**
-     * @param patchBackup the alpha backup when this archive is a patch, otherwise
-     *        null; see removeRetiredFiles().
-     * @return the relative paths of every file written, for the manifest.
-     */
-    private List<String> extract(File archive, File patchBackup) throws IOException {
-        final File destination = GameData.gameDirectory(context);
-        // Unpacked over whatever is already there rather than replacing it, the
-        // way the desktop launcher installs a release. Everything the archive
-        // does not contain therefore survives: the files imported from an
-        // original Dungeon Keeper, save games, downloaded music, screenshots,
-        // and any campaigns, map packs or mods the player added. Files that a
-        // release retires are handled below by the removal list instead.
-        if (!destination.isDirectory() && !destination.mkdirs()) {
-            throw new IOException("Cannot create " + destination.getAbsolutePath());
-        }
-
+    /** @return the relative paths of every file written, for the manifest. */
+    private List<String> unpack(File archive) throws IOException {
         listener.onStage("Unpacking", 0, "");
-        final String canonicalRoot = destination.getCanonicalPath() + File.separator;
-        final List<String> written = new ArrayList<>();
-        int entries = 0;
-
-        try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
-            SevenZArchiveEntry entry;
-            final byte[] buffer = new byte[256 * 1024];
-            while ((entry = sevenZ.getNextEntry()) != null) {
-                if (isCancelled()) {
-                    return written;
-                }
-                final String name = entry.getName();
-                if (name == null || name.isEmpty()) {
-                    continue;
-                }
-                final File out = new File(destination, name);
-                // Refuse anything that would escape the destination directory.
-                if (!out.getCanonicalPath().startsWith(canonicalRoot)) {
-                    Log.w(TAG, "Skipping entry outside the destination: " + name);
-                    continue;
-                }
-                if (entry.isDirectory()) {
-                    //noinspection ResultOfMethodCallIgnored
-                    out.mkdirs();
-                    continue;
-                }
-                if (isSkipped(name)) {
-                    continue;
-                }
-                final File parent = out.getParentFile();
-                if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-                    throw new IOException("Cannot create " + parent.getAbsolutePath());
-                }
-                try (OutputStream os = new FileOutputStream(out)) {
-                    int read;
-                    while ((read = sevenZ.read(buffer)) > 0) {
-                        os.write(buffer, 0, read);
-                    }
-                }
-                written.add(name);
-                if ((++entries % 100) == 0) {
-                    listener.onStage("Unpacking", -1, entries + " files");
-                }
-            }
+        final List<String> written = ArchiveUnpacker.unpackSevenZ(archive,
+            GameData.gameDirectory(context), unpackProgress);
+        if (!isCancelled()) {
+            // The release predates the engine we just built, so its configuration
+            // can be missing files or carry values this parser rejects.
+            listener.onStage("Applying configuration", -1, "");
+            BundledConfig.install(context, true);
         }
-        Log.i(TAG, "Unpacked " + entries + " files");
-
-        // The release predates the engine we just built, so its configuration
-        // can be missing files or carry values this parser rejects.
-        listener.onStage("Applying configuration", -1, "");
-        BundledConfig.install(context, true);
-
-        removeRetiredFiles(destination, patchBackup);
         return written;
     }
 
-    /**
-     * Records what an unpack left behind, so a later check can tell a whole
-     * installation from the torso an interrupted one leaves.
-     *
-     * Sizes are taken from the disk after the configuration overlay and the
-     * retirement list have run, not from the archive, so verification later
-     * compares like with like; a file the retirement list deleted again simply
-     * falls out. Written to a temporary name first: a manifest that lies is
-     * worse than none.
-     */
     private void writeManifest(File manifest, List<String> names) throws IOException {
-        final File root = GameData.gameDirectory(context);
-        final File dir = manifest.getParentFile();
-        if (dir != null && !dir.isDirectory() && !dir.mkdirs()) {
-            throw new IOException("Cannot create " + dir.getAbsolutePath());
-        }
-        final StringBuilder lines = new StringBuilder();
-        int listed = 0;
-        for (String name : names) {
-            final File f = new File(root, name);
-            if (f.isFile()) {
-                lines.append(f.length()).append('\t').append(name).append(LINE_END);
-                listed++;
-            }
-        }
-        final File tmp = new File(manifest.getAbsolutePath() + ".tmp");
-        try (OutputStream out = new FileOutputStream(tmp)) {
-            out.write(lines.toString().getBytes("UTF-8"));
-        }
-        if (!tmp.renameTo(manifest)) {
-            //noinspection ResultOfMethodCallIgnored
-            manifest.delete();
-            if (!tmp.renameTo(manifest)) {
-                throw new IOException("Cannot write " + manifest.getAbsolutePath());
-            }
-        }
+        final int listed = InstallManifest.write(manifest, GameData.gameDirectory(context), names);
         Log.i(TAG, "Manifest " + manifest.getName() + " lists " + listed + " files");
-    }
-
-    /**
-     * Deletes the files a release has retired, listed per version in
-     * launcher-auto-file-removal.txt, which ships inside the archive.
-     *
-     * Installing over the top leaves files behind that newer releases no longer
-     * contain; this is the mechanism the desktop launcher uses for them, and it
-     * is why not wiping the directory is safe.
-     *
-     * A patch retires files of the release underneath it as well. Those go into
-     * its backup instead, so that taking the patch off brings them back and the
-     * release's manifest, which still lists them, comes true again.
-     */
-    private void removeRetiredFiles(File root, File patchBackup) {
-        final File list = new File(root, "launcher-auto-file-removal.txt");
-        if (!list.isFile()) {
-            return;
-        }
-        final Set<String> releaseFiles = (patchBackup != null)
-            ? GameData.stableManifestPaths(context)
-            : Collections.emptySet();
-        int removed = 0;
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.InputStreamReader(new java.io.FileInputStream(list), "UTF-8"))) {
-            String line;
-            boolean sectionApplies = false;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) {
-                    continue;
-                }
-                if (line.startsWith("[") && line.endsWith("]")) {
-                    // Entries are listed under the version that retired them,
-                    // so every section up to the one being installed applies.
-                    sectionApplies = true;
-                    continue;
-                }
-                if (!sectionApplies) {
-                    continue;
-                }
-                final String relative = line.startsWith("/") ? line.substring(1) : line;
-                final File victim = new File(root, relative);
-                if (victim.isFile() && victim.getCanonicalPath()
-                        .startsWith(root.getCanonicalPath() + File.separator)) {
-                    final boolean gone = releaseFiles.contains(relative)
-                        ? moveIntoBackup(victim, new File(patchBackup, relative))
-                        : victim.delete();
-                    if (gone) {
-                        removed++;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Could not process the file removal list", e);
-            return;
-        }
-        if (removed > 0) {
-            Log.i(TAG, "Removed " + removed + " files retired by this release");
-        }
-    }
-
-    /** A copy already in the backup is the release's own and is left alone. */
-    private static boolean moveIntoBackup(File file, File kept) {
-        if (kept.isFile()) {
-            return file.delete();
-        }
-        final File parent = kept.getParentFile();
-        return parent != null && (parent.isDirectory() || parent.mkdirs()) && file.renameTo(kept);
-    }
-
-    private static boolean isSkipped(String name) {
-        final String lower = name.toLowerCase(Locale.US);
-        for (String suffix : SKIPPED_SUFFIXES) {
-            if (lower.endsWith(suffix)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void finish(boolean success, String message) {

@@ -52,6 +52,10 @@ jobs:
     - name: Fetch native dependency sources
       run: bash android/scripts/fetch-deps.sh
 
+    - name: Run the launcher's unit tests
+      working-directory: android
+      run: gradle --no-daemon testReleaseUnitTest
+
     - name: Build APK
       working-directory: android
       run: |

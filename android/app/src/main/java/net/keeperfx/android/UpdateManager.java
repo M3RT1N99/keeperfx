@@ -45,9 +45,9 @@ public final class UpdateManager {
         public final String title;
         public final String detail;
         /** Only set for Kind.APP. */
-        public final AppUpdater.Available appUpdate;
+        final AppRelease appUpdate;
 
-        public Item(Kind kind, String title, String detail, AppUpdater.Available appUpdate) {
+        Item(Kind kind, String title, String detail, AppRelease appUpdate) {
             this.kind = kind;
             this.title = title;
             this.detail = detail;
@@ -64,29 +64,80 @@ public final class UpdateManager {
     }
 
     /**
-     * Blocking; call from a background thread. Network failures for one item do
-     * not hide the others.
+     * Everything the list of downloads depends on. The fields that come from the
+     * network are null when the question could not be answered: being offline
+     * for one item does not hide the others.
      */
-    public static List<Item> check(Context context) {
-        final List<Item> items = new ArrayList<>();
-        final Prefs prefs = new Prefs(context);
+    static final class Facts {
+        boolean dataInstalled;
+        List<String> missingEntries = new ArrayList<>();
+        String stableVersion = "";
+        boolean hasManifest;
+        InstallManifest.Report verified = new InstallManifest.Report();
+        boolean alphaEnabled;
+        String alphaVersion = "";
+        boolean alphaCached;
+        boolean hasMusic;
+        String appVersionName = "";
 
+        ReleaseApi.ReleaseInfo latestStable;
+        ReleaseApi.ReleaseInfo latestAlpha;
+        AppRelease appUpdate;
+    }
+
+    /** Blocking; call from a background thread. */
+    public static List<Item> check(Context context) {
+        final Prefs prefs = new Prefs(context);
+        final Facts facts = new Facts();
+        facts.missingEntries = GameData.findMissingKeeperfxEntries(context);
+        facts.dataInstalled = facts.missingEntries.isEmpty();
+        facts.stableVersion = prefs.getInstalledVersion();
+        facts.hasManifest = GameData.hasManifest(context);
         // Local disk work, no network: every file the archives said they
         // unpacked, compared with what is actually there.
-        final GameData.VerifyReport verified = GameData.verifyInstalledFiles(context);
+        facts.verified = GameData.verifyInstalledFiles(context);
+        facts.alphaEnabled = prefs.isAlphaEnabled();
+        facts.alphaVersion = prefs.getInstalledAlphaVersion();
+        facts.hasMusic = GameData.hasMusic(context);
+        facts.appVersionName = AppUpdater.installedVersionName(context);
+
+        try {
+            facts.latestStable = ReleaseApi.latestStable();
+        } catch (Exception e) {
+            Log.w(TAG, "Could not check the KeeperFX release", e);
+        }
+        if (facts.dataInstalled && facts.alphaEnabled) {
+            try {
+                facts.latestAlpha = ReleaseApi.latestAlpha();
+                facts.alphaCached =
+                    ReleaseDownloader.isAlphaCached(context, facts.latestAlpha.version);
+            } catch (Exception e) {
+                Log.w(TAG, "Could not check the KeeperFX alpha", e);
+            }
+        }
+        try {
+            facts.appUpdate = AppUpdater.checkForUpdate(context);
+        } catch (Exception e) {
+            Log.w(TAG, "Could not check for an app update", e);
+        }
+        return plan(facts);
+    }
+
+    /** Decides what to offer. No Android and no network, so a test can pin it. */
+    static List<Item> plan(Facts f) {
+        final List<Item> items = new ArrayList<>();
 
         // --- KeeperFX release -------------------------------------------------
-        try {
-            final ReleaseDownloader.ReleaseInfo release = ReleaseDownloader.queryLatestRelease();
-            final boolean installed = GameData.isKeeperfxInstalled(context);
-            final String current = prefs.getInstalledVersion();
+        if (f.latestStable != null) {
+            final ReleaseApi.ReleaseInfo release = f.latestStable;
+            final String current = f.stableVersion;
             final String size = GameData.describeBytes(release.sizeInBytes);
-            if (!installed) {
+            if (!f.dataInstalled) {
                 // Says what is actually wrong rather than just offering a
                 // download: the check now looks inside the directories, so it
                 // can name the files that are absent instead of leaving the
                 // player to guess from silence and black screens.
-                final List<String> gaps = GameData.findMissingKeeperfxEntries(context);
+                final List<String> gaps = f.missingEntries;
                 final StringBuilder detail = new StringBuilder("Game data, ").append(size);
                 if (!gaps.isEmpty()) {
                     detail.append("\n    missing: ");
@@ -114,7 +165,7 @@ public final class UpdateManager {
                 items.add(new Item(Kind.GAME_DATA,
                     "KeeperFX " + release.version,
                     "Update from " + current + ", " + size, null));
-            } else if (!GameData.hasManifest(context)) {
+            } else if (!f.hasManifest) {
                 // Installed by a build that did not record what it unpacked. A
                 // device in the wild carried the torso of an interrupted unpack
                 // for weeks - campgns/keeporig_ger existed but held no speech -
@@ -124,8 +175,8 @@ public final class UpdateManager {
                     "Verify KeeperFX " + current,
                     "This installation predates file verification."
                         + "\n    Reinstalling checks every file once, " + size, null));
-            } else if (!verified.stableProblems.isEmpty()) {
-                final List<String> gaps = verified.stableProblems;
+            } else if (!f.verified.stableProblems.isEmpty()) {
+                final List<String> gaps = f.verified.stableProblems;
                 final StringBuilder detail = new StringBuilder()
                     .append(gaps.size())
                     .append(gaps.size() == 1 ? " file" : " files")
@@ -142,8 +193,6 @@ public final class UpdateManager {
                     "Repair KeeperFX " + current,
                     detail.toString(), null));
             }
-        } catch (Exception e) {
-            Log.w(TAG, "Could not check the KeeperFX release", e);
         }
 
         // --- Alpha patch ------------------------------------------------------
@@ -153,47 +202,38 @@ public final class UpdateManager {
         // font16.fxfont and sounds.cfg, all three of which the alpha patch
         // carries. It is only meaningful once the release it patches is there,
         // and that check must never ask for a file only this patch brings.
-        if (GameData.isKeeperfxInstalled(context) && prefs.isAlphaEnabled()) {
-            try {
-                final ReleaseDownloader.ReleaseInfo alpha = ReleaseDownloader.queryLatestAlpha();
-                final String current = prefs.getInstalledAlphaVersion();
-                if (!alpha.version.isEmpty() && !alpha.version.equals(current)) {
-                    // Nothing to fetch if the archive is still on the device
-                    // from a previous switch, and saying "33 MB" then would be
-                    // a plain untruth about what pressing the button costs.
-                    final boolean cached =
-                        ReleaseDownloader.isAlphaCached(context, alpha.version);
-                    final String cost = cached
-                        ? "already downloaded, only needs applying"
-                        : GameData.describeBytes(alpha.sizeInBytes);
-                    items.add(new Item(Kind.GAME_ALPHA,
-                        "KeeperFX alpha " + alpha.version,
-                        (current.isEmpty()
-                            ? "Files the current engine needs and 1.4.0 does not have, "
-                            : "Update from " + current + ", ")
-                            + cost, null));
-                } else if (!alpha.version.isEmpty() && !verified.alphaProblems.isEmpty()) {
-                    // The patch is current but files it brought are gone or
-                    // wrong; re-applying it is the download that fixes them.
-                    final String cost =
-                        ReleaseDownloader.isAlphaCached(context, alpha.version)
-                            ? "already downloaded, only needs applying"
-                            : GameData.describeBytes(alpha.sizeInBytes);
-                    items.add(new Item(Kind.GAME_ALPHA,
-                        "Repair KeeperFX alpha " + alpha.version,
-                        verified.alphaProblems.size()
-                            + (verified.alphaProblems.size() == 1 ? " file" : " files")
-                            + " missing or damaged, " + cost, null));
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Could not check the KeeperFX alpha", e);
+        if (f.dataInstalled && f.alphaEnabled && f.latestAlpha != null
+                && !f.latestAlpha.version.isEmpty()) {
+            final ReleaseApi.ReleaseInfo alpha = f.latestAlpha;
+            final String current = f.alphaVersion;
+            // Nothing to fetch if the archive is still on the device from a
+            // previous switch, and saying "33 MB" then would be a plain untruth
+            // about what pressing the button costs.
+            final String cost = f.alphaCached
+                ? "already downloaded, only needs applying"
+                : GameData.describeBytes(alpha.sizeInBytes);
+            if (!alpha.version.equals(current)) {
+                items.add(new Item(Kind.GAME_ALPHA,
+                    "KeeperFX alpha " + alpha.version,
+                    (current.isEmpty()
+                        ? "Files the current engine needs and 1.4.0 does not have, "
+                        : "Update from " + current + ", ")
+                        + cost, null));
+            } else if (!f.verified.alphaProblems.isEmpty()) {
+                // The patch is current but files it brought are gone or wrong;
+                // re-applying it is the download that fixes them.
+                items.add(new Item(Kind.GAME_ALPHA,
+                    "Repair KeeperFX alpha " + alpha.version,
+                    f.verified.alphaProblems.size()
+                        + (f.verified.alphaProblems.size() == 1 ? " file" : " files")
+                        + " missing or damaged, " + cost, null));
             }
         }
 
         // --- Background music -------------------------------------------------
         // Only worth offering once the game data is in place; it unpacks into
         // the installation directory.
-        if (GameData.isKeeperfxInstalled(context) && !GameData.hasMusic(context)) {
+        if (f.dataInstalled && !f.hasMusic) {
             // Checked on every sweep, not only on a fresh install: the music is
             // not part of the release on any platform, so an installation that
             // is otherwise complete is still silent without it, and the log
@@ -205,17 +245,11 @@ public final class UpdateManager {
         }
 
         // --- The app itself ---------------------------------------------------
-        try {
-            final AppUpdater.Available app = AppUpdater.checkForUpdate(context);
-            if (app != null) {
-                items.add(new Item(Kind.APP,
-                    "KeeperFX app " + app.versionName,
-                    "Currently " + AppUpdater.installedVersionName(context), app));
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Could not check for an app update", e);
+        if (f.appUpdate != null) {
+            items.add(new Item(Kind.APP,
+                "KeeperFX app " + f.appUpdate.versionName,
+                "Currently " + f.appVersionName, f.appUpdate));
         }
-
         return items;
     }
 }

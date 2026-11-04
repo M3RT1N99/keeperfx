@@ -115,7 +115,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 inputModeGroup.check(R.id.inputAuto);
                 break;
         }
-        final java.util.List<GameLanguage.Entry> languages = GameLanguage.all();
+        final List<GameLanguage.Entry> languages = GameLanguage.all();
         final ArrayAdapter<GameLanguage.Entry> languageAdapter = new ArrayAdapter<>(
             this, android.R.layout.simple_spinner_item, languages);
         languageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -430,14 +430,14 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         updateAppButton.setText(R.string.app_update_check);
 
         new Thread(() -> {
-            AppUpdater.Available available = null;
+            AppRelease available = null;
             boolean reachable = true;
             try {
                 available = AppUpdater.checkForUpdate(this);
             } catch (Exception e) {
                 reachable = false;
             }
-            final AppUpdater.Available found = available;
+            final AppRelease found = available;
             final boolean online = reachable;
             mainHandler.post(() -> {
                 updateAppButton.setEnabled(true);
@@ -524,11 +524,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         new AlertDialog.Builder(this)
             .setTitle(R.string.import_original_title)
             .setMessage(R.string.import_original_explanation)
-            .setPositiveButton(R.string.import_choose_folder, (dialog, which) -> {
-                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivityForResult(intent, REQUEST_PICK_ORIGINAL_DK);
-            })
+            .setPositiveButton(R.string.import_choose_folder,
+                (dialog, which) -> openFolderPicker(REQUEST_PICK_ORIGINAL_DK))
             .setNeutralButton(R.string.import_choose_zip, (dialog, which) -> {
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -546,13 +543,16 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         new AlertDialog.Builder(this)
             .setTitle(titleRes)
             .setMessage(explanationRes)
-            .setPositiveButton(R.string.import_choose, (dialog, which) -> {
-                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivityForResult(intent, requestCode);
-            })
+            .setPositiveButton(R.string.import_choose,
+                (dialog, which) -> openFolderPicker(requestCode))
             .setNegativeButton(android.R.string.cancel, null)
             .show();
+    }
+
+    private void openFolderPicker(int requestCode) {
+        final Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivityForResult(intent, requestCode);
     }
 
     @Override
@@ -653,7 +653,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             .setTitle(R.string.remove_title)
             .setMessage(R.string.remove_explanation)
             .setPositiveButton(R.string.remove_confirm, (dialog, which) -> {
-                DataImporter.deleteRecursively(GameData.gameDirectory(this));
+                FileUtil.deleteTree(GameData.gameDirectory(this));
                 // Not only the version: the alpha backup, the archive cache
                 // and the manifests all describe the installation that was
                 // just deleted, and an alpha backup that survives a reset
