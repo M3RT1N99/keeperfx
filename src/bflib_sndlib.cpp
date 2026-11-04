@@ -671,10 +671,20 @@ extern "C" void sound_restore_id_redirect_snapshot(void) {
 		SZCAST(g_id_redirects.size()), SZCAST(g_stack_policies.size()));
 }
 
+#ifdef __ANDROID__
+/** The engine runs on behind the screen, see android_audio_enter_background(). */
+static bool g_muted_for_background = false;
+
+#endif
 extern "C" void SetSoundMasterVolume(SoundVolume volume) {
 	try {
 		// Set OpenAL listener gain to maximum so we can split up the mentor speech volume slider from the sound effects volume slider
+#ifdef __ANDROID__
+		// Another player pausing or unpausing lands here on the phone in the pocket.
+		alListenerf(AL_GAIN, g_muted_for_background ? 0.0f : 1.0f);
+#else
 		alListenerf(AL_GAIN, 1.0f);
+#endif
 		const auto errcode = alGetError();
 		if (errcode != AL_NO_ERROR) {
 			throw openal_error("Cannot set master volume", errcode);
@@ -1306,6 +1316,7 @@ extern "C" void ShutDownSDLAudio()
  */
 extern "C" void android_audio_enter_background(int engine_keeps_running)
 {
+	g_muted_for_background = true;
 	if (g_openal_device) {
 		alListenerf(AL_GAIN, 0.0f);
 		if (!engine_keeps_running) {
@@ -1321,6 +1332,7 @@ extern "C" void android_audio_enter_background(int engine_keeps_running)
 
 extern "C" void android_audio_enter_foreground(int engine_kept_running)
 {
+	g_muted_for_background = false;
 	if (g_openal_device) {
 		if (!engine_kept_running) {
 			alcDeviceResumeSOFT(g_openal_device.get());
