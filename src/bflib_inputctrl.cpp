@@ -305,8 +305,10 @@ static TbKeyCode mousebutton_to_keycode(const Uint8 *button)
 
 #ifdef __ANDROID__
 /* A back press from a system gesture can go down and up between two looks at the
-   keyboard, and the game would never know it happened. Its release then waits for
-   the next poll, which gives the game exactly one look at the key being down. */
+   keyboard, and the game would never know it happened. In a level it looks once per
+   game turn however many polls come in between, so the press is left where it keeps
+   until that look. The menus outside a level look at the key being down after every
+   poll, so its release waits for the next poll. */
 static TbBool back_pressed_this_poll = false;
 static TbBool back_release_waiting = false;
 #endif
@@ -336,6 +338,7 @@ static void process_event(const SDL_Event *ev)
         }
         if (ev->key.key == SDLK_AC_BACK) {
             back_pressed_this_poll = true;
+            lbKeyPressed[KC_ESCAPE] = 1;
         }
 #endif
         x = keyboard_keys_mapping(&ev->key);

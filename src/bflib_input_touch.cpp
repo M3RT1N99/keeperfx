@@ -515,7 +515,8 @@ static void touch_begin_camera_gesture(void)
     touch_total_twist = 0.0f;
     touch_pinch_accum = touch_twist_accum = 0.0f;
     touch_gesture = TGest_Camera;
-    touch_camera_regrip();
+    const struct TgFingers fingers = {(float)a->x, (float)a->y, (float)b->x, (float)b->y};
+    touch_camera_regrip(&fingers);
 }
 
 static float touch_clamp01(float value)
@@ -860,11 +861,7 @@ void touch_frame_update(void)
     const struct TgTuning tuning = touch_current_tuning();
     if ((touch_gesture == TGest_Camera) && (touch_two_fingers(&a, &b) >= 2))
     {
-        struct TgFingers fingers;
-        fingers.ax = (float)a->x;
-        fingers.ay = (float)a->y;
-        fingers.bx = (float)b->x;
-        fingers.by = (float)b->y;
+        const struct TgFingers fingers = {(float)a->x, (float)a->y, (float)b->x, (float)b->y};
         touch_camera_frame(&fingers, &tuning);
     }
     else
@@ -929,8 +926,10 @@ void update_touch_inputs(void)
         }
     }
 
-    // Escape is held for a frame so the menu code sees a complete keypress,
-    // the same shape the controller path uses for its pause button.
+    // Escape is held for a frame so the menu code sees a complete keypress, the same
+    // shape the controller path uses for its pause button. In a level the game only
+    // looks once per turn, and this runs for every drawn frame, so it is left in the
+    // place that keeps a press until that look too.
     if (touch_back_key_frames > 0)
     {
         touch_back_key_frames--;
@@ -946,6 +945,7 @@ void update_touch_inputs(void)
     {
         touch_tapped_back = false;
         lbKeyOn[KC_ESCAPE] = 1;
+        lbKeyPressed[KC_ESCAPE] = 1;
         lbInkey = KC_ESCAPE;
         touch_back_key_frames = 2;
     }

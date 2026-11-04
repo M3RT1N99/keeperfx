@@ -36,8 +36,8 @@ struct TgTuning;
  */
 void touch_camera_frame(const struct TgFingers *fingers, const struct TgTuning *tuning);
 
-/** The next frame takes hold of the map afresh, from wherever the fingers then are. */
-void touch_camera_regrip(void);
+/** The next frame takes hold of the map afresh, with the fingers as they are now. */
+void touch_camera_regrip(const struct TgFingers *fingers);
 
 /** Fingers left the map. With may_roll, a release with speed rolls on. */
 void touch_camera_release(const struct TgTuning *tuning, TbBool may_roll);

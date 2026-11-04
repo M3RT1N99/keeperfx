@@ -60,6 +60,7 @@ struct TouchZoomFlight {
 static struct TgGesture grip;
 static TbBool gripping = false;
 static TbBool regrip_wanted = false;
+static struct TgFingers regrip_at;
 /** What this module last left in the camera, to notice when something else moved it. */
 static struct TgCamera left_behind;
 static int left_behind_idx = -1;
@@ -195,8 +196,9 @@ static void show_pose(int idx, const struct TgCamera *pose)
     }
 }
 
-void touch_camera_regrip(void)
+void touch_camera_regrip(const struct TgFingers *fingers)
 {
+    regrip_at = *fingers;
     regrip_wanted = true;
 }
 
@@ -222,6 +224,7 @@ void touch_camera_frame(const struct TgFingers *fingers, const struct TgTuning *
     last_frame_ns = now;
     if (!camera_can_move()) {
         gripping = false;
+        regrip_wanted = false;
         touch_camera_catch();
         return;
     }
@@ -235,12 +238,14 @@ void touch_camera_frame(const struct TgFingers *fingers, const struct TgTuning *
     if (fingers != NULL) {
         if (!gripping || regrip_wanted || moved_by_something_else(cam, idx)) {
             // From what is on screen, not from the destination, which the interpolation
-            // may still be on its way to.
+            // may still be on its way to, and from where the fingers landed: a whole frame
+            // of events arrives at once, and what they travelled in it must not be lost.
             struct TgCamera shown;
             pose_of_camera(&local_state.camera.current[idx], &shown);
-            const float mid_x = (fingers->ax + fingers->bx) * 0.5f;
-            const float mid_y = (fingers->ay + fingers->by) * 0.5f;
-            tg_grip(&grip, fingers, &view, &shown, surface_height_at(&view, &shown, mid_x, mid_y));
+            const struct TgFingers *from = regrip_wanted ? &regrip_at : fingers;
+            const float mid_x = (from->ax + from->bx) * 0.5f;
+            const float mid_y = (from->ay + from->by) * 0.5f;
+            tg_grip(&grip, from, &view, &shown, surface_height_at(&view, &shown, mid_x, mid_y));
             gripping = true;
             regrip_wanted = false;
             // Owed from the grip on, not from the first change of zoom: what is on screen
