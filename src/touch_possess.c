@@ -24,16 +24,19 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include "bflib_mouse.h"
 #include "bflib_touch.h"
 #include "config_creature.h"
 #include "config_settings.h"
 #include "front_input.h"
 #include "frontend.h"
+#include "frontmenu_ingame_evnt.h"
 #include "game_legacy.h"
 #include "gui_boxmenu.h"
 #include "gui_frontmenu.h"
 #include "keeperfx.hpp"
 #include "kfx/renderer/RendererManager.h"
+#include "kjm_input.h"
 #include "local_camera.h"
 #include "local_possession.h"
 #include "observer.h"
@@ -87,11 +90,29 @@ static void current_screen(struct TsScreen *screen)
     screen->flying = thing_exists(thing) && flag_is_set(thing->movement_flags, TMvF_Flying);
 }
 
+/**
+ * The box a paused game shows is how it goes on, and a click on it is read from the
+ * pointer, which rests at the centre while a creature is steered: without this a tap
+ * on the box is an attack, and a phone that has lost its other player stays paused.
+ * The box only knows the pointer, so the pointer goes there for the question.
+ */
+static TbBool point_is_over_pause_box(long x, long y)
+{
+    if (!flag_is_set(game.operation_flags, GOF_Paused))
+        return false;
+    const long rest_x = GetMouseX();
+    const long rest_y = GetMouseY();
+    LbMouseSetPositionInitial(x, y);
+    const TbBool over_box = mouse_is_over_paused_message();
+    LbMouseSetPositionInitial(rest_x, rest_y);
+    return over_box;
+}
+
 void touch_possess_finger_down(unsigned long long id, long x, long y, long long ms)
 {
     struct TsScreen screen;
     current_screen(&screen);
-    const TbBool on_menu = (point_is_over_gui_menu(x, y) >= 0) || point_is_over_gui_box(x, y);
+    const TbBool on_menu = (point_is_over_gui_menu(x, y) >= 0) || point_is_over_gui_box(x, y) || point_is_over_pause_box(x, y);
     ts_finger_down(&steer, id, (float)x, (float)y, ms, &screen, on_menu);
 }
 

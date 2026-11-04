@@ -41,6 +41,7 @@
 #include "bflib_planar.h"
 #include "bflib_video.h"
 #include "front_input.h"
+#include "frontmenu_ingame_evnt.h"
 #include "kjm_input.h"
 #include "kfx/platform/WindowSystemSDL.h"
 #include "kfx/renderer/RendererManager.h"
@@ -662,6 +663,15 @@ static void touch_normalized_to_game(float nx, float ny, long *x, long *y)
         *y = game_h - 1;
 }
 
+/** A tap is what the toggle says it is, except on the pause box, which only knows the left button. */
+static void touch_click_as_tapped(void)
+{
+    if (touch_sticky_rmb && !mouse_is_over_paused_message())
+        touch_queue_right_click();
+    else
+        touch_queue_click();
+}
+
 /**
  * A first finger that has moved far enough holds the left button down, so that dig
  * areas and rooms can be painted the same way as with a mouse - once a second finger
@@ -859,10 +869,7 @@ void TEvent(const SDL_Event *ev)
                 if (!canceled && (moved || (held_ms <= TOUCH_TAP_MAX_MS)))
                 {
                     touch_move_pointer(up_x, up_y);
-                    if (touch_sticky_rmb)
-                        touch_queue_right_click();
-                    else
-                        touch_queue_click();
+                    touch_click_as_tapped();
                 }
                 break;
             case TGest_Drag:
@@ -922,14 +929,6 @@ void TEvent(const SDL_Event *ev)
 
 static void touch_apply_pan_accumulator(void);
 static void touch_apply_camera_accumulators(void);
-
-static void touch_click_as_tapped(void)
-{
-    if (touch_sticky_rmb)
-        touch_queue_right_click();
-    else
-        touch_queue_click();
-}
 
 /** Turns what the fingers asked for into clicks, one at a time. */
 static void touch_serve_steering(void)
