@@ -4083,9 +4083,12 @@ void frontend_draw_product_version(struct GuiButton *gbtn)
     LbTextSetFont(frontend_font[1]);
     int units_per_px = simple_frontend_sprite_height_units_per_px(gbtn, GFS_hugebutton_a05l, 100);
     int h = LbTextLineHeight() * units_per_px / 16;
-    LbTextSetWindow(0, gbtn->scr_pos_y, gbtn->width, h);
     char text[128];
     snprintf(text, sizeof(text), "%s %s", PRODUCT_NAME, PRODUCT_VERSION);
+    // The window is one line high. A version wider than the button would break at a
+    // space and lose its end, and the end is what says a build is unofficial.
+    int text_width = LbTextStringWidthM(text, units_per_px);
+    LbTextSetWindow(0, gbtn->scr_pos_y, max((int)gbtn->width, text_width), h);
     LbTextDrawResized(0, 0, units_per_px, text);
 }
 
