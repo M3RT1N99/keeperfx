@@ -70,15 +70,15 @@
     <string name="app_update_offline">Der Update-Server hat nicht geantwortet. Prüfe die Internetverbindung und versuche es noch einmal. Ist die Verbindung in Ordnung, versuche es in einer Stunde wieder: GitHub begrenzt, wie oft es gefragt werden darf.</string>
     <string name="app_update_install">Installieren</string>
 
-    <string name="install_failed">Installation fehlgeschlagen: %1$s</string>
+    <string name="install_failed">Installation fehlgeschlagen</string>
 
     <string name="import_keeperfx_title">KeeperFX-Ordner importieren</string>
     <string name="import_original_title">Original Dungeon Keeper importieren</string>
     <string name="import_choose">Ordner wählen</string>
     <string name="import_choose_folder">Ordner</string>
     <string name="import_choose_zip">Zip-Archiv</string>
-    <string name="import_failed">Import fehlgeschlagen: %1$s</string>
-    <string name="config_failed">Konfiguration konnte nicht geschrieben werden: %1$s</string>
+    <string name="import_failed">Import fehlgeschlagen</string>
+    <string name="config_failed">Konfiguration konnte nicht geschrieben werden</string>
 
     <string name="remove_title">Installation löschen</string>
     <string name="remove_explanation">Löscht die Installation einschließlich der Spielstände. Die Ordner, aus denen du importiert hast, bleiben unberührt.</string>
