@@ -34,6 +34,7 @@
 
 #ifdef __ANDROID__
 #include "android.h"
+#include "android_lan_rules.h"
 #include "net_lan.h"
 #endif
 
@@ -863,11 +864,11 @@ namespace
      * good, and Wi-Fi that loses its validation takes an unbound socket's traffic to
      * cellular. Either way the peer stops answering, with ENet's own timeout still far off.
      *
-     * A socket that still hears its peers is where it belongs and is not touched, whatever
-     * the networks look like by now. A phone that owns a hotspot while it is the client of
-     * another Wi-Fi would lose its own clients by following that Wi-Fi. This way nothing
-     * asks the system anything either, unless the game is in trouble already. ENet pings
-     * every half a second, so two seconds is several unanswered pings.
+     * A socket that still hears any of its peers is where it belongs and is not touched,
+     * whatever the networks look like by now. A phone that owns a hotspot while it is the
+     * client of another Wi-Fi would lose its own clients by following that Wi-Fi. This way
+     * nothing asks the system anything either, unless the game is in trouble already. ENet
+     * pings every half a second, so two seconds is several unanswered pings.
      *
      * A host still waiting in its lobby has nobody to hear, and the player may only now be
      * joining the Wi-Fi the others are on. Its replies to their looking for games would go
@@ -878,18 +879,18 @@ namespace
         if (!host || !frontnet_service_selected(FrontendNetSvc_LAN)) {
             return;
         }
-        bool anyone_connected = false;
+        int connected = 0;
+        int quiet = 0;
         for (size_t peer_index = 0; peer_index < host->peerCount; peer_index++) {
             const ENetPeer *peer = &host->peers[peer_index];
             if (peer->state == ENET_PEER_STATE_CONNECTED) {
-                anyone_connected = true;
+                connected++;
                 if (ENET_TIME_DIFFERENCE(host->serviceTime, peer->lastReceiveTime) >= 2000) {
-                    android_lan_follow_network(host->socket, lan_host_discovery_fd());
-                    return;
+                    quiet++;
                 }
             }
         }
-        if (!anyone_connected && !client_peer && (netstate.phase == NetPhase_Lobby)) {
+        if (lan_should_follow_network(connected, quiet, !client_peer && (netstate.phase == NetPhase_Lobby))) {
             android_lan_follow_network(host->socket, lan_host_discovery_fd());
         }
     }

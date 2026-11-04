@@ -60,4 +60,23 @@ static inline int64_t lan_socket_network(int64_t answer)
     return answer > 0 ? answer : 0;
 }
 
+/**
+ * Whether a local game's socket should go and look for its network again.
+ *
+ * A network that has gone silences every peer at once. One quiet peer among others that
+ * are heard has trouble of its own, a level loading or a locked screen, and moving the
+ * socket would take the others away for its sake.
+ *
+ * @param connected       Peers connected at this moment.
+ * @param quiet           How many of them have not been heard for a while.
+ * @param host_in_lobby   This is a host still waiting in its lobby. With nobody there to
+ *  hear, the player may only now be joining the Wi-Fi the others are on.
+ */
+static inline int lan_should_follow_network(int connected, int quiet, int host_in_lobby)
+{
+    if (connected == 0)
+        return host_in_lobby;
+    return quiet == connected;
+}
+
 #endif // KFX_ANDROID_LAN_RULES_H

@@ -42,6 +42,16 @@ static void expect_network(const char *what, int64_t answer, int64_t wanted)
     }
 }
 
+static void expect_follow(const char *what, int connected, int quiet, int host_in_lobby, int wanted)
+{
+    checks++;
+    const int got = lan_should_follow_network(connected, quiet, host_in_lobby);
+    if (got != wanted) {
+        failures++;
+        printf("FAILED %s: got %d, wanted %d\n", what, got, wanted);
+    }
+}
+
 int android_lan_rules_tests(int *total_checks)
 {
     expect_network("a network's handle is where the socket belongs", 600406151181LL, 600406151181LL);
@@ -58,6 +68,14 @@ int android_lan_rules_tests(int *total_checks)
     expect("a /32 has none", IP(10, 0, 0, 1), IP(255, 255, 255, 255), 0, 0);
     expect("a /0 would be the limited broadcast", IP(10, 0, 0, 1), 0, 0, 0);
     expect("so would a reported limited broadcast", IP(10, 0, 0, 1), IP(255, 255, 255, 0), UINT32_MAX, 0);
+    expect_follow("the one peer quiet: the network may have gone", 1, 1, 0, 1);
+    expect_follow("the one peer heard", 1, 0, 0, 0);
+    expect_follow("all quiet", 3, 3, 0, 1);
+    expect_follow("one quiet among others heard is that peer's own trouble", 3, 1, 0, 0);
+    expect_follow("all but one quiet, the one heard proves the socket", 3, 2, 0, 0);
+    expect_follow("nobody here, a host in its lobby", 0, 0, 1, 1);
+    expect_follow("nobody here, anything else", 0, 0, 0, 0);
+    expect_follow("the lobby does not outvote a peer that is heard", 1, 0, 1, 0);
     *total_checks += checks;
     return failures;
 }
