@@ -53,6 +53,14 @@ void touch_camera_catch(void);
 void touch_camera_packet_zoom(struct Packet *pckt);
 
 /**
+ * True while a pinch still has zoom flags to send. Each of them changes the zoom kept
+ * in the settings, and writing that file for every one would stall the frames the
+ * fingers are moving: on a phone a file write can take tens of milliseconds. Once this
+ * turns false the settings have been saved.
+ */
+TbBool touch_camera_zoom_settling(void);
+
+/**
  * The zoom flags in this turn's packet which came from touch_camera_packet_zoom().
  * The local camera follows the fingers, so those flags are for the dungeon camera
  * alone. Asking uses them up.

@@ -28,6 +28,7 @@
 
 #include "bflib_datetm.h"
 #include "bflib_video.h"
+#include "config_settings.h"
 #include "engine_camera.h"
 #include "frontend.h"
 #include "game_legacy.h"
@@ -312,8 +313,10 @@ void touch_camera_packet_zoom(struct Packet *pckt)
     const int direction = tg_zoom_chase(cam->zoom, zoom,
         zoom_in_for_view(zoom, view_mode, zoom_max, zoom_min), zoom_out_for_view(zoom, view_mode, zoom_max, zoom_min));
     if (direction == 0) {
-        if (!gripping)
+        if (!gripping) {
             zoom_owed = false;
+            save_settings();
+        }
         return;
     }
     zoom_flags_this_turn = (direction > 0) ? PCtr_ViewZoomIn : PCtr_ViewZoomOut;
@@ -323,6 +326,11 @@ void touch_camera_packet_zoom(struct Packet *pckt)
         flights[flights_count].direction = (signed char)direction;
         flights_count++;
     }
+}
+
+TbBool touch_camera_zoom_settling(void)
+{
+    return zoom_owed;
 }
 
 uint32_t touch_camera_take_zoom_flags(void)

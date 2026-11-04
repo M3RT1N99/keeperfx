@@ -107,6 +107,7 @@
 #include "spdigger_stack.h"
 #include "frontmenu_ingame_map.h"
 #include "lua_triggers.h"
+#include "touch_camera.h"
 
 #include "keeperfx.hpp"
 #include "post_inc.h"
@@ -630,7 +631,7 @@ void process_user_dungeon_control_packet_control(NetUserId user)
             }
             settings_changed = true;
         }
-        if (settings_changed) {
+        if (settings_changed && !touch_camera_zoom_settling()) {
             save_settings();
         }
     }
