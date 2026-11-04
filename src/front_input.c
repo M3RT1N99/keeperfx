@@ -924,6 +924,13 @@ static TbBool get_paused_message_inputs(void)
     return true;
 }
 
+#ifdef __ANDROID__
+/** When this phone last saw the game paused, for finish_level_requested(). */
+static TbClockMSec last_seen_paused = 0;
+/** Longer than a double tap's second tap can take to come down. */
+#define FINISH_LEVEL_AFTER_PAUSE_MSEC 500
+
+#endif
 /**
  * Whether the player asked to leave a level that has already been decided.
  *
@@ -955,6 +962,10 @@ static TbBool finish_level_requested(void)
     // window, which is the part of the screen the player cannot do anything else with.
     if (a_menu_window_is_active() || (point_is_over_gui_menu(GetMouseX(), GetMouseY()) >= 0))
         return false;
+    // The box a paused game shows is gone the moment the game goes on, so the second tap of
+    // a double tap on it comes down on the play area, and that tap belongs to the unpausing.
+    if ((LbTimerClock() - last_seen_paused) < FINISH_LEVEL_AFTER_PAUSE_MSEC)
+        return false;
 #endif
     // The panel is tested by its own rectangle rather than by asking
     // game_is_busy_doing_gui(). That flag is set by get_gui_inputs(), which
@@ -977,6 +988,10 @@ static TbBool finish_level_requested(void)
 
 static short get_global_inputs(void)
 {
+#ifdef __ANDROID__
+  if (flag_is_set(game.operation_flags, GOF_Paused))
+      last_seen_paused = LbTimerClock();
+#endif
   if (game_is_busy_doing_gui_string_input())
     return false;
   struct PlayerInfo* player = get_my_player();
