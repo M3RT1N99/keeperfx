@@ -319,7 +319,7 @@ public class ResumableDownloadTest {
     @Test
     public void aReleaseWithoutAVersionedTagOrAnApkIsNotAnUpdate() throws Exception {
         assertNull(AppRelease.fromGithub(new org.json.JSONObject(
-            "{\"tag_name\":\"android-latest\",\"assets\":[{\"name\":\"keeperfx-android-arm64.apk\",\"browser_download_url\":\"https://x/a.apk\"}]}")));
+            "{\"tag_name\":\"macos-v1.60\",\"assets\":[{\"name\":\"keeperfx-android-arm64.apk\",\"browser_download_url\":\"https://x/a.apk\"}]}")));
         assertNull(AppRelease.fromGithub(new org.json.JSONObject(
             "{\"tag_name\":\"android-v\",\"assets\":[]}")));
         assertNull(AppRelease.fromGithub(new org.json.JSONObject(
@@ -329,13 +329,34 @@ public class ResumableDownloadTest {
     @Test
     public void aReleaseCarriesItsVersionSizeAndChanges() throws Exception {
         final AppRelease release = AppRelease.fromGithub(new org.json.JSONObject(
-            "{\"tag_name\":\"android-v1.60\",\"body\":\"intro - not a bullet\\n- one\\n  - two\\n\\nend\","
-                + "\"assets\":[{\"name\":\"version.json\"},{\"name\":\"keeperfx-android-arm64.apk\",\"size\":123,\"browser_download_url\":\"https://x/a.apk\"}]}"));
+            "{\"tag_name\":\"android-v1.60\",\"body\":\"intro - not a bullet\\n"
+                + "## What it can do\\n- a feature\\n\\n"
+                + "## Changes since 1.59\\n\\n- one\\n  - two\\n\\nOnly the newest 2 of 9 are listed.\\n\","
+                + "\"assets\":[{\"name\":\"other.txt\"},{\"name\":\"keeperfx-android-arm64.apk\",\"size\":123,\"browser_download_url\":\"https://x/a.apk\"}]}"));
         assertEquals("1.60", release.versionName);
         assertEquals("https://x/a.apk", release.apkUrl);
         assertEquals(123, release.apkSize);
         assertEquals(java.util.Arrays.asList("one", "two"), release.changes);
         assertEquals("\u2022 one\n\u2022 two", release.changelog());
+    }
+
+    /** What a first release says about itself must not read as a list of changes in the updater. */
+    @Test
+    public void notesWithoutAComparisonHaveNoChanges() throws Exception {
+        final AppRelease release = AppRelease.fromGithub(new org.json.JSONObject(
+            "{\"tag_name\":\"android-v1.0\",\"body\":\"## What it can do\\n- a feature\\n- another\\n\","
+                + "\"assets\":[{\"name\":\"keeperfx-android-arm64.apk\",\"browser_download_url\":\"https://x/a.apk\"}]}"));
+        assertEquals(java.util.Collections.emptyList(), release.changes);
+        assertEquals("", release.changelog());
+    }
+
+    /** The test above is only worth something while the workflow writes what it looks for. */
+    @Test
+    public void theWorkflowWritesTheHeadingTheUpdaterLooksFor() throws IOException {
+        final String workflow = new String(java.nio.file.Files.readAllBytes(
+            new File("../../.github/workflows/build-android.yml").toPath()),
+            java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(workflow.contains("echo \"" + AppRelease.CHANGES_HEADING + "${PREVIOUS#android-v}\""));
     }
 
     @Test

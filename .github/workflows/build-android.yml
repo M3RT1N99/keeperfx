@@ -23,7 +23,6 @@ jobs:
       engine-version: ${{ steps.apk.outputs.engine-version }}
       package-suffix: ${{ steps.apk.outputs.package-suffix }}
       git-revision: ${{ steps.apk.outputs.git-revision }}
-      build-number: ${{ steps.apk.outputs.build-number }}
 
     steps:
     # Not persist-credentials: false. That makes checkout run git submodule foreach
@@ -93,7 +92,6 @@ jobs:
         git fetch --no-tags --quiet upstream master
         ENGINE_BUILD=$(git rev-list --count "$(git merge-base HEAD upstream/master)")
         echo "ENGINE_BUILD=$ENGINE_BUILD" >> $GITHUB_ENV
-        echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
         echo "GIT_REVISION=$GIT_REVISION" >> $GITHUB_ENV
         # Passing a suffix here overrides the one the CMake side would compose,
         # so the marker from version.mk has to be carried along or the APK ends
@@ -130,13 +128,12 @@ jobs:
         # What was asked for is not proof: an APK once went out with a plain suffix
         # because of what the build did with it. The marker has to be in the library.
         strings apk-check/lib/arm64-v8a/libkeeperfx.so | grep -F "$PACKAGE_SUFFIX"
-        # Only the Actions artifact. The release assets keep their names, because
-        # installed updaters look for them.
+        # Only the Actions artifact. The release asset keeps its name, because
+        # installed updaters look for it.
         ARTIFACT_NAME="keeperfx-android-arm64-unofficial-${GIT_REVISION}"
         echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
         mkdir -p out
-        # Stable file name: the in-app updater finds the release asset by it, and the
-        # oldest builds download it from a fixed URL.
+        # Stable file name: the in-app updater finds the release asset by it.
         cp "$APK" "out/keeperfx-android-arm64.apk"
         # The version comes out of the APK rather than being worked out a second
         # time here, so the tag can never disagree with what the app reports.
@@ -152,7 +149,6 @@ jobs:
           echo "engine-version=${VER_MAJOR}.${VER_MINOR}.${VER_RELEASE}.${ENGINE_BUILD}"
           echo "package-suffix=$PACKAGE_SUFFIX"
           echo "git-revision=$GIT_REVISION"
-          echo "build-number=$BUILD_NUMBER"
         } >> "$GITHUB_OUTPUT"
 
     - name: Upload APK
@@ -192,7 +188,6 @@ jobs:
         ENGINE_VERSION: ${{ needs.build-android.outputs.engine-version }}
         PACKAGE_SUFFIX: ${{ needs.build-android.outputs.package-suffix }}
         GIT_REVISION: ${{ needs.build-android.outputs.git-revision }}
-        BUILD_NUMBER: ${{ needs.build-android.outputs.build-number }}
       run: |
         set -eux
         # The app version is the port's own. Which KeeperFX the engine is
@@ -207,30 +202,11 @@ jobs:
           exit 1
         fi
 
-        cat > out/version.json <<JSON
-        {
-          "versionName": "${VERSION_NAME}",
-          "buildNumber": ${BUILD_NUMBER},
-          "commit": "${GIT_REVISION}",
-          "tag": "${TAG}",
-          "apk": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/keeperfx-android-arm64.apk"
-        }
-        JSON
-
-        # Changelog since the previous Android release. The tags are created by
-        # this workflow, so the newest one that is an ancestor is the last build.
+        # The newest other tag, when there is one, is the release to compare with. The
+        # tags are created by this workflow.
         git fetch --tags --quiet || true
         PREVIOUS=$(git tag --list 'android-v*' --sort=-creatordate | grep -v "^${TAG}$" | head -n1 || true)
-        if [ -n "$PREVIOUS" ]; then
-          RANGE="${PREVIOUS}..HEAD"
-          HEADING="Changes since ${PREVIOUS#android-v}"
-        else
-          RANGE="HEAD~20..HEAD"
-          HEADING="Recent changes"
-        fi
-        # Subject lines only; the bodies explain the why and belong in the log.
-        CHANGES=$(git log --no-merges --pretty=format:'- %s' "$RANGE" 2>/dev/null | head -n 40)
-        [ -n "$CHANGES" ] || CHANGES="- No source changes"
+        MAX_CHANGES=40
 
         {
           echo "**Unofficial community build.** Not produced by the KeeperFX team and"
@@ -239,7 +215,17 @@ jobs:
           echo "\`${ENGINE_VERSION} ${PACKAGE_SUFFIX}\`, in the title bar and at the top of"
           echo "every log, so a screenshot cannot be mistaken for an official release."
           echo
-          echo "Development build of the \`${GITHUB_REF_NAME}\` branch."
+          echo "KeeperFX is the enhanced engine for Dungeon Keeper, and this app runs it on an"
+          echo "Android phone. You need the files of your own copy of the original game. The"
+          echo "launcher fetches everything else."
+          echo
+          echo "## What it can do"
+          echo
+          echo "- Touch controls, with two fingers holding the map"
+          echo "- Steering a possessed creature with a stick"
+          echo "- Multiplayer online and on the local network, including a phone's own hotspot"
+          echo "- Moving a whole installation to another phone by export and import"
+          echo "- Updates from inside the app"
           echo
           echo "| | |"
           echo "|---|---|"
@@ -247,21 +233,32 @@ jobs:
           echo "| Engine | KeeperFX \`${ENGINE_VERSION}\` |"
           echo "| Commit | \`${GIT_REVISION}\` |"
           echo "| ABI | \`arm64-v8a\` |"
-          echo "| Requires | Android 9 (API 28) or newer |"
+          echo "| Requires | Android 9 or newer |"
           echo
-          echo "## ${HEADING}"
+          echo "## How to install it"
           echo
-          echo "${CHANGES}"
+          echo "1. Download \`keeperfx-android-arm64.apk\` on the phone, open it and allow the"
+          echo "   install. Play Protect warns about an unknown developer, which is expected"
+          echo "   for a self signed APK."
+          echo "2. Open KeeperFX and tap **Install KeeperFX** for the game data and the music."
+          echo "3. Tap **Import original Dungeon Keeper** and pick the folder or zip of your copy."
+          echo "4. Tap **Play**."
           echo
-          echo "---"
-          echo
-          echo "Install straight over a previous build; game data and settings are kept."
-          echo "Play Protect warns about an unknown developer, which is expected for a"
-          echo "self signed APK."
-          echo
-          echo "Contains the engine only. Use **Check for downloads** in the launcher to"
-          echo "fetch the game data and the music, then **Import original Dungeon Keeper**"
-          echo "for the files that must come from the original game."
+          echo "Later versions install over this one from inside the app, and game data and"
+          echo "settings stay."
+          if [ -n "$PREVIOUS" ]; then
+            # Subject lines only; the bodies explain the why and belong in the log.
+            CHANGES=$(git log --no-merges --pretty=format:'- %s' "${PREVIOUS}..HEAD" | head -n "$MAX_CHANGES")
+            TOTAL=$(git rev-list --no-merges --count "${PREVIOUS}..HEAD")
+            echo
+            echo "## Changes since ${PREVIOUS#android-v}"
+            echo
+            echo "${CHANGES:-No source changes.}"
+            if [ "$TOTAL" -gt "$MAX_CHANGES" ]; then
+              echo
+              echo "This list is cut off: it shows the newest $MAX_CHANGES of $TOTAL commits."
+            fi
+          fi
         } > out/notes.md
 
         # Every call names the repository explicitly, so that gh can never resolve
@@ -286,30 +283,10 @@ jobs:
         # A re-run of the same commit would clash with its own tag.
         gh release delete -R "$GITHUB_REPOSITORY" "$TAG" --yes --cleanup-tag || true
         publish gh release create -R "$GITHUB_REPOSITORY" "$TAG" \
-          out/keeperfx-android-arm64.apk out/version.json \
+          out/keeperfx-android-arm64.apk \
           --target "${GITHUB_SHA}" \
           --title "KeeperFX for Android ${VERSION_NAME} (unofficial)" \
           --notes-file out/notes.md
-
-        # Builds up to 1.4.0.5289 look for a fixed android-latest URL rather than
-        # asking the API, so that tag has to keep moving or those installs could
-        # never update themselves again. It is marked as a prerelease, which
-        # keeps /releases/latest returning the newest android-v* instead of this
-        # one - that is what newer builds follow.
-        gh release delete -R "$GITHUB_REPOSITORY" android-latest --yes --cleanup-tag || true
-        publish gh release create -R "$GITHUB_REPOSITORY" android-latest \
-          out/keeperfx-android-arm64.apk out/version.json \
-          --target "${GITHUB_SHA}" \
-          --prerelease \
-          --title "KeeperFX for Android ${VERSION_NAME} (unofficial, compatibility pointer)" \
-          --notes "**Unofficial community build**, not produced or supported by the
-        KeeperFX team.
-
-        Always the same build as the newest \`android-v*\` release, kept
-        so that app versions up to 1.4.0.5289 can still find their update. It is
-        flagged as a prerelease so it never shadows the real one.
-
-        See [${TAG}](../../releases/tag/${TAG}) for the changelog."
 
   # The Android port must not change how the desktop ports build. This job is the
   # regression guard for the shared source files the port touches.

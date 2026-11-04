@@ -26,12 +26,14 @@ final class AppRelease {
 
     private static final String TAG_PREFIX = "android-v";
     private static final String APK_ASSET = "keeperfx-android-arm64.apk";
+    /** As .github/workflows/build-android.yml writes it, followed by the version it compares with. */
+    static final String CHANGES_HEADING = "## Changes since ";
 
     final String versionName;
     final String apkUrl;
     /** Size of the APK as the release lists it, or -1; guards the download. */
     final long apkSize;
-    /** Changelog lines from the release notes, without their bullets. */
+    /** What changed since the release before, from the notes, without the bullets. */
     final List<String> changes;
 
     AppRelease(String versionName, String apkUrl, long apkSize, List<String> changes) {
@@ -47,10 +49,7 @@ final class AppRelease {
      */
     static AppRelease fromGithub(JSONObject release) throws JSONException {
         final String tag = release.optString("tag_name", "");
-        // Only a versioned tag carries a version. The android-latest pointer,
-        // which exists so older builds can still find an update, is a
-        // prerelease and should never turn up here, but if it does its name
-        // must not be mistaken for a version number.
+        // Only a versioned tag carries a version, and this fork can hold other releases.
         if (!tag.startsWith(TAG_PREFIX) || tag.length() == TAG_PREFIX.length()) {
             return null;
         }
@@ -75,15 +74,18 @@ final class AppRelease {
     }
 
     /**
-     * Pulls the bullet list out of the release notes. The workflow writes one
-     * line per commit subject, so this is the changelog without having to
-     * understand the rest of the markdown around it.
+     * Pulls the list of changes out of the release notes: the bullets under the heading
+     * the workflow writes when there is an earlier release to compare with. The notes
+     * have other lists, which say what the app can do and not what changed in it.
      */
     private static List<String> parseChangelog(String notes) {
         final List<String> changes = new ArrayList<>();
+        boolean inChanges = false;
         for (String raw : notes.split("\n")) {
             final String line = raw.trim();
-            if (line.startsWith("- ") && line.length() > 2) {
+            if (line.startsWith("## ")) {
+                inChanges = line.startsWith(CHANGES_HEADING);
+            } else if (inChanges && line.startsWith("- ") && line.length() > 2) {
                 changes.add(line.substring(2).trim());
             }
         }

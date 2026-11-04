@@ -43,9 +43,8 @@ public final class AppUpdater {
     private static final String TAG = "KeeperFX";
 
     /**
-     * Newest release published by .github/workflows/build-android.yml. Each
-     * build gets its own tag so there is a history, so there is no fixed asset
-     * URL to read any more; the API points at the current one and carries the
+     * Newest release published by .github/workflows/build-android.yml. Each build has
+     * its own tag, so the API is what points at the current one, and it carries the
      * release notes in the same response.
      */
     private static final String LATEST_RELEASE_URL =
