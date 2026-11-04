@@ -159,6 +159,29 @@ public class GameActivity extends SDLActivity {
         Process.killProcess(Process.myPid());
     }
 
+    /** One button over the top right corner of the game, the rows counted from the top. */
+    private ImageButton addOverlayButton(int icon, int description, int row) {
+        final float density = getResources().getDisplayMetrics().density;
+        final int size = Math.round(48 * density);
+        final int margin = Math.round(10 * density);
+        final ImageButton button = new ImageButton(this);
+        button.setImageResource(icon);
+        button.setBackgroundResource(R.drawable.overlay_round);
+        button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        button.setContentDescription(GameLanguage.localized(this).getString(description));
+        button.setAlpha(IDLE_ALPHA);
+        // RIGHT, not END: the game's picture does not mirror on a phone set to Arabic, and
+        // the other side holds the status panel.
+        final FrameLayout.LayoutParams params =
+            new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.RIGHT);
+        params.topMargin = margin + row * (size + margin);
+        params.rightMargin = margin;
+        // addContentView() stacks onto the window's own frame, so SDL's view
+        // hierarchy is left exactly as SDLActivity built it.
+        addContentView(button, params);
+        return button;
+    }
+
     /**
      * Puts a back arrow over the top right corner of the game.
      *
@@ -169,26 +192,8 @@ public class GameActivity extends SDLActivity {
      * opposite corner is the one place the button covers nothing but scenery.
      */
     private void addBackButton() {
-        final float density = getResources().getDisplayMetrics().density;
-        final int size = Math.round(48 * density);
-        final int margin = Math.round(10 * density);
-        final ImageButton button = new ImageButton(this);
-        button.setImageResource(R.drawable.ic_game_back);
-        button.setBackgroundResource(R.drawable.overlay_round);
-        button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        button.setContentDescription(GameLanguage.localized(this).getString(R.string.game_back));
-        // Present but not competing with the game for attention.
-        button.setAlpha(IDLE_ALPHA);
-        button.setOnClickListener(view -> sendEscape(view));
-        // RIGHT, not END: the game's picture does not mirror on a phone set to Arabic, and
-        // the other side holds the status panel.
-        final FrameLayout.LayoutParams params =
-            new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.RIGHT);
-        params.topMargin = margin;
-        params.rightMargin = margin;
-        // addContentView() stacks onto the window's own frame, so SDL's view
-        // hierarchy is left exactly as SDLActivity built it.
-        addContentView(button, params);
+        addOverlayButton(R.drawable.ic_game_back, R.string.game_back, 0)
+            .setOnClickListener(view -> sendKey(view, KeyEvent.KEYCODE_ESCAPE));
     }
 
     /**
@@ -204,43 +209,18 @@ public class GameActivity extends SDLActivity {
      * flip and colours itself from what it asked for.
      */
     private void addRightClickToggle() {
-        final float density = getResources().getDisplayMetrics().density;
-        final int size = Math.round(48 * density);
-        final int margin = Math.round(10 * density);
-        final ImageButton button = new ImageButton(this);
-        button.setImageResource(R.drawable.ic_right_click);
-        button.setBackgroundResource(R.drawable.overlay_round);
-        button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        button.setContentDescription(GameLanguage.localized(this).getString(R.string.game_right_click));
-        button.setAlpha(IDLE_ALPHA);
-        button.setOnClickListener(view -> {
-            rightClickActive = !rightClickActive;
-            view.setAlpha(rightClickActive ? 1.0f : IDLE_ALPHA);
-            view.setSelected(rightClickActive);
-            sendKey(view, KEYCODE_STICKY_RIGHT_CLICK);
-        });
-        final FrameLayout.LayoutParams params =
-            new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.RIGHT);
-        // Directly under the back arrow: same column, one button lower.
-        params.topMargin = margin + size + margin;
-        params.rightMargin = margin;
-        addContentView(button, params);
+        addOverlayButton(R.drawable.ic_right_click, R.string.game_right_click, 1)
+            .setOnClickListener(view -> {
+                rightClickActive = !rightClickActive;
+                view.setAlpha(rightClickActive ? 1.0f : IDLE_ALPHA);
+                view.setSelected(rightClickActive);
+                sendKey(view, KEYCODE_STICKY_RIGHT_CLICK);
+            });
     }
 
     /**
-     * Feeds the engine an Escape press.
-     *
-     * SDL translates the Android key code into its own, so this arrives as an
-     * ordinary keyboard event and no engine code has to know about it. The
-     * release is delayed because the game samples the keyboard once per frame
-     * and would otherwise see a key that was never held.
-     */
-    private void sendEscape(View button) {
-        sendKey(button, KeyEvent.KEYCODE_ESCAPE);
-    }
-
-    /**
-     * Presses and releases one key.
+     * Presses and releases one key. SDL translates the Android key code into its own, so
+     * it arrives as an ordinary keyboard event and no engine code has to know about it.
      *
      * The release is delayed because the game samples the keyboard once per
      * frame and would otherwise see a key that was never held.
