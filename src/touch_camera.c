@@ -243,11 +243,12 @@ void touch_camera_frame(const struct TgFingers *fingers, const struct TgTuning *
             tg_grip(&grip, fingers, &view, &shown, surface_height_at(&view, &shown, mid_x, mid_y));
             gripping = true;
             regrip_wanted = false;
+            // Owed from the grip on, not from the first change of zoom: what is on screen
+            // can already differ from the dungeon camera, part of the way through a step.
+            zoom_owed = true;
         }
         struct TgCamera pose = grip.origin;
         tg_follow(&grip, fingers, frame_ms, &view, tuning, &pose);
-        if (pose.zoom != grip.origin.zoom)
-            zoom_owed = true;
         show_pose(idx, &pose);
         return;
     }

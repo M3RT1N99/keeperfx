@@ -1832,7 +1832,7 @@ static short process_command_line(unsigned short argc, char *argv[])
       }
       else if ( strcasecmp(parstr,"touchtune") == 0 )
       {
-          // "-touchtune panspeed=5,longpress=350". Every gesture constant was
+          // "-touchtune panslop=2,longpress=350". Every gesture constant was
           // chosen without a device to try it on, so this exists to let them be
           // settled on real hardware in one sitting instead of one rebuild per
           // guess. The launcher passes its extra arguments field through
