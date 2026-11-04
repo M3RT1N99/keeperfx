@@ -949,6 +949,13 @@ static TbBool finish_level_requested(void)
         return false;
     if (mouse_is_over_panel_map(local_state.minimap_pos_x, local_state.minimap_pos_y))
         return false;
+#ifdef __ANDROID__
+    // A tap between a menu's buttons is still meant for the menu, and get_gui_inputs()
+    // leaves a click on no button standing, where it does run. So is one beside a menu
+    // window, which is the part of the screen the player cannot do anything else with.
+    if (a_menu_window_is_active() || (point_is_over_gui_menu(GetMouseX(), GetMouseY()) >= 0))
+        return false;
+#endif
     // The panel is tested by its own rectangle rather than by asking
     // game_is_busy_doing_gui(). That flag is set by get_gui_inputs(), which
     // does not run at all on the lost level path - get_inputs() returns
