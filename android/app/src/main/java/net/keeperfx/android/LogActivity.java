@@ -142,7 +142,9 @@ public class LogActivity extends Activity {
     private String diagnosticsHeader() {
         final Prefs prefs = new Prefs(this);
         final StringBuilder sb = new StringBuilder();
-        sb.append("KeeperFX for Android\n");
+        // The engine's own header with its suffixed version is the first thing a long
+        // log loses, and this preamble is what is left to tell it from an official build.
+        sb.append("KeeperFX for Android (unofficial)\n");
         sb.append("app version    : ").append(AppUpdater.installedVersionName(this)).append('\n');
         sb.append("KeeperFX data  : ")
           .append(GameData.describeInstalledVersion(this))

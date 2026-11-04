@@ -4,7 +4,7 @@
   so this file can grow one string at a time without ever leaving a gap.
 -->
 <resources>
-    <string name="app_subtitle">Dungeon Keeper, neu gebaut — für Android</string>
+    <string name="app_subtitle">Dungeon Keeper, neu gebaut — für Android (inoffiziell)</string>
 
     <string name="log_title">Engine-Protokoll</string>
     <string name="log_loading">Wird gelesen…</string>
