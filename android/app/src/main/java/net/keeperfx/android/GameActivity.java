@@ -24,6 +24,7 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
@@ -65,6 +66,7 @@ public class GameActivity extends SDLActivity {
 
     private String[] arguments = new String[0];
     private boolean rightClickActive = false;
+    private boolean keyboardVisible = false;
     private WifiManager.MulticastLock multicastLock;
 
     @Override
@@ -94,10 +96,35 @@ public class GameActivity extends SDLActivity {
 
         super.onCreate(savedInstanceState);
         goImmersive();
+        watchKeyboard();
         if (new Prefs(this).isBackButtonShown()) {
             addBackButton();
             addRightClickToggle();
         }
+    }
+
+    /**
+     * Tells SDL when the keyboard has gone away by a route it does not hear of.
+     *
+     * SDL only learns of it from a Back key reaching its text field. The hide button in
+     * the keyboard's own window does not come by there, and SDL would go on believing
+     * text input is running and the keyboard is up: nothing could raise it again, since
+     * asking SDL to start what it thinks is started does nothing. Before Android 11 that
+     * button is the system's back key, which does arrive. A keyboard hidden on SDL's own
+     * orders has already handed the focus back, so that case is told nothing.
+     */
+    private void watchKeyboard() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return;
+        }
+        findViewById(android.R.id.content).setOnApplyWindowInsetsListener((view, insets) -> {
+            final boolean visible = insets.isVisible(WindowInsets.Type.ime());
+            if (keyboardVisible && !visible && mTextEdit != null && mTextEdit.hasFocus()) {
+                SDLActivity.onNativeKeyboardFocusLost();
+            }
+            keyboardVisible = visible;
+            return view.onApplyWindowInsets(insets);
+        });
     }
 
     @Override
