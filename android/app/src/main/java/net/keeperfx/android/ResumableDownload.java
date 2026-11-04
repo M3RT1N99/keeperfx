@@ -132,13 +132,13 @@ public final class ResumableDownload {
                 append = false;
                 existing = 0;
             } else {
-                throw new IOException("Server returned HTTP " + status);
+                throw new Message.Failure(R.string.http_status, status);
             }
 
             final long remaining = connection.getContentLengthLong();
             final long total = (remaining >= 0) ? existing + remaining : -1;
             final long expected = (total > 0) ? total : expectedSize;
-            FileUtil.requireRoom(target.getParentFile(), expected - existing, "this download");
+            FileUtil.requireRoom(target.getParentFile(), expected - existing, R.string.no_room_download);
             long done = existing;
 
             try (InputStream in = new BufferedInputStream(connection.getInputStream());
@@ -171,8 +171,8 @@ public final class ResumableDownload {
                     //noinspection ResultOfMethodCallIgnored
                     partial.delete();
                 }
-                throw new IOException(
-                    "Download ended at " + done + " of " + expected + " bytes");
+                throw new Message.Failure(R.string.download_cut_short,
+                    GameData.describeBytes(done), GameData.describeBytes(expected));
             }
             moveIntoPlace(partial, target);
             return true;
@@ -206,7 +206,7 @@ public final class ResumableDownload {
 
     private static void moveIntoPlace(File partial, File target) throws IOException {
         if (!partial.renameTo(target)) {
-            throw new IOException("Cannot write " + target.getAbsolutePath());
+            throw new Message.Failure(R.string.file_cannot_write, target.getAbsolutePath());
         }
     }
 }

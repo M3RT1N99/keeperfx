@@ -65,7 +65,8 @@ public final class DataImporter {
     public interface Listener {
         void onProgress(int filesCopied, String currentPath);
 
-        void onFinished(boolean success, String message);
+        /** @param failure null when all went well. */
+        void onFinished(Message failure);
     }
 
     private final Context context;
@@ -109,7 +110,7 @@ public final class DataImporter {
             copyDirectory(treeUri, start.documentUri, start.target);
 
             if (cancelled) {
-                finish(false, "Import cancelled");
+                finish(new Message(R.string.import_cancelled));
                 return;
             }
 
@@ -121,10 +122,10 @@ public final class DataImporter {
             // recorded about the previous installation - the alpha state, its
             // backup, the manifests - now describes files this may have replaced.
             ReleaseDownloader.wipeInstallState(context);
-            finish(true, "Copied " + filesCopied + " files");
+            finish(null);
         } catch (Exception e) {
             Log.e(TAG, "Import failed", e);
-            finish(false, "Import failed: " + e.getMessage());
+            finish(new Message(R.string.import_failed_detail, Message.detailOf(e)));
         }
     }
 
@@ -151,14 +152,14 @@ public final class DataImporter {
             searchAndCopy(treeUri, rootUri, wanted, found);
 
             if (cancelled) {
-                finish(false, "Import cancelled");
+                finish(new Message(R.string.import_cancelled));
                 return;
             }
 
-            finishOriginalImport("Pick the folder that holds the original game's DATA and SOUND folders.");
+            finishOriginalImport(R.string.import_original_incomplete_folder);
         } catch (Exception e) {
             Log.e(TAG, "Original game import failed", e);
-            finish(false, "Import failed: " + e.getMessage());
+            finish(new Message(R.string.import_failed_detail, Message.detailOf(e)));
         }
     }
 
@@ -182,7 +183,7 @@ public final class DataImporter {
 
             try (InputStream raw = context.getContentResolver().openInputStream(zipUri)) {
                 if (raw == null) {
-                    finish(false, "Cannot read the archive");
+                    finish(new Message(R.string.import_cannot_read_archive));
                     return;
                 }
                 try (java.util.zip.ZipInputStream zip =
@@ -213,13 +214,13 @@ public final class DataImporter {
             }
 
             if (cancelled) {
-                finish(false, "Import cancelled");
+                finish(new Message(R.string.import_cancelled));
                 return;
             }
-            finishOriginalImport("The archive has to hold the original game's DATA and SOUND files.");
+            finishOriginalImport(R.string.import_original_incomplete_zip);
         } catch (Exception e) {
             Log.e(TAG, "Original game import from a zip failed", e);
-            finish(false, "Import failed: " + e.getMessage());
+            finish(new Message(R.string.import_failed_detail, Message.detailOf(e)));
         }
     }
 
@@ -231,19 +232,12 @@ public final class DataImporter {
         return wanted;
     }
 
-    private void finishOriginalImport(String hintWhenIncomplete) {
+    /** @param whenIncomplete a string with how many were copied, what is missing and what to do */
+    private void finishOriginalImport(int whenIncomplete) {
         final List<String> stillMissing = GameData.findMissingOriginalDkFiles(context);
-        if (stillMissing.isEmpty()) {
-            finish(true, "Copied " + filesCopied + " files from the original game");
-            return;
-        }
-        final StringBuilder sb = new StringBuilder();
-        sb.append("Copied ").append(filesCopied).append(" files, but these are still missing:\n\n");
-        for (String name : stillMissing) {
-            sb.append("  ").append(name).append('\n');
-        }
-        sb.append('\n').append(hintWhenIncomplete);
-        finish(false, sb.toString());
+        finish(stillMissing.isEmpty()
+            ? null
+            : new Message(whenIncomplete, filesCopied, String.join("\n", stillMissing)));
     }
 
     private void searchAndCopy(Uri treeUri, Uri rootUri, Set<String> wanted, Set<String> found)
@@ -398,7 +392,7 @@ public final class DataImporter {
     private void copyFile(Uri source, File target) throws IOException {
         try (InputStream in = context.getContentResolver().openInputStream(source)) {
             if (in == null) {
-                throw new IOException("Cannot read " + source);
+                throw new Message.Failure(R.string.file_cannot_read, source);
             }
             FileUtil.writeAtomically(target, in);
         }
@@ -408,8 +402,8 @@ public final class DataImporter {
         }
     }
 
-    private void finish(boolean success, String message) {
+    private void finish(Message failure) {
         listener.onProgress(filesCopied, "");
-        listener.onFinished(success, message);
+        listener.onFinished(failure);
     }
 }

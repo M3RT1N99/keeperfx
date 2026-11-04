@@ -204,9 +204,8 @@ public class TouchTuningActivity extends Activity {
     private void updateTunableLabel(TextView label, Prefs.TouchTunable tunable, float value) {
         final String shown = Prefs.formatTouchTune(tunable, value);
         final boolean isDefault = Math.abs(value - tunable.def) < tunable.step / 2.0f;
-        final String text = getString(labelFor(tunable)) + " — "
-            + (isDefault ? getString(R.string.tuning_value_default, shown) : shown);
-        label.setText(text);
+        label.setText(getString(isDefault ? R.string.tuning_value_default : R.string.tuning_value,
+            getString(labelFor(tunable)), shown));
     }
 
     private int labelFor(Prefs.TouchTunable tunable) {

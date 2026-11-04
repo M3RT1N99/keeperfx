@@ -36,7 +36,6 @@ import androidx.core.content.FileProvider;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Locale;
 
 public final class AppUpdater {
 
@@ -50,21 +49,7 @@ public final class AppUpdater {
     private static final String LATEST_RELEASE_URL =
         "https://api.github.com/repos/M3RT1N99/keeperfx/releases/latest";
 
-    public interface Listener {
-        void onProgress(int percent, String detail);
-
-        /** The system installer's intent, in case it has to be opened some other way. */
-        void onReadyToInstall(Intent install);
-
-        void onFinished(boolean success, String message);
-    }
-
-    private final Context context;
-    private final Listener listener;
-
-    public AppUpdater(Context context, Listener listener) {
-        this.context = context.getApplicationContext();
-        this.listener = listener;
+    private AppUpdater() {
     }
 
     // ------------------------------------------------------------ version check
@@ -92,7 +77,7 @@ public final class AppUpdater {
             throws IOException, org.json.JSONException {
         final AppRelease release = AppRelease.fromGithub(latest);
         if (release == null) {
-            throw new IOException("The newest release carries no version or no APK");
+            throw new Message.Failure(R.string.release_unusable);
         }
         if (!AppVersion.isNewer(release.versionName, installed)) {
             return null;
@@ -108,52 +93,28 @@ public final class AppUpdater {
         return context.getPackageManager().canRequestPackageInstalls();
     }
 
-    /** Runs synchronously; the caller provides the thread. */
-    void downloadAndInstall(AppRelease available) {
-        try {
-            // Named after the version so a partial download of an older build
-            // is never mistaken for this one and resumed into nonsense.
-            final File target = new File(new File(context.getFilesDir(), "updates"),
-                "keeperfx-" + available.versionName + ".apk");
-            FileUtil.ensureDirectory(target.getParentFile());
-            FileUtil.deleteOtherVersions(target, "keeperfx-");
+    /**
+     * Fetches the APK. Runs synchronously; the caller provides the thread.
+     *
+     * @return the system installer's intent for it, or null when cancelled.
+     */
+    static Intent download(Context context, AppRelease available, ResumableDownload.Progress progress)
+            throws IOException {
+        // Named after the version so a partial download of an older build
+        // is never mistaken for this one and resumed into nonsense.
+        final File target = new File(new File(context.getFilesDir(), "updates"),
+            "keeperfx-" + available.versionName + ".apk");
+        FileUtil.ensureDirectory(target.getParentFile());
+        FileUtil.deleteOtherVersions(target, "keeperfx-");
 
-            listener.onProgress(-1, "");
-            if (!download(available.apkUrl, target, available.apkSize)) {
-                listener.onFinished(false, "Download cancelled");
-                return;
-            }
-
-            final Uri uri = FileProvider.getUriForFile(
-                context, context.getPackageName() + ".files", target);
-            final Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(uri, "application/vnd.android.package-archive");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                | Intent.FLAG_ACTIVITY_NEW_TASK);
-            listener.onReadyToInstall(intent);
-            context.startActivity(intent);
-
-            listener.onFinished(true, "");
-        } catch (Exception e) {
-            Log.e(TAG, "Update failed", e);
-            listener.onFinished(false, "Update failed: " + e.getMessage());
+        if (!ResumableDownload.fetch(available.apkUrl, target, available.apkSize, progress)) {
+            return null;
         }
-    }
-
-    /** @return true when the file is complete, false when cancelled. */
-    private boolean download(String url, File target, long expectedSize) throws IOException {
-        return ResumableDownload.fetch(url, target, expectedSize, new ResumableDownload.Progress() {
-            @Override
-            public void onBytes(long done, long total) {
-                final int percent = (total > 0) ? (int) (done * 100 / total) : -1;
-                listener.onProgress(percent, String.format(Locale.US, "%s of %s",
-                    GameData.describeBytes(done), GameData.describeBytes(total)));
-            }
-
-            @Override
-            public boolean isCancelled() {
-                return DownloadService.isCancelRequested();
-            }
-        });
+        final Uri uri = FileProvider.getUriForFile(
+            context, context.getPackageName() + ".files", target);
+        final Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, "application/vnd.android.package-archive");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        return intent;
     }
 }

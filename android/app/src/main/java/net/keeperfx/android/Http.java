@@ -31,9 +31,9 @@ final class Http {
     private static final int MAX_REDIRECTS = 5;
 
     /** The server says this does not exist, which can be an answer and not a failure. */
-    static final class NotFoundException extends IOException {
-        NotFoundException(String url) {
-            super("Server returned HTTP 404 for " + url);
+    static final class NotFoundException extends Message.Failure {
+        NotFoundException() {
+            super(R.string.http_status, HttpURLConnection.HTTP_NOT_FOUND);
         }
     }
 
@@ -105,10 +105,10 @@ final class Http {
         try {
             final int status = connection.getResponseCode();
             if (status == HttpURLConnection.HTTP_NOT_FOUND) {
-                throw new NotFoundException(url);
+                throw new NotFoundException();
             }
             if (status != HttpURLConnection.HTTP_OK) {
-                throw new IOException("Server returned HTTP " + status + " for " + url);
+                throw new Message.Failure(R.string.http_status, status);
             }
             final ByteArrayOutputStream body = new ByteArrayOutputStream();
             try (InputStream in = connection.getInputStream()) {

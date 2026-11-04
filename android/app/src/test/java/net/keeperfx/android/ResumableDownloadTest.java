@@ -290,7 +290,7 @@ public class ResumableDownloadTest {
             Http.getJson(url);
             fail("a 404 has to throw");
         } catch (Http.NotFoundException expected) {
-            assertTrue(expected.getMessage().contains("404"));
+            assertEquals(new Message(R.string.http_status, 404), expected.message);
         }
         server.close();
         serverThread.join(2000);
@@ -300,8 +300,8 @@ public class ResumableDownloadTest {
             fail("a 500 has to throw");
         } catch (Http.NotFoundException wrong) {
             fail("a 500 does not say the document does not exist");
-        } catch (IOException expected) {
-            assertTrue(expected.getMessage().contains("500"));
+        } catch (Message.Failure expected) {
+            assertEquals(new Message(R.string.http_status, 500), expected.message);
         }
     }
 

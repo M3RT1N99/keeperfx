@@ -21,23 +21,23 @@
     <string name="game_still_open_title">Das Spiel ist noch offen</string>
     <string name="game_still_open">Das Spiel ist im Hintergrund noch offen. Beende es zuerst, denn das hier ersetzt oder löscht Dateien, die es gerade benutzt.</string>
 
-    <string name="version_unknown">importierter Ordner</string>
+    <string name="version_imported_folder">importierter Ordner</string>
 
-    <string name="status_keeperfx_ready">KeeperFX %1$s installiert (%2$s)</string>
+    <string name="status_keeperfx_ready">KeeperFX: %1$s (%2$s)</string>
     <string name="status_keeperfx_missing">KeeperFX ist nicht installiert</string>
     <string name="status_original_ready">Dateien des originalen Dungeon Keeper vorhanden</string>
-    <string name="status_original_missing">%1$d Dateien des originalen Dungeon Keeper fehlen</string>
+    <string name="status_original_missing">Fehlende Dateien des originalen Dungeon Keeper: %1$d</string>
     <string name="status_importing">KeeperFX wird kopiert…</string>
     <string name="status_searching_original">Originaldateien werden gesucht…</string>
     <string name="status_engine_mismatch">Der Alpha-Patch ist Build %1$d und die Engine dieser App Build %2$d, weil es für diesen Build keinen Patch gab. Falls etwas nicht stimmt, kann das der Grund sein.</string>
-    <string name="status_import_progress">%1$d Dateien kopiert — %2$s</string>
+    <string name="status_import_progress">Kopierte Dateien: %1$d. %2$s</string>
 
     <string name="hint_install_keeperfx">Tippe auf „KeeperFX installieren“, um die aktuelle Version zu laden, oder importiere einen Ordner, den du schon hast.</string>
     <string name="hint_import_original">Fehlt noch aus einem originalen Dungeon Keeper:</string>
 
     <string name="button_install_keeperfx">KeeperFX installieren</string>
     <string name="button_update_keeperfx">Nach Downloads suchen</string>
-    <string name="button_updates_waiting">%1$d Download(s) verfügbar</string>
+    <string name="button_updates_waiting">Downloads verfügbar: %1$d</string>
     <string name="button_import_original">Original Dungeon Keeper importieren</string>
     <string name="button_import_keeperfx">Ordner</string>
     <string name="button_remove">Zurücksetzen</string>
@@ -50,7 +50,7 @@
     <string name="updates_unanswered_title">Suche nach Downloads fehlgeschlagen</string>
     <string name="updates_unanswered">Ein Server hat nicht geantwortet, es kann also etwas bereitstehen, das diese Suche nicht sieht. Prüfe die Internetverbindung und versuche es noch einmal. Ist die Verbindung in Ordnung, versuche es in einer Stunde wieder: GitHub begrenzt, wie oft es nach der neuesten App gefragt werden darf.</string>
     <string name="updates_unanswered_more">Ein Server hat nicht geantwortet, es kann also noch mehr geben.</string>
-    <string name="updates_available_title">%1$d Download(s) verfügbar</string>
+    <string name="updates_available_title">Downloads verfügbar: %1$d</string>
     <string name="updates_download_all">Alle laden</string>
     <string name="updates_replaces_data">Die Spieldaten werden dabei ersetzt. Spielstände, importierte Originaldateien, Musik und eigene Karten bleiben erhalten.</string>
     <string name="updates_use_wifi">Am besten im WLAN. Der Download läuft weiter, wenn du die App verlässt.</string>
@@ -92,9 +92,7 @@
     <string name="input_auto">Automatisch — dem zuletzt benutzten Gerät folgen</string>
     <string name="input_touch">Touch — immer die Touch-Steuerung</string>
     <string name="input_pointer">Maus &amp; Tastatur — Touchscreen ignorieren</string>
-    <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Drehen · Zwei-Finger-Tipp = Rechtsklick · Drei-Finger-Tipp = zurück (die Karte hat einen eigenen Panel-Knopf)
-
-Die Zurück-Taste und die Zurück-Geste verlassen ein Menü ebenfalls. Auf dem Bildschirm: ein Zurück-Pfeil und ein Rechtsklick-Schalter — solange er an ist, schlägt ein Tipp zu und ein Ziehen hebt Markierungen auf.</string>
+    <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Drehen · Zwei-Finger-Tipp = Rechtsklick · Drei-Finger-Tipp = zurück (die Karte hat einen eigenen Panel-Knopf)\n\nDie Zurück-Taste und die Zurück-Geste verlassen ein Menü ebenfalls. Auf dem Bildschirm: ein Zurück-Pfeil und ein Rechtsklick-Schalter — solange er an ist, schlägt ein Tipp zu und ein Ziehen hebt Markierungen auf.</string>
     <string name="option_back_button">Bildschirmtasten im Spiel anzeigen</string>
     <string name="game_back">Zurück</string>
     <string name="game_right_click">Rechtsklick</string>

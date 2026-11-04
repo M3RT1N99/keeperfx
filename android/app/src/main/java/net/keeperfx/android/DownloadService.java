@@ -200,8 +200,8 @@ public class DownloadService extends Service {
         } catch (IllegalStateException e) {
             // Android refuses when the app is not on screen any more.
             Log.w(TAG, "Cannot start the download service", e);
-            publish(new State(false, "", -1, "", "Cannot start: " + e.getMessage(),
-                R.string.install_failed));
+            publish(new State(false, "", -1, "",
+                context.getString(R.string.job_cannot_start, e.getMessage()), R.string.install_failed));
         }
     }
 
@@ -263,11 +263,11 @@ public class DownloadService extends Service {
     }
 
     private void runJobs(int[] kinds, Uri file) {
-        String failure = null;
+        Message failure = null;
         int failureTitle = R.string.install_failed;
         for (int ordinal : kinds) {
             if (cancelRequested) {
-                failure = getString(R.string.notification_cancelled);
+                failure = new Message(R.string.job_cancelled);
                 break;
             }
             final UpdateManager.Kind kind = UpdateManager.Kind.values()[ordinal];
@@ -282,7 +282,7 @@ public class DownloadService extends Service {
             }
         }
 
-        final String finalFailure = failure;
+        final String finalFailure = (failure == null) ? null : failure.in(this);
         final File exported = (failure == null) ? exportedFile : null;
         publish(new State(false, "", -1, "", finalFailure, failureTitle));
         mainHandler.post(() -> {
@@ -301,116 +301,107 @@ public class DownloadService extends Service {
         });
     }
 
-    /** @return null on success, otherwise the failure message. */
-    private String runJob(UpdateManager.Kind kind, Uri file) {
-        final String[] failure = new String[1];
-
+    /** @return null on success, otherwise what went wrong. */
+    private Message runJob(UpdateManager.Kind kind, Uri file) {
         switch (kind) {
-            case GAME_DATA:
-            case GAME_ALPHA:
-            case ALPHA_REVERT:
-            case MUSIC: {
-                // Asked again per job: a queue of them can have been going for a while.
-                if (GameProcess.isAlive(this)) {
-                    return getString(R.string.game_still_open);
-                }
-                final ReleaseDownloader downloader =
-                    new ReleaseDownloader(this, new ReleaseDownloader.Listener() {
-                        @Override
-                        public void onStage(String stage, int percent, String detail) {
-                            report(stage, percent, detail);
-                        }
-
-                        @Override
-                        public void onFinished(boolean success, String message) {
-                            failure[0] = success ? null : message;
-                        }
-                    });
-                if (kind == UpdateManager.Kind.GAME_DATA) {
-                    downloader.run();
-                } else if (kind == UpdateManager.Kind.GAME_ALPHA) {
-                    downloader.runAlpha();
-                } else if (kind == UpdateManager.Kind.ALPHA_REVERT) {
-                    downloader.revertAlpha();
-                } else {
-                    downloader.runMusic();
-                }
-                break;
-            }
-            case APP: {
-                final AppUpdater updater = new AppUpdater(this, new AppUpdater.Listener() {
-                    @Override
-                    public void onProgress(int percent, String detail) {
-                        report(getString(R.string.status_downloading_app), percent, detail);
-                    }
-
-                    @Override
-                    public void onReadyToInstall(Intent install) {
-                        installIntent = install;
-                    }
-
-                    @Override
-                    public void onFinished(boolean success, String message) {
-                        failure[0] = success ? null : message;
-                    }
-                });
-                try {
-                    final AppRelease available = AppUpdater.checkForUpdate(this);
-                    if (available == null) {
-                        return null; // someone else already installed it
-                    }
-                    updater.downloadAndInstall(available);
-                } catch (Exception e) {
-                    Log.e(TAG, "App update failed", e);
-                    return "App update failed: " + e.getMessage();
-                }
-                break;
-            }
+            case APP:
+                return runAppUpdate();
             case BUNDLE_EXPORT:
                 return runBundleExport();
             case BUNDLE_IMPORT:
                 return runBundleImport(file);
+            default:
+                break;
         }
-        return failure[0];
+        // Asked again per job: a queue of them can have been going for a while.
+        if (GameProcess.isAlive(this)) {
+            return new Message(R.string.game_still_open);
+        }
+        final ReleaseDownloader downloader = new ReleaseDownloader(this, this::report);
+        switch (kind) {
+            case GAME_DATA:
+                return downloader.run();
+            case GAME_ALPHA:
+                return downloader.runAlpha();
+            case ALPHA_REVERT:
+                return downloader.revertAlpha();
+            default:
+                return downloader.runMusic();
+        }
     }
 
-    private String runBundleExport() {
+    private Message runAppUpdate() {
+        final Message stage = new Message(R.string.status_downloading_app);
         try {
-            exportedFile = PhoneTransfer.runExport(this, transferProgress("Packing"));
+            final AppRelease available = AppUpdater.checkForUpdate(this);
+            if (available == null) {
+                return null; // someone else already installed it
+            }
+            report(stage, -1, null);
+            final Intent install = AppUpdater.download(this, available, new ResumableDownload.Progress() {
+                @Override
+                public void onBytes(long done, long total) {
+                    report(stage, (total > 0) ? (int) (done * 100 / total) : -1,
+                        new Message(R.string.progress_bytes,
+                            GameData.describeBytes(done), GameData.describeBytes(total)));
+                }
+
+                @Override
+                public boolean isCancelled() {
+                    return cancelRequested;
+                }
+            });
+            if (install == null) {
+                return new Message(R.string.job_download_cancelled);
+            }
+            installIntent = install;
+            startActivity(install);
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "App update failed", e);
+            return new Message(R.string.job_app_update_failed, Message.detailOf(e));
+        }
+    }
+
+    private Message runBundleExport() {
+        try {
+            exportedFile = PhoneTransfer.runExport(this, transferProgress(R.string.stage_packing));
             return null;
         } catch (TransferBundle.CancelledException e) {
-            return "Packing cancelled.";
+            return new Message(R.string.job_packing_cancelled);
         } catch (TransferBundle.RefusedException | FileUtil.NoRoomException e) {
-            return e.getMessage();
+            return e.message;
         } catch (Exception e) {
             Log.e(TAG, "Could not pack the installation", e);
-            return "Packing failed: " + e.getMessage();
+            return new Message(R.string.job_packing_failed, Message.detailOf(e));
         }
     }
 
-    private String runBundleImport(Uri file) {
+    private Message runBundleImport(Uri file) {
         try {
-            PhoneTransfer.runImport(this, file, transferProgress("Unpacking the imported file"));
+            PhoneTransfer.runImport(this, file, transferProgress(R.string.stage_unpacking_import));
             importedFile = PhoneTransfer.describeImported(this, file);
             settingsGeneration++;
             doneMessage = R.string.import_bundle_done_notification;
             return null;
         } catch (TransferBundle.CancelledException e) {
-            return "Import cancelled. Nothing was changed.";
+            return new Message(R.string.job_import_cancelled);
         } catch (TransferBundle.RefusedException | FileUtil.NoRoomException e) {
-            return e.getMessage();
+            return e.message;
         } catch (Exception e) {
             Log.e(TAG, "Could not import the picked file", e);
-            return "Import failed: " + e.getMessage();
+            return new Message(R.string.job_import_failed, Message.detailOf(e));
         }
     }
 
-    private TransferBundle.Progress transferProgress(String stage) {
+    private TransferBundle.Progress transferProgress(int stage) {
+        final Message stageMessage = new Message(stage);
         return new TransferBundle.Progress() {
             @Override
             public void onBytes(long done, long total) {
-                report(stage, (total > 0) ? (int) (done * 100 / total) : -1,
-                    GameData.describeBytes(done) + " of " + GameData.describeBytes(total));
+                report(stageMessage, (total > 0) ? (int) (done * 100 / total) : -1,
+                    new Message(R.string.progress_bytes,
+                        GameData.describeBytes(done), GameData.describeBytes(total)));
             }
 
             @Override
@@ -420,8 +411,11 @@ public class DownloadService extends Service {
         };
     }
 
-    private void report(String stage, int percent, String detail) {
-        publish(new State(true, stage, percent, detail, null, R.string.install_failed));
+    /** @param detail null when there is nothing to add. */
+    private void report(Message stageMessage, int percent, Message detail) {
+        final String stage = stageMessage.in(this);
+        publish(new State(true, stage, percent, (detail == null) ? "" : detail.in(this), null,
+            R.string.install_failed));
         // A notification per 256 KB, or per percent on a fast line, is more than
         // Android accepts: it starts dropping them, and then also the last one that
         // says how it all ended. Seen leaving "Downloading the music" up for good.

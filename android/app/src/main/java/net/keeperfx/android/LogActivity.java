@@ -100,11 +100,11 @@ public class LogActivity extends Activity {
                 try {
                     body = readTail(file, MAX_BYTES);
                 } catch (IOException e) {
-                    body = "Could not read the log: " + e.getMessage();
+                    body = getString(R.string.log_read_failed, e.getMessage());
                 }
                 text = body;
                 header = getString(R.string.log_header,
-                    GameData.describeBytes(file.length()),
+                    GameData.describeBytes(file.length()).in(this),
                     java.text.DateFormat.getDateTimeInstance()
                         .format(new java.util.Date(file.lastModified())));
             }
@@ -146,13 +146,15 @@ public class LogActivity extends Activity {
         // log loses, and this preamble is what is left to tell it from an official build.
         sb.append("KeeperFX for Android (unofficial)\n");
         sb.append("app version    : ").append(AppUpdater.installedVersionName(this)).append('\n');
+        final String release = prefs.getInstalledVersion();
+        final String alpha = prefs.getInstalledAlphaVersion();
         sb.append("KeeperFX data  : ")
-          .append(GameData.describeInstalledVersion(this))
+          .append(release.isEmpty() ? "imported folder" : release)
+          .append(alpha.isEmpty() ? "" : " + alpha " + alpha)
           .append('\n');
         sb.append("engine build   : ").append(BuildConfig.ENGINE_BUILD).append('\n');
         sb.append("data for engine: ")
-          .append(GameData.describeDataFit(BuildConfig.ENGINE_BUILD,
-              prefs.getInstalledAlphaVersion()))
+          .append(GameData.describeDataFit(BuildConfig.ENGINE_BUILD, alpha))
           .append('\n');
         sb.append("device         : ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n');
         sb.append("android        : ").append(Build.VERSION.RELEASE)
@@ -214,7 +216,7 @@ public class LogActivity extends Activity {
                     Intent.createChooser(intent, getString(R.string.log_share))));
             } catch (Exception e) {
                 mainHandler.post(() -> Toast.makeText(this,
-                    "Could not share the log: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                    getString(R.string.log_share_failed, e.getMessage()), Toast.LENGTH_LONG).show());
             }
         }, "kfx-log-share").start();
     }
@@ -226,7 +228,7 @@ public class LogActivity extends Activity {
             return;
         }
         try {
-            clipboard.setPrimaryClip(ClipData.newPlainText("KeeperFX log",
+            clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.log_title),
                 diagnosticsHeader() + clipboardPart(currentLog, MAX_CLIPBOARD_CHARS)));
         } catch (RuntimeException e) {
             // Share goes through a file, so this limit is not one it has.

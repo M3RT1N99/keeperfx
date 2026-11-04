@@ -127,9 +127,9 @@ public final class GameData {
     // ------------------------------------------------------------ KeeperFX half
 
     /** Entries of the KeeperFX release that are still missing. */
-    public static List<String> findMissingKeeperfxEntries(Context context) {
+    public static List<Message> findMissingKeeperfxEntries(Context context) {
         if (installInProgress(context).exists()) {
-            return Collections.singletonList("(the last install did not finish)");
+            return Collections.singletonList(new Message(R.string.missing_install_unfinished));
         }
         return findMissingKeeperfxEntries(gameDirectory(context));
     }
@@ -148,24 +148,20 @@ public final class GameData {
         FileUtil.writeAtomically(installInProgress(context), new byte[0]);
     }
 
-    static List<String> findMissingKeeperfxEntries(File root) {
-        final List<String> missing = new ArrayList<>();
+    /** @return the paths that are missing, or a sentence when it is not about any one of them. */
+    static List<Message> findMissingKeeperfxEntries(File root) {
         if (!root.isDirectory()) {
-            missing.add("(nothing installed yet)");
-            return missing;
+            return Collections.singletonList(new Message(R.string.missing_nothing_installed));
         }
+        final List<Message> missing = new ArrayList<>();
         for (String dir : KEEPERFX_DIRECTORIES) {
             final File d = resolveIgnoringCase(root, dir);
-            if (!d.isDirectory()) {
-                missing.add(dir + "/");
-            } else {
-                // Existing but empty counts as missing. A half finished install
-                // used to pass this check and then surface as silence and black
-                // screens, with the launcher insisting the data was complete.
-                final String[] entries = d.list();
-                if (entries == null || entries.length == 0) {
-                    missing.add(dir + "/ (empty)");
-                }
+            // Existing but empty counts as missing. A half finished install used to
+            // pass this check and then surface as silence and black screens, with the
+            // launcher insisting the data was complete.
+            final String[] entries = d.list();
+            if (entries == null || entries.length == 0) {
+                missing.add(Message.plain(dir + "/"));
             }
         }
         for (String file : KEEPERFX_CONTENT_FILES) {
@@ -174,12 +170,12 @@ public final class GameData {
             final boolean present = f.isFile()
                 || (f.isDirectory() && f.list() != null && f.list().length > 0);
             if (!present) {
-                missing.add(file);
+                missing.add(Message.plain(file));
             }
         }
         for (String file : KEEPERFX_FILES) {
             if (!resolveIgnoringCase(root, file).isFile()) {
-                missing.add(file);
+                missing.add(Message.plain(file));
             }
         }
         return missing;
@@ -350,14 +346,15 @@ public final class GameData {
      * the number at the top of the launcher has to change to match, or nobody
      * can tell which of the two they are looking at.
      */
-    public static String describeInstalledVersion(Context context) {
+    public static Message describeInstalledVersion(Context context) {
         final Prefs prefs = new Prefs(context);
         return describeVersion(prefs.getInstalledVersion(), prefs.getInstalledAlphaVersion());
     }
 
-    static String describeVersion(String release, String alpha) {
-        final String base = release.isEmpty() ? "imported folder" : release;
-        return alpha.isEmpty() ? base : base + " + alpha " + alpha;
+    static Message describeVersion(String release, String alpha) {
+        final Message base = release.isEmpty()
+            ? new Message(R.string.version_imported_folder) : Message.plain(release);
+        return alpha.isEmpty() ? base : new Message(R.string.version_with_alpha, base, alpha);
     }
 
     /**
@@ -377,22 +374,22 @@ public final class GameData {
     }
 
     /** Human readable size of the installation, for the launcher status line. */
-    public static String describeSize(File dir) {
+    public static Message describeSize(File dir) {
         return describeBytes(directorySize(dir));
     }
 
-    public static String describeBytes(long bytes) {
-        if (bytes <= 0) {
-            return "0 B";
+    public static Message describeBytes(long bytes) {
+        if (bytes < 1024) {
+            return new Message(R.string.size_bytes, Math.max(0, bytes));
         }
-        final String[] units = {"B", "KB", "MB", "GB"};
+        final int[] units = {R.string.size_kb, R.string.size_mb, R.string.size_gb};
         int unit = 0;
-        double value = bytes;
+        double value = bytes / 1024.0;
         while (value >= 1024.0 && unit < units.length - 1) {
             value /= 1024.0;
             unit++;
         }
-        return String.format(Locale.US, "%.1f %s", value, units[unit]);
+        return new Message(units[unit], value);
     }
 
     private static long directorySize(File dir) {

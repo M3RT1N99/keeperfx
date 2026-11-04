@@ -137,7 +137,7 @@ final class ArchiveUnpacker {
         FileUtil.ensureDirectory(destination);
         try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
             FileUtil.requireRoom(destination, bytesNeeded(sevenZ.getEntries(), destination),
-                "unpacking");
+                R.string.no_room_unpack);
         }
     }
 
@@ -178,13 +178,13 @@ final class ArchiveUnpacker {
                 return 0;
             }
             if (files == 0) {
-                throw new IOException("The archive holds no files");
+                throw new Message.Failure(R.string.archive_empty);
             }
             FileUtil.ensureDirectory(target);
             for (File file : staging.listFiles()) {
                 final File installed = new File(target, file.getName());
                 if (!file.renameTo(installed)) {
-                    throw new IOException("Cannot write " + installed.getAbsolutePath());
+                    throw new Message.Failure(R.string.file_cannot_write, installed.getAbsolutePath());
                 }
             }
             return files;

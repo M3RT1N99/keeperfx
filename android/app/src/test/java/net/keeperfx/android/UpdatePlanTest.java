@@ -62,20 +62,28 @@ public class UpdatePlanTest {
     }
 
     private String plannedTitle(int index) {
-        return UpdateManager.plan(facts).get(index).title;
+        return StringResources.text(UpdateManager.plan(facts).get(index).title);
     }
 
     private String plannedDetail(int index) {
-        return UpdateManager.plan(facts).get(index).detail;
+        final StringBuilder lines = new StringBuilder();
+        for (Message line : UpdateManager.plan(facts).get(index).lines) {
+            lines.append(StringResources.text(line)).append('\n');
+        }
+        return lines.toString();
+    }
+
+    private String dialogText(List<UpdateManager.Item> items) {
+        return UpdateManager.describe(items, StringResources.ENGLISH);
     }
 
     /** What the launcher refuses while the game is open. */
     @Test
     public void onlyAnAppUpdateLeavesTheInstallationAlone() {
-        final UpdateManager.Item app = new UpdateManager.Item(UpdateManager.Kind.APP, "", "", null);
-        final UpdateManager.Item music = new UpdateManager.Item(UpdateManager.Kind.MUSIC, "", "", null);
-        final UpdateManager.Item data = new UpdateManager.Item(UpdateManager.Kind.GAME_DATA, "", "", null);
-        final UpdateManager.Item alpha = new UpdateManager.Item(UpdateManager.Kind.GAME_ALPHA, "", "", null);
+        final UpdateManager.Item app = new UpdateManager.Item(UpdateManager.Kind.APP, Message.plain(), null);
+        final UpdateManager.Item music = new UpdateManager.Item(UpdateManager.Kind.MUSIC, Message.plain(), null);
+        final UpdateManager.Item data = new UpdateManager.Item(UpdateManager.Kind.GAME_DATA, Message.plain(), null);
+        final UpdateManager.Item alpha = new UpdateManager.Item(UpdateManager.Kind.GAME_ALPHA, Message.plain(), null);
         assertFalse(UpdateManager.changesInstallation(Arrays.asList(app)));
         assertFalse(UpdateManager.changesInstallation(Collections.emptyList()));
         assertTrue(UpdateManager.changesInstallation(Arrays.asList(app, music)));
@@ -88,7 +96,7 @@ public class UpdatePlanTest {
     public void theAlphaOfferOnAnImportedFolderReadsLikeASentence() {
         facts.stableVersion = "";
         facts.alphaVersion = "";
-        final String text = UpdateManager.describe(UpdateManager.plan(facts));
+        final String text = dialogText(UpdateManager.plan(facts));
         assertTrue(text, text.contains("needs and this installation does not have"));
         assertFalse(text, text.contains("needs and  does"));
     }
@@ -101,7 +109,7 @@ public class UpdatePlanTest {
     @Test
     public void aFreshDeviceIsOfferedTheReleaseAndNothingThatDependsOnIt() {
         facts.dataInstalled = false;
-        facts.missingEntries = Arrays.asList("(nothing installed yet)");
+        facts.missingEntries = Arrays.asList(new Message(R.string.missing_nothing_installed));
         facts.stableVersion = "";
         facts.alphaVersion = "";
         facts.hasMusic = false;
@@ -116,7 +124,7 @@ public class UpdatePlanTest {
     @Test
     public void aFreshInstallMovesOnOnceTheReleaseIsOnDisk() throws IOException {
         final File root = folder.newFolder("keeperfx");
-        assertEquals(Collections.singletonList("(nothing installed yet)"),
+        assertEquals(Collections.singletonList(new Message(R.string.missing_nothing_installed)),
             GameData.findMissingKeeperfxEntries(new File(root, "absent")));
         assertTrue(!GameData.findMissingKeeperfxEntries(root).isEmpty());
 
@@ -158,7 +166,7 @@ public class UpdatePlanTest {
         layOutWhatTheStableReleaseShips(root);
         FileUtil.deleteTree(new File(root, "levels"));
         assertTrue(new File(root, "levels").mkdirs());
-        assertEquals(Collections.singletonList("levels/ (empty)"),
+        assertEquals(Collections.singletonList(Message.plain("levels/")),
             GameData.findMissingKeeperfxEntries(root));
     }
 
@@ -200,7 +208,8 @@ public class UpdatePlanTest {
     public void aCachedPatchDoesNotClaimToCostADownload() {
         facts.alphaVersion = "";
         facts.alphaCached = true;
-        assertTrue(plannedDetail(0).contains("already downloaded"));
+        assertTrue(plannedDetail(0).contains("Already downloaded"));
+        assertFalse(plannedDetail(0).contains("MB"));
     }
 
     @Test
@@ -256,6 +265,50 @@ public class UpdatePlanTest {
         assertTrue(GameData.describeDataFit(5591, "1.4.0.5700").startsWith("MISMATCH"));
         assertTrue(GameData.describeDataFit(5591, "").startsWith("no alpha"));
         assertTrue(GameData.describeDataFit(0, "1.4.0.5591").startsWith("unknown"));
+    }
+
+    /** The sentence for nothing being there says that, and a list of paths gets its heading. */
+    @Test
+    public void whatIsMissingIsSaidInASentenceOrAsAShortList() {
+        facts.dataInstalled = false;
+        facts.missingEntries = Arrays.asList(new Message(R.string.missing_nothing_installed));
+        assertEquals("Game data, 357.2 MB\nNothing is installed yet.\n", plannedDetail(0));
+
+        facts.missingEntries = Arrays.asList(new Message(R.string.missing_install_unfinished));
+        assertEquals("Game data, 357.2 MB\nThe last install did not finish.\n", plannedDetail(0));
+
+        facts.missingEntries = Arrays.asList(Message.plain("data/"), Message.plain("levels/"));
+        assertEquals("Game data, 357.2 MB\nMissing: data/, levels/\n", plannedDetail(0));
+
+        facts.missingEntries = Arrays.asList(Message.plain("a"), Message.plain("b"), Message.plain("c"),
+            Message.plain("d"), Message.plain("e"), Message.plain("f"));
+        assertEquals("Game data, 357.2 MB\nMissing: a, b, c, d and 2 more\n", plannedDetail(0));
+    }
+
+    @Test
+    public void aRepairNamesItsSizeAndTheFirstFewFiles() {
+        facts.verified.stableProblems.addAll(Arrays.asList("a", "b", "c", "d"));
+        assertEquals("Files missing or damaged: 4. Reinstalling repairs them, 357.2 MB\n"
+            + "For example: a, b, c\n", plannedDetail(0));
+    }
+
+    @Test
+    public void everyLineOfThePlanComesOutInWords() {
+        facts.stableVersion = "1.3.2";
+        facts.alphaVersion = "1.4.0.5598";
+        facts.hasMusic = false;
+        facts.appUpdate = new AppRelease("1.60", "https://example.test/app.apk", 1,
+            Collections.<String>emptyList());
+        assertEquals("\u2022 KeeperFX 1.4.0\n"
+            + "    Update from 1.3.2, 357.2 MB\n"
+            + "\u2022 KeeperFX alpha 1.4.0.5591\n"
+            + "    Replaces 1.4.0.5598\n"
+            + "    Download: 22.7 MB\n"
+            + "\u2022 Background music\n"
+            + "    Not included in the release, about 42 MB\n"
+            + "    The game plays no music until this is installed.\n"
+            + "\u2022 KeeperFX app 1.60\n"
+            + "    Currently 1.57\n", dialogText(UpdateManager.plan(facts)));
     }
 
     @Test
@@ -369,8 +422,8 @@ public class UpdatePlanTest {
                             return AppUpdater.newerThan("1.57", Http.getJson(limited));
                         } catch (IOException e) {
                             // That it was the status, and not this server falling over.
-                            assertTrue(e.getMessage(),
-                                e.getMessage().contains("HTTP " + status.substring(0, 3)));
+                            assertEquals(new Message(R.string.http_status,
+                                Integer.parseInt(status.substring(0, 3))), Message.detailOf(e));
                             throw e;
                         }
                     }
@@ -406,8 +459,8 @@ public class UpdatePlanTest {
         try {
             AppUpdater.newerThan("1.57", new JSONObject("{\"tag_name\":\"android-v1.60\"}"));
             fail("null here would read as being on the newest build");
-        } catch (IOException expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("no APK"));
+        } catch (Message.Failure expected) {
+            assertEquals(new Message(R.string.release_unusable), expected.message);
         }
     }
 
@@ -425,7 +478,7 @@ public class UpdatePlanTest {
         facts.appUpdate = new AppRelease("1.60", "https://example.test/app.apk", 1,
             Arrays.asList("first change", "second change"));
         final List<UpdateManager.Item> items = UpdateManager.plan(facts);
-        final String text = UpdateManager.describe(items);
+        final String text = dialogText(items);
         assertTrue(text, text.contains("\u2022 KeeperFX alpha 1.4.0.5591\n    Files the current engine"));
         assertTrue(text, text.contains("\u2022 KeeperFX app 1.60\n    Currently 1.57\n"
             + "    \u2022 first change\n    \u2022 second change\n"));

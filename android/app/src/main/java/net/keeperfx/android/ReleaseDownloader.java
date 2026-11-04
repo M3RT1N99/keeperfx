@@ -31,17 +31,17 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 
 public final class ReleaseDownloader {
 
     private static final String TAG = "KeeperFX";
 
     public interface Listener {
-        /** @param percent 0..100, or -1 when the total size is unknown. */
-        void onStage(String stage, int percent, String detail);
-
-        void onFinished(boolean success, String message);
+        /**
+         * @param percent 0..100, or -1 when the total size is unknown.
+         * @param detail null when there is nothing to add.
+         */
+        void onStage(Message stage, int percent, Message detail);
     }
 
     private final Context context;
@@ -50,7 +50,7 @@ public final class ReleaseDownloader {
     private final ArchiveUnpacker.Progress unpackProgress = new ArchiveUnpacker.Progress() {
         @Override
         public void onFiles(int unpacked) {
-            listener.onStage("Unpacking", -1, unpacked + " files");
+            stage(R.string.stage_unpacking, -1, new Message(R.string.stage_unpacked_files, unpacked));
         }
 
         @Override
@@ -74,36 +74,36 @@ public final class ReleaseDownloader {
      *
      * Music is not part of the release on any platform; the desktop launcher
      * fetches it from the same workshop item. Runs synchronously.
+     *
+     * @return null when it is done, otherwise what went wrong.
      */
-    public void runMusic() {
+    public Message runMusic() {
         File archive = null;
         try {
-            listener.onStage("Looking up the music archive", -1, "");
+            stage(R.string.stage_music_lookup, -1, null);
             final String url = ReleaseApi.musicArchiveUrl();
             if (url.isEmpty()) {
-                finish(false, "The workshop API returned no music download");
-                return;
+                return new Message(R.string.job_no_music_download);
             }
 
             archive = new File(downloadDirectory(), "keeperfx-music-archive.zip");
             FileUtil.deleteOtherVersions(archive, "keeperfx-music");
-            if (!download(url, archive, -1, "music")) {
-                finish(false, "Download cancelled");
-                return;
+            if (!download(url, archive, -1, new Message(R.string.stage_music_download))) {
+                return new Message(R.string.job_download_cancelled);
             }
 
-            listener.onStage("Unpacking the music", -1, "");
+            stage(R.string.stage_music_unpack, -1, null);
             final File musicDir = new File(GameData.gameDirectory(context), "music");
             final int files = ArchiveUnpacker.unzipAllOrNothing(archive, musicDir,
                 new File(downloadDirectory(), "music-unpacking"), unpackProgress);
             if (isCancelled()) {
-                finish(false, "Cancelled while unpacking");
-                return;
+                return new Message(R.string.job_unpack_cancelled);
             }
-            finish(true, "Installed " + files + " music tracks");
+            Log.i(TAG, "Installed " + files + " music tracks");
+            return null;
         } catch (Exception e) {
             Log.e(TAG, "Music download failed", e);
-            finish(false, "Failed: " + e.getMessage());
+            return failure(e);
         } finally {
             // Only ever a whole archive under this name. What is still partial
             // is what the next attempt resumes from.
@@ -121,15 +121,16 @@ public final class ReleaseDownloader {
      * the same layout, only fewer files, and it merges rather than replaces. The
      * recorded version is left alone, because what is installed is still the
      * stable release with a patch on top.
+     *
+     * @return null when it is done, otherwise what went wrong.
      */
-    public void runAlpha() {
+    public Message runAlpha() {
         File archive = null;
         try {
-            listener.onStage("Checking for the alpha patch", -1, "");
+            stage(R.string.stage_alpha_check, -1, null);
             final ReleaseApi.ReleaseInfo alpha = ReleaseApi.alphaForEngine(BuildConfig.ENGINE_BUILD);
             if (alpha.downloadUrl.isEmpty()) {
-                finish(false, "The alpha API returned no download URL");
-                return;
+                return new Message(R.string.job_no_download_address);
             }
             final String version = alpha.version.isEmpty() ? "unknown" : alpha.version;
             Log.i(TAG, "KeeperFX alpha for engine build " + BuildConfig.ENGINE_BUILD + ": "
@@ -141,19 +142,18 @@ public final class ReleaseDownloader {
             archive = alphaArchiveCache(context, version);
             FileUtil.deleteOtherVersions(archive, "alpha-");
             if (ResumableDownload.isComplete(archive, alpha.sizeInBytes)) {
-                listener.onStage("Using the archive already downloaded", -1, "");
-            } else if (!download(alpha.downloadUrl, archive, alpha.sizeInBytes, version)) {
-                finish(false, "Download cancelled");
-                return;
+                stage(R.string.stage_archive_cached, -1, null);
+            } else if (!download(alpha.downloadUrl, archive, alpha.sizeInBytes,
+                    new Message(R.string.stage_download_version, version))) {
+                return new Message(R.string.job_download_cancelled);
             }
 
             ArchiveUnpacker.requireRoomFor(archive, GameData.gameDirectory(context));
-            listener.onStage("Saving the files being replaced", -1, "");
+            stage(R.string.stage_saving_replaced, -1, null);
             alphaBackup().extendFor(archive);
             final List<String> unpacked = unpack(archive);
             if (isCancelled()) {
-                finish(false, "Cancelled while unpacking");
-                return;
+                return new Message(R.string.job_unpack_cancelled);
             }
             final File root = GameData.gameDirectory(context);
             ArchiveUnpacker.removeRetiredFiles(root, GameData.alphaBackupDirectory(context),
@@ -161,9 +161,10 @@ public final class ReleaseDownloader {
             writeManifest(GameData.alphaManifest(context), unpacked);
 
             new Prefs(context).setInstalledAlphaVersion(version);
-            finish(true, "KeeperFX alpha " + version + " applied");
+            Log.i(TAG, "KeeperFX alpha " + version + " applied");
+            return null;
         } catch (FileUtil.NoRoomException e) {
-            finish(false, e.getMessage());
+            return e.message;
         } catch (Exception e) {
             Log.e(TAG, "Alpha download failed", e);
             // Kept on success, see above. After a failure it may be what failed,
@@ -172,7 +173,7 @@ public final class ReleaseDownloader {
                 //noinspection ResultOfMethodCallIgnored
                 archive.delete();
             }
-            finish(false, "Failed: " + e.getMessage());
+            return failure(e);
         }
     }
 
@@ -206,27 +207,29 @@ public final class ReleaseDownloader {
      *
      * Runs synchronously and is quick: the backup is some tens of megabytes of
      * configuration and data files, not the 374 MB release.
+     *
+     * @return null when it is done, otherwise what went wrong.
      */
-    public void revertAlpha() {
+    public Message revertAlpha() {
         try {
             final Prefs prefs = new Prefs(context);
             final AlphaBackup backup = alphaBackup();
             if (!backup.exists()) {
                 prefs.setInstalledAlphaVersion("");
-                finish(true, "No alpha patch to remove");
-                return;
+                return null;
             }
-            listener.onStage("Restoring the release", -1, "");
+            stage(R.string.stage_restoring_release, -1, null);
             final int restored = backup.restore();
             prefs.setInstalledAlphaVersion("");
             // The restored files are the stable release's own copies again, so
             // the stable manifest describes them and the patch's does not.
             //noinspection ResultOfMethodCallIgnored
             GameData.alphaManifest(context).delete();
-            finish(true, "Alpha patch removed, " + restored + " files restored");
+            Log.i(TAG, "Alpha patch removed, " + restored + " files restored");
+            return null;
         } catch (Exception e) {
             Log.e(TAG, "Could not remove the alpha patch", e);
-            finish(false, "Failed: " + e.getMessage());
+            return failure(e);
         }
     }
 
@@ -260,24 +263,28 @@ public final class ReleaseDownloader {
         GameData.installInProgress(context).delete();
     }
 
-    /** Runs synchronously; the caller provides the thread. */
-    public void run() {
+    /**
+     * Fetches the release and lays it over the installation. Runs synchronously; the
+     * caller provides the thread.
+     *
+     * @return null when it is done, otherwise what went wrong.
+     */
+    public Message run() {
         File archive = null;
         try {
-            listener.onStage("Checking for the current release", -1, "");
+            stage(R.string.stage_release_check, -1, null);
             final ReleaseApi.ReleaseInfo release = ReleaseApi.latestStable();
             final String version = release.version.isEmpty() ? "unknown" : release.version;
             if (release.downloadUrl.isEmpty()) {
-                finish(false, "The release API returned no download URL");
-                return;
+                return new Message(R.string.job_no_download_address);
             }
             Log.i(TAG, "Latest KeeperFX release: " + version + " at " + release.downloadUrl);
 
             archive = new File(downloadDirectory(), "keeperfx-release-" + version + ".7z");
             FileUtil.deleteOtherVersions(archive, "keeperfx-release");
-            if (!download(release.downloadUrl, archive, release.sizeInBytes, version)) {
-                finish(false, "Download cancelled");
-                return;
+            if (!download(release.downloadUrl, archive, release.sizeInBytes,
+                    new Message(R.string.stage_download_version, version))) {
+                return new Message(R.string.job_download_cancelled);
             }
 
             // Everything before this point leaves the installation as it was.
@@ -300,8 +307,7 @@ public final class ReleaseDownloader {
 
             final List<String> unpacked = unpack(archive);
             if (isCancelled()) {
-                finish(false, "Cancelled while unpacking");
-                return;
+                return new Message(R.string.job_unpack_cancelled);
             }
             ArchiveUnpacker.removeRetiredFiles(GameData.gameDirectory(context), null,
                 Collections.<String>emptySet());
@@ -309,15 +315,16 @@ public final class ReleaseDownloader {
             prefs.setInstalledVersion(version);
             //noinspection ResultOfMethodCallIgnored
             GameData.installInProgress(context).delete();
-            finish(true, "KeeperFX " + version + " installed");
+            Log.i(TAG, "KeeperFX " + version + " installed");
+            return null;
         } catch (FileUtil.NoRoomException e) {
             // The archive is fine and free storage is all that is missing, so the
             // next attempt should not have to fetch it again.
             archive = null;
-            finish(false, e.getMessage());
+            return e.message;
         } catch (Exception e) {
             Log.e(TAG, "Release download failed", e);
-            finish(false, "Failed: " + e.getMessage());
+            return failure(e);
         } finally {
             // Only ever a whole archive under this name, whether it unpacked or
             // turned out to be damaged. What is still partial is what the next
@@ -330,17 +337,14 @@ public final class ReleaseDownloader {
     }
 
     /** @return true when the file is complete, false when cancelled. */
-    private boolean download(String url, File target, long expectedSize, String version)
+    private boolean download(String url, File target, long expectedSize, Message stage)
             throws IOException {
-        final String stage = "music".equals(version)
-            ? "Downloading the music"
-            : "Downloading KeeperFX " + version;
         return ResumableDownload.fetch(url, target, expectedSize, new ResumableDownload.Progress() {
             @Override
             public void onBytes(long done, long total) {
                 final long known = (total > 0) ? total : expectedSize;
                 final int percent = (known > 0) ? (int) (done * 100 / known) : -1;
-                listener.onStage(stage, percent, String.format(Locale.US, "%s of %s",
+                listener.onStage(stage, percent, new Message(R.string.progress_bytes,
                     GameData.describeBytes(done), GameData.describeBytes(known)));
             }
 
@@ -361,13 +365,13 @@ public final class ReleaseDownloader {
 
     /** @return the relative paths of every file written, for the manifest. */
     private List<String> unpack(File archive) throws IOException {
-        listener.onStage("Unpacking", 0, "");
+        stage(R.string.stage_unpacking, 0, null);
         final List<String> written = ArchiveUnpacker.unpackSevenZ(archive,
             GameData.gameDirectory(context), unpackProgress);
         if (!isCancelled()) {
             // The release predates the engine we just built, so its configuration
             // can be missing files or carry values this parser rejects.
-            listener.onStage("Applying configuration", -1, "");
+            stage(R.string.stage_applying_config, -1, null);
             BundledConfig.install(context, true);
         }
         return written;
@@ -378,7 +382,13 @@ public final class ReleaseDownloader {
         Log.i(TAG, "Manifest " + manifest.getName() + " lists " + listed + " files");
     }
 
-    private void finish(boolean success, String message) {
-        listener.onFinished(success, message);
+    private void stage(int stage, int percent, Message detail) {
+        listener.onStage(new Message(stage), percent, detail);
+    }
+
+    private static Message failure(Exception e) {
+        return (e instanceof Message.Failure)
+            ? ((Message.Failure) e).message
+            : new Message(R.string.job_failed, Message.detailOf(e));
     }
 }

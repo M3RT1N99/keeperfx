@@ -50,16 +50,16 @@ public final class UpdateManager {
 
     public static final class Item {
         public final Kind kind;
-        public final String title;
-        public final String detail;
+        final Message title;
+        final Message[] lines;
         /** Only set for Kind.APP. */
         final AppRelease appUpdate;
 
-        Item(Kind kind, String title, String detail, AppRelease appUpdate) {
+        Item(Kind kind, Message title, AppRelease appUpdate, Message... lines) {
             this.kind = kind;
             this.title = title;
-            this.detail = detail;
             this.appUpdate = appUpdate;
+            this.lines = lines;
         }
     }
 
@@ -99,12 +99,12 @@ public final class UpdateManager {
      * changelog has to be here and not only in the app-only dialog behind the
      * version button.
      */
-    static String describe(List<Item> items) {
+    static String describe(List<Item> items, Message.Strings strings) {
         final StringBuilder body = new StringBuilder();
         for (Item item : items) {
-            body.append("\u2022 ").append(item.title).append('\n');
-            if (!item.detail.isEmpty()) {
-                body.append("    ").append(item.detail).append('\n');
+            body.append("\u2022 ").append(item.title.text(strings)).append('\n');
+            for (Message line : item.lines) {
+                body.append("    ").append(line.text(strings)).append('\n');
             }
             if (item.appUpdate != null && !item.appUpdate.changelog().isEmpty()) {
                 for (String line : item.appUpdate.changelog().split("\n")) {
@@ -137,7 +137,7 @@ public final class UpdateManager {
      */
     static final class Facts {
         boolean dataInstalled;
-        List<String> missingEntries = new ArrayList<>();
+        List<Message> missingEntries = new ArrayList<>();
         String stableVersion = "";
         InstallManifest.Report verified = new InstallManifest.Report();
         boolean alphaEnabled;
@@ -238,57 +238,32 @@ public final class UpdateManager {
         if (f.latestStable != null) {
             final ReleaseApi.ReleaseInfo release = f.latestStable;
             final String current = f.stableVersion;
-            final String size = GameData.describeBytes(release.sizeInBytes);
+            final Message size = GameData.describeBytes(release.sizeInBytes);
+            final Message latest = new Message(R.string.update_release, release.version);
             if (!f.dataInstalled) {
                 // Says what is actually wrong rather than just offering a
                 // download: the check now looks inside the directories, so it
                 // can name the files that are absent instead of leaving the
                 // player to guess from silence and black screens.
-                final List<String> gaps = f.missingEntries;
-                final StringBuilder detail = new StringBuilder("Game data, ").append(size);
-                if (!gaps.isEmpty()) {
-                    detail.append("\n    missing: ");
-                    for (int i = 0; i < gaps.size() && i < 4; i++) {
-                        if (i > 0) {
-                            detail.append(", ");
-                        }
-                        detail.append(gaps.get(i));
-                    }
-                    if (gaps.size() > 4) {
-                        detail.append(" and ").append(gaps.size() - 4).append(" more");
-                    }
-                }
-                items.add(new Item(Kind.GAME_DATA,
-                    "KeeperFX " + release.version,
-                    detail.toString(), null));
+                final Message data = new Message(R.string.update_release_size, size);
+                items.add(f.missingEntries.isEmpty()
+                    ? new Item(Kind.GAME_DATA, latest, null, data)
+                    : new Item(Kind.GAME_DATA, latest, null, data, missingLine(f.missingEntries)));
             } else if (current.isEmpty()) {
                 // A hand imported folder carries no version, and there is no way
                 // to tell how complete it is - the one that prompted this came
                 // with no map pack levels at all. Always offer the real release.
-                items.add(new Item(Kind.GAME_DATA,
-                    "KeeperFX " + release.version,
-                    "Replaces the imported folder with the official release, " + size, null));
+                items.add(new Item(Kind.GAME_DATA, latest, null,
+                    new Message(R.string.update_replaces_folder, size)));
             } else if (!current.equals(release.version)) {
-                items.add(new Item(Kind.GAME_DATA,
-                    "KeeperFX " + release.version,
-                    "Update from " + current + ", " + size, null));
+                items.add(new Item(Kind.GAME_DATA, latest, null,
+                    new Message(R.string.update_from_version, current, size)));
             } else if (!f.verified.stableProblems.isEmpty()) {
                 final List<String> gaps = f.verified.stableProblems;
-                final StringBuilder detail = new StringBuilder()
-                    .append(gaps.size())
-                    .append(gaps.size() == 1 ? " file" : " files")
-                    .append(" missing or damaged, reinstalling repairs them, ")
-                    .append(size)
-                    .append("\n    e.g. ");
-                for (int i = 0; i < gaps.size() && i < 3; i++) {
-                    if (i > 0) {
-                        detail.append(", ");
-                    }
-                    detail.append(gaps.get(i));
-                }
-                items.add(new Item(Kind.GAME_DATA,
-                    "Repair KeeperFX " + current,
-                    detail.toString(), null));
+                items.add(new Item(Kind.GAME_DATA, new Message(R.string.update_repair, current), null,
+                    new Message(R.string.update_release_damaged, gaps.size(), size),
+                    new Message(R.string.update_for_example,
+                        Message.plain(gaps.subList(0, Math.min(3, gaps.size())).toArray()))));
             }
         }
 
@@ -306,33 +281,27 @@ public final class UpdateManager {
             // Nothing to fetch if the archive is still on the device from a
             // previous switch, and saying "33 MB" then would be a plain untruth
             // about what pressing the button costs.
-            final String cost = f.alphaCached
-                ? "already downloaded, only needs applying"
-                : GameData.describeBytes(alpha.sizeInBytes);
+            final Message cost = f.alphaCached
+                ? new Message(R.string.update_cost_cached)
+                : new Message(R.string.update_cost_download, GameData.describeBytes(alpha.sizeInBytes));
             if (alpha.version.equals(current)) {
                 if (!f.verified.alphaProblems.isEmpty()) {
                     // The patch is current but files it brought are gone or wrong;
                     // re-applying it is the download that fixes them.
                     items.add(new Item(Kind.GAME_ALPHA,
-                        "Repair KeeperFX alpha " + alpha.version,
-                        f.verified.alphaProblems.size()
-                            + (f.verified.alphaProblems.size() == 1 ? " file" : " files")
-                            + " missing or damaged, " + cost, null));
+                        new Message(R.string.update_repair_alpha, alpha.version), null,
+                        new Message(R.string.update_alpha_damaged, f.verified.alphaProblems.size()),
+                        cost));
                 }
             } else if (!ReleaseApi.fitsEngine(current, f.engineBuild)) {
                 // What is installed stays if it fits, even when the API has lost
                 // that build and has only something newer to suggest.
-                // An imported folder carries no version to name here.
-                final String base = f.stableVersion.isEmpty() ? "this installation" : f.stableVersion;
-                final StringBuilder detail = new StringBuilder(current.isEmpty()
-                    ? "Files the current engine needs and " + base + " does not have, "
-                    : "Replaces " + current + ", ").append(cost);
-                if (!ReleaseApi.fitsEngine(alpha.version, f.engineBuild)) {
-                    detail.append("\n    The newest one: there is no patch for engine build ")
-                        .append(f.engineBuild);
-                }
-                items.add(new Item(Kind.GAME_ALPHA,
-                    "KeeperFX alpha " + alpha.version, detail.toString(), null));
+                final Message title = new Message(R.string.update_alpha, alpha.version);
+                final Message what = alphaOffer(current, f.stableVersion);
+                items.add(ReleaseApi.fitsEngine(alpha.version, f.engineBuild)
+                    ? new Item(Kind.GAME_ALPHA, title, null, what, cost)
+                    : new Item(Kind.GAME_ALPHA, title, null, what, cost,
+                        new Message(R.string.update_alpha_other_build, f.engineBuild)));
             }
         }
 
@@ -344,18 +313,37 @@ public final class UpdateManager {
             // not part of the release on any platform, so an installation that
             // is otherwise complete is still silent without it, and the log
             // only says "Cannot load music from ./music/keeper02.ogg".
-            items.add(new Item(Kind.MUSIC,
-                "Background music",
-                "Not included in the release, about 42 MB"
-                    + "\n    the game plays no music until this is installed", null));
+            items.add(new Item(Kind.MUSIC, new Message(R.string.update_music), null,
+                new Message(R.string.update_music_size), new Message(R.string.update_music_why)));
         }
 
         // --- The app itself ---------------------------------------------------
         if (f.appUpdate != null) {
             items.add(new Item(Kind.APP,
-                "KeeperFX app " + f.appUpdate.versionName,
-                "Currently " + f.appVersionName, f.appUpdate));
+                new Message(R.string.update_app, f.appUpdate.versionName), f.appUpdate,
+                new Message(R.string.update_app_current, f.appVersionName)));
         }
         return items;
+    }
+
+    /** The first few paths, or the sentence that stands in for them all. */
+    private static Message missingLine(List<Message> gaps) {
+        if (gaps.size() == 1 && !gaps.get(0).isPlain()) {
+            return gaps.get(0);
+        }
+        final Message firstFew = Message.plain(gaps.subList(0, Math.min(4, gaps.size())).toArray());
+        return (gaps.size() > 4)
+            ? new Message(R.string.update_missing_and_more, firstFew, gaps.size() - 4)
+            : new Message(R.string.update_missing, firstFew);
+    }
+
+    private static Message alphaOffer(String currentAlpha, String stableVersion) {
+        if (!currentAlpha.isEmpty()) {
+            return new Message(R.string.update_alpha_replaces, currentAlpha);
+        }
+        // An imported folder carries no version to name here.
+        return stableVersion.isEmpty()
+            ? new Message(R.string.update_alpha_adds_to_folder)
+            : new Message(R.string.update_alpha_adds, stableVersion);
     }
 }

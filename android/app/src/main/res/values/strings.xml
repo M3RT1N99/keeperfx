@@ -1,43 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every word the launcher shows. Each language has a copy of this file under values-<code>,
+  and StringResourcesTest holds them against this one.
+
+  For translators: keep the placeholders exactly, %1$s and %2$d and %1$.1f, in whatever order
+  the sentence needs. Write \n for a line break, \' for an apostrophe and \" for a straight
+  quote. Typographic quotes need no backslash. Where a comment below says a text is narrow,
+  keep it short, a word or two if you can.
+-->
 <resources>
-    <string name="app_name">KeeperFX</string>
+    <string name="app_name" translatable="false">KeeperFX</string>
     <string name="app_subtitle">Dungeon Keeper, remade — for Android (unofficial)</string>
 
     <string name="log_title">Engine log</string>
-    <string name="log_header">keeperfx.log · %1$s · %2$s</string>
+    <string name="log_header" translatable="false">keeperfx.log · %1$s · %2$s</string>
     <string name="log_loading">Reading…</string>
     <string name="log_none">No log yet — start the game once.</string>
     <string name="log_empty_hint">The log is empty. It is written while the game runs and survives a crash, so try starting the game and coming back here.</string>
+    <!-- Narrow: three buttons side by side. -->
     <string name="log_share">Share</string>
     <string name="log_copy">Copy</string>
     <string name="log_refresh">Reload</string>
     <string name="log_copied">Log copied to the clipboard</string>
     <string name="log_copied_end">Only the end of the log fits on the clipboard. Share sends more of it.</string>
     <string name="log_copy_failed">Could not copy the log. Use Share instead.</string>
-    <string name="button_log">Log</string>
+    <string name="log_read_failed">Could not read the log: %1$s</string>
+    <string name="log_share_failed">Could not share the log: %1$s</string>
 
+    <!-- A file size. The unit is the thing to translate, if your language writes it differently. -->
+    <string name="size_bytes">%1$d B</string>
+    <string name="size_kb">%1$.1f KB</string>
+    <string name="size_mb">%1$.1f MB</string>
+    <string name="size_gb">%1$.1f GB</string>
+    <string name="progress_bytes">%1$s of %2$s</string>
+
+    <!-- Narrow: two buttons side by side, in small print. -->
     <string name="button_export">Export installation</string>
     <string name="button_import">Import installation</string>
     <string name="button_share_again">Share again</string>
     <string name="button_delete_export">Delete</string>
 
     <string name="export_title">Export installation</string>
-    <string name="export_offer">Everything is packed into one file, so that another device can end up just like this one:\n\n• KeeperFX %1$s, the original Dungeon Keeper files%2$s\n• Your saved games (%3$d), campaign progress, settings, mods and screenshots\n\nThat is %4$s in %5$d files. Packing needs up to %6$s of free storage, and %7$s are free.\n\nThe file contains your copy of the original Dungeon Keeper files and your saves, and is meant for your own devices. Once it is packed, this device shows you where it can go.</string>
-    <string name="export_offer_music">, the music</string>
+    <string name="export_offer_intro">Everything is packed into one file, so that another device can end up just like this one:</string>
+    <string name="export_offer_game">• KeeperFX %1$s and the original Dungeon Keeper files</string>
+    <string name="export_offer_music">• The music</string>
+    <string name="export_offer_saves">• Your saved games (%1$d), campaign progress, settings, mods and screenshots</string>
+    <string name="export_offer_size">Size: %1$s. Files: %2$d. Packing needs up to %3$s of free storage. Free now: %4$s.</string>
+    <string name="export_offer_own_devices">The file contains your copy of the original Dungeon Keeper files and your saves, and is meant for your own devices. Once it is packed, this device shows you where it can go.</string>
     <string name="export_confirm">Pack it</string>
     <string name="export_share_title">Export KeeperFX (unofficial)</string>
     <string name="export_ready_notification">The export is ready. Tap to choose where it goes.</string>
+    <!-- %1$s is the name of the file, %2$s its size. -->
     <string name="export_waiting">Ready to export: %1$s, %2$s. It stays here until you delete it, or for a day.</string>
+    <string name="export_not_installed">The game is not completely installed yet, so there is nothing to export.</string>
+    <string name="export_no_manifest">This installation came from a folder, so nothing can tell whether it is whole. \"Check for downloads\" offers the official release, then it can be exported.</string>
+    <string name="export_damaged">Files missing or damaged: %1$d. \"Check for downloads\" repairs them, then it can be exported.</string>
+    <string name="export_cannot_look">Could not look at the installation: %1$s</string>
+    <!-- %1$s is a path. -->
+    <string name="export_file_changed">%1$s changed while it was being packed.</string>
+    <string name="stage_packing">Packing</string>
+    <string name="job_packing_cancelled">Packing cancelled.</string>
+    <string name="job_packing_failed">Packing failed: %1$s</string>
 
     <string name="import_bundle_title">Import installation</string>
     <string name="import_bundle_explanation">Pick the file that was exported from another device. Whatever received it decides where it landed, so if it is not in Download, look there.</string>
     <string name="import_bundle_choose">Choose file</string>
-    <string name="import_bundle_offer">This file holds KeeperFX %1$s, the original game files, campaign progress and saved games (%2$d): %3$s in all.</string>
+    <string name="import_bundle_offer">This file holds KeeperFX %1$s, the original game files, campaign progress and saved games (%2$d). Size: %3$s.</string>
     <string name="import_bundle_trust">Only import what you exported yourself or got from someone you trust: the game runs the scripts inside.</string>
     <string name="import_bundle_replaces">It replaces everything on this device, campaign progress included. Saved games here that would be lost: %1$d.</string>
     <string name="import_bundle_replaces_no_saves">It replaces everything on this device, campaign progress included. There are no saved games here to lose.</string>
     <string name="import_bundle_nothing_here">Nothing is installed on this device yet.</string>
-    <string name="import_bundle_room">Unpacking needs %1$s of free storage, and %2$s are free.</string>
+    <string name="import_bundle_room">Unpacking needs %1$s of free storage. Free now: %2$s.</string>
     <string name="import_bundle_other_build">It comes from app %1$s with engine build %2$d, and this is app %3$s with engine build %4$d. That is fine, it can still be imported. \"Check for downloads\" then offers the alpha patch that matches this engine.</string>
     <string name="import_bundle_confirm">Replace everything</string>
     <string name="import_bundle_done_notification">KeeperFX imported. It is ready to play.</string>
@@ -46,30 +79,52 @@
     <string name="import_bundle_delete">Delete the file</string>
     <string name="import_bundle_keep">Keep it</string>
     <string name="import_bundle_not_deleted">It could not be deleted from here, so it is still there:\n\n%1$s\n\nA file manager can delete it.</string>
+    <string name="import_bundle_picked_file">The file you picked</string>
+    <string name="import_bundle_cannot_read">Cannot read this file.</string>
+    <string name="import_bundle_cannot_read_detail">Cannot read this file: %1$s</string>
+    <string name="stage_unpacking_import">Unpacking the imported file</string>
+    <string name="job_import_cancelled">Import cancelled. Nothing was changed.</string>
+    <string name="job_import_failed">Import failed: %1$s</string>
+    <string name="transfer_not_a_bundle">This is not an exported KeeperFX installation. Nothing was changed.</string>
+    <string name="transfer_damaged">This file is incomplete or damaged, probably cut off on its way here. Nothing was changed. Export it again.</string>
+    <string name="transfer_from_newer_app">This file was made by a newer KeeperFX app than this one. Update the app here first. Nothing was changed.</string>
+    <string name="transfer_holds_more">This file holds more than it says it does, so it is not what it claims to be. Nothing was changed.</string>
+    <!-- %1$s is a path. -->
+    <string name="transfer_outside_game">This file tries to write outside the game (%1$s), so it will not be installed. Nothing was changed.</string>
+    <string name="transfer_not_complete">This file does not hold a complete installation, so the game could not start from it. Nothing was changed.</string>
+    <string name="transfer_earlier_import_stuck">An earlier import could neither be finished nor undone.</string>
+    <string name="transfer_settings_not_written">Could not write the launcher\'s settings.</string>
 
     <string name="game_still_open_title">The game is still open</string>
     <string name="game_still_open">The game is still open in the background. Quit it first, because this replaces or deletes files it is using.</string>
 
-    <string name="version_unknown">imported folder</string>
+    <!-- Stands where a version number would, as in "KeeperFX: imported folder (640 MB)". -->
+    <string name="version_imported_folder">imported folder</string>
+    <!-- Two versions, or "imported folder" and a version: 1.4.0 + alpha 1.4.0.5591 -->
+    <string name="version_with_alpha">%1$s + alpha %2$s</string>
 
-    <string name="status_keeperfx_ready">KeeperFX %1$s installed (%2$s)</string>
+    <!-- %1$s is the version, %2$s the size on disk. -->
+    <string name="status_keeperfx_ready">KeeperFX: %1$s (%2$s)</string>
     <string name="status_keeperfx_missing">KeeperFX is not installed</string>
     <string name="status_original_ready">Original Dungeon Keeper files present</string>
-    <string name="status_original_missing">%1$d files from the original Dungeon Keeper are missing</string>
+    <string name="status_original_missing">Files missing from the original Dungeon Keeper: %1$d</string>
     <string name="status_importing">Copying KeeperFX…</string>
     <string name="status_searching_original">Searching for the original game files…</string>
     <string name="status_engine_mismatch">The alpha patch is build %1$d and this app\'s engine is build %2$d, because there was no patch for that build. If something looks wrong, this may be why.</string>
-    <string name="status_import_progress">%1$d files copied — %2$s</string>
+    <!-- %2$s is the name of the file being copied, and can be empty. -->
+    <string name="status_import_progress">Files copied: %1$d. %2$s</string>
+    <string name="status_missing_more">… and %1$d more</string>
 
-    <string name="hint_install_keeperfx">Tap "Install KeeperFX" to download the current release, or import a folder you already have.</string>
+    <string name="hint_install_keeperfx">Tap \"Install KeeperFX\" to download the current release, or import a folder you already have.</string>
     <string name="hint_import_original">Still missing from an original Dungeon Keeper:</string>
 
     <string name="button_install_keeperfx">Install KeeperFX</string>
     <string name="button_update_keeperfx">Check for downloads</string>
-    <string name="button_updates_waiting">%1$d download(s) available</string>
+    <string name="button_updates_waiting">Downloads available: %1$d</string>
     <string name="button_import_original">Import original Dungeon Keeper</string>
-    <!-- Utility row: short labels, the buttons are a third of the width each
-         and carry an icon. The dialogs behind them spell out what they do. -->
+    <!-- Narrow: the buttons are a third of the width each, and the first two carry an icon.
+         The dialogs behind them spell out what they do. -->
+    <string name="button_log">Log</string>
     <string name="button_import_keeperfx">Folder</string>
     <string name="button_remove">Reset</string>
     <string name="button_play">Play</string>
@@ -78,14 +133,42 @@
     <string name="status_downloading_app">Downloading the app update…</string>
 
     <string name="updates_none_title">Everything is up to date</string>
-    <string name="updates_none">The app, the game data and the music are all current.\n\nFiles from an original Dungeon Keeper cannot be downloaded — use "Import original Dungeon Keeper" for those.</string>
+    <string name="updates_none">The app, the game data and the music are all current.\n\nFiles from an original Dungeon Keeper cannot be downloaded. Use \"Import original Dungeon Keeper\" for those.</string>
     <string name="updates_unanswered_title">Could not check for downloads</string>
     <string name="updates_unanswered">A server did not answer, so something may be waiting that this cannot see. Check the internet connection and try again. If the connection is fine, try again in an hour: GitHub limits how often it can be asked for the newest app.</string>
     <string name="updates_unanswered_more">A server did not answer, so there may be more than this.</string>
-    <string name="updates_available_title">%1$d download(s) available</string>
+    <string name="updates_available_title">Downloads available: %1$d</string>
     <string name="updates_download_all">Download all</string>
     <string name="updates_replaces_data">The game data is unpacked over the current installation. Save games, the files from the original game, music, and anything you added are kept.</string>
     <string name="updates_use_wifi">Best done on Wi-Fi.</string>
+
+    <!-- The list of what can be downloaded: a heading, and lines under it. -->
+    <string name="update_release">KeeperFX %1$s</string>
+    <string name="update_release_size">Game data, %1$s</string>
+    <string name="update_missing">Missing: %1$s</string>
+    <string name="update_missing_and_more">Missing: %1$s and %2$d more</string>
+    <string name="update_replaces_folder">Replaces the imported folder with the official release, %1$s</string>
+    <string name="update_from_version">Update from %1$s, %2$s</string>
+    <string name="update_repair">Repair KeeperFX %1$s</string>
+    <!-- %2$s is the size of the download. -->
+    <string name="update_release_damaged">Files missing or damaged: %1$d. Reinstalling repairs them, %2$s</string>
+    <string name="update_for_example">For example: %1$s</string>
+    <string name="update_alpha">KeeperFX alpha %1$s</string>
+    <string name="update_repair_alpha">Repair KeeperFX alpha %1$s</string>
+    <string name="update_alpha_damaged">Files missing or damaged: %1$d</string>
+    <string name="update_alpha_adds">Files the current engine needs and %1$s does not have</string>
+    <string name="update_alpha_adds_to_folder">Files the current engine needs and this installation does not have</string>
+    <string name="update_alpha_replaces">Replaces %1$s</string>
+    <string name="update_alpha_other_build">The newest one: there is no patch for engine build %1$d</string>
+    <string name="update_cost_download">Download: %1$s</string>
+    <string name="update_cost_cached">Already downloaded, it only needs applying</string>
+    <string name="update_music">Background music</string>
+    <string name="update_music_size">Not included in the release, about 42 MB</string>
+    <string name="update_music_why">The game plays no music until this is installed.</string>
+    <string name="update_app">KeeperFX app %1$s</string>
+    <string name="update_app_current">Currently %1$s</string>
+    <string name="missing_nothing_installed">Nothing is installed yet.</string>
+    <string name="missing_install_unfinished">The last install did not finish.</string>
 
     <string name="updates_permission_title">Permission needed</string>
     <string name="updates_permission">To install its own update, KeeperFX needs permission to install apps. Grant it once in the settings screen that follows, then start the update again.</string>
@@ -93,13 +176,10 @@
     <string name="updates_permission_rest_running_later">The other downloads are running. The app update was left out: it needs permission to install apps, and granting that ends everything the app is doing. When these are done, start the update again.</string>
     <string name="updates_permission_open">Open settings</string>
 
+    <!-- %1$s is the version of the app. A small button: it also says which version this is. -->
     <string name="button_update_app">Update app · %1$s</string>
     <string name="app_update_title">App update</string>
-    <string name="app_update_available">Version %1$s is available.
-
-You are on %2$s.
-
-The update installs over this one; game data and settings are kept.</string>
+    <string name="app_update_available">Version %1$s is available.\n\nYou are on %2$s.\n\nThe update installs over this one. Game data and settings are kept.</string>
     <string name="app_update_none">You are on the newest build (%1$s).</string>
     <string name="app_update_changes">What changed:</string>
     <string name="app_update_check">Checking…</string>
@@ -108,24 +188,66 @@ The update installs over this one; game data and settings are kept.</string>
 
     <string name="notification_channel_downloads">Downloads</string>
     <string name="notification_preparing">Preparing…</string>
-    <string name="notification_done">Download finished</string>
-    <string name="notification_cancelled">Download cancelled</string>
+    <string name="notification_done">Finished.</string>
     <string name="notification_install_update">Update downloaded. Tap to install.</string>
     <string name="updates_running">A download is already running.</string>
     <string name="notification_channel_network_game">Network game</string>
     <string name="notification_network_game">Network game running. Tap to go back, the others are waiting.</string>
 
+    <!-- What a download or an install says about itself while it runs. Short: these share a line. -->
+    <string name="stage_release_check">Checking for the current release</string>
+    <string name="stage_download_version">Downloading KeeperFX %1$s</string>
+    <string name="stage_unpacking">Unpacking</string>
+    <string name="stage_unpacked_files">Files unpacked: %1$d</string>
+    <string name="stage_applying_config">Applying configuration</string>
+    <string name="stage_alpha_check">Checking for the alpha patch</string>
+    <string name="stage_archive_cached">Using the archive already downloaded</string>
+    <string name="stage_saving_replaced">Saving the files being replaced</string>
+    <string name="stage_restoring_release">Restoring the release</string>
+    <string name="stage_music_lookup">Looking up the music archive</string>
+    <string name="stage_music_download">Downloading the music</string>
+    <string name="stage_music_unpack">Unpacking the music</string>
+
+    <!-- Why a download or an install stopped. %1$s comes from the system and is often in English. -->
+    <string name="job_failed">Failed: %1$s</string>
+    <string name="job_cannot_start">Could not start: %1$s</string>
+    <string name="job_app_update_failed">App update failed: %1$s</string>
+    <string name="job_cancelled">Cancelled.</string>
+    <string name="job_download_cancelled">Download cancelled.</string>
+    <string name="job_unpack_cancelled">Cancelled while unpacking.</string>
+    <string name="job_no_download_address">The server gave no address to download this from.</string>
+    <string name="job_no_music_download">The server lists no music to download.</string>
+    <string name="http_status">The server answered with HTTP %1$d.</string>
+    <string name="download_cut_short">The download ended at %1$s of %2$s.</string>
+    <string name="archive_empty">The archive holds no files.</string>
+    <string name="release_unusable">The newest release carries no version or no APK.</string>
+    <string name="no_room_download">Not enough free storage: this download needs %1$s. Free now: %2$s.</string>
+    <string name="no_room_unpack">Not enough free storage: unpacking needs %1$s. Free now: %2$s.</string>
+    <string name="no_room_export">Not enough free storage: packing everything needs %1$s. Free now: %2$s.</string>
+    <string name="no_room_import">Not enough free storage: unpacking this file needs %1$s. Free now: %2$s.</string>
+    <!-- %1$s is a path. -->
+    <string name="file_cannot_create">Cannot create %1$s</string>
+    <string name="file_cannot_write">Cannot write %1$s</string>
+    <string name="file_cannot_read">Cannot read %1$s</string>
+    <string name="file_cannot_move">Cannot move %1$s to %2$s</string>
+
     <string name="install_failed">Installation failed</string>
 
     <string name="import_keeperfx_title">Import KeeperFX folder</string>
-    <string name="import_keeperfx_explanation">Use this instead of downloading if you already have a KeeperFX installation on this device. Its folder is copied over the current installation, so save games and the files from the original game are kept.\n\nUse "Reset" first if you want to start from nothing.</string>
+    <string name="import_keeperfx_explanation">Use this instead of downloading if you already have a KeeperFX installation on this device. Its folder is copied over the current installation, so save games and the files from the original game are kept.\n\nUse \"Reset\" first if you want to start from nothing.</string>
 
     <string name="import_original_title">Import original Dungeon Keeper</string>
-    <string name="import_original_explanation">KeeperFX cannot ship a few files that must come from an original Dungeon Keeper. Pick your Dungeon Keeper folder — the one containing DATA and SOUND — and they are picked out and copied automatically.\n\nA mounted or extracted CD image works too. Nothing else from that folder is copied.</string>
+    <string name="import_original_explanation">KeeperFX cannot ship a few files that must come from an original Dungeon Keeper. Pick your Dungeon Keeper folder, the one containing DATA and SOUND, and they are picked out and copied automatically.\n\nA mounted or extracted CD image works too. Nothing else from that folder is copied.</string>
     <string name="import_choose">Choose folder</string>
     <string name="import_choose_folder">Folder</string>
     <string name="import_choose_zip">Zip archive</string>
     <string name="import_failed">Import incomplete</string>
+    <string name="import_failed_detail">Import failed: %1$s</string>
+    <string name="import_cancelled">Import cancelled.</string>
+    <string name="import_cannot_read_archive">Cannot read the archive.</string>
+    <!-- %1$d files were copied. %2$s is a list of paths, one per line. -->
+    <string name="import_original_incomplete_folder">Files copied: %1$d. These are still missing:\n\n%2$s\n\nPick the folder that holds the original game\'s DATA and SOUND folders.</string>
+    <string name="import_original_incomplete_zip">Files copied: %1$d. These are still missing:\n\n%2$s\n\nThe archive has to hold the original game\'s DATA and SOUND files.</string>
     <string name="config_failed">Could not apply the bundled configuration</string>
 
     <string name="remove_title">Delete everything</string>
@@ -136,16 +258,14 @@ The update installs over this one; game data and settings are kept.</string>
     <string name="input_auto">Automatic — follow the device last used</string>
     <string name="input_touch">Touch — always use the touch scheme</string>
     <string name="input_pointer">Mouse &amp; keyboard — ignore the touch screen</string>
-    <string name="input_gestures">Tap = left click · hold = right click · drag = paint area · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back (the map has its own panel button)
-
-The system back button and the back gesture also leave a menu. On screen: a back arrow, and a right click toggle - while it is on, a tap slaps and a drag undesignates.</string>
+    <string name="input_gestures">Tap = left click · hold = right click · drag = paint area · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back (the map has its own panel button)\n\nThe system back button and the back gesture also leave a menu. On screen: a back arrow, and a right click toggle. While it is on, a tap slaps and a drag undesignates.</string>
     <string name="option_back_button">Show the on screen buttons while playing</string>
     <string name="game_back">Back</string>
     <string name="game_right_click">Right click</string>
 
     <string name="settings_data">Game data</string>
     <string name="option_use_alpha">Also install the alpha patch for this engine</string>
-    <string name="option_use_alpha_hint">The engine in this app is built from the current source, and the stable release does not carry everything it expects - the fonts for Japanese, Chinese and Korean among them. The alpha patch adds those, a small download on top of the release. Turn this off to stay strictly on 1.4.0; the patch comes back off without downloading anything.</string>
+    <string name="option_use_alpha_hint">The engine in this app is built from the current source, and the stable release does not carry everything it expects, the fonts for Japanese, Chinese and Korean among them. The alpha patch adds those, a small download on top of the release. Turn this off to stay strictly on 1.4.0. The patch comes back off without downloading anything.</string>
 
     <string name="settings_language">Language</string>
     <string name="settings_language_hint">Sets the language the game runs in. Starts on the one the device uses; speech and text only appear in it when the installation carries that language.</string>
@@ -161,7 +281,9 @@ The system back button and the back gesture also leave a menu. On screen: a back
     <string name="tuning_title">Touch tuning</string>
     <string name="tuning_intro">Every knob here reaches the engine as its -touchtune startup option, so the extra command line options field still overrides them. Changes apply the next time the game starts.</string>
     <string name="tuning_reset">Reset to defaults</string>
-    <string name="tuning_value_default">%1$s · default</string>
+    <!-- %1$s is one of the knobs below, %2$s its value. -->
+    <string name="tuning_value">%1$s: %2$s</string>
+    <string name="tuning_value_default">%1$s: %2$s (default)</string>
     <string name="tuning_fps">Frame rate limit</string>
     <string name="tuning_fps_hint">60 divides the display evenly and leaves the phone cool. Unlimited draws as fast as the processor can, which heats it up until everything stutters.</string>
     <string name="tuning_fps_unlimited">Unlimited (engine default)</string>

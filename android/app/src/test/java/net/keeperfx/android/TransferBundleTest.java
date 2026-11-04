@@ -99,15 +99,26 @@ public class TransferBundleTest {
     }
 
     /** A refused file changes nothing at all on the phone, and tidies up after itself. */
-    private void assertRefused(File bundle, String expectedInMessage) throws IOException {
+    private void assertRefused(File bundle, int expected) throws IOException {
         final Map<String, String> before = b.snapshot();
         try {
             b.importFile(bundle);
-            fail("this file has to be refused: " + expectedInMessage);
+            fail("this file has to be refused: " + StringResources.text(new Message(expected, "x")));
         } catch (TransferBundle.RefusedException refused) {
-            assertTrue(refused.getMessage(), refused.getMessage().contains(expectedInMessage));
+            assertEquals(refused.message.toString(), expected, refused.message.resource);
         }
         assertEquals(before, b.snapshot());
+    }
+
+    /** For when what is wrong with a file depends on where the damage falls. */
+    private void assertRefused(File bundle) throws IOException {
+        final Map<String, String> before = b.snapshot();
+        try {
+            b.importFile(bundle);
+            fail("this file has to be refused");
+        } catch (TransferBundle.RefusedException refused) {
+            assertEquals(before, b.snapshot());
+        }
     }
 
     // -------------------------------------------------------------------- round trip
@@ -407,7 +418,7 @@ public class TransferBundleTest {
             final Map<String, byte[]> entries = readBundle(a.export());
             entries.put(name, new byte[0]);
             setMarker(entries, "entries=" + declared(entries, "entries"), "entries=" + (declared(entries, "entries") + 1));
-            assertRefused(writeBundle(entries), "outside the game");
+            assertRefused(writeBundle(entries), R.string.transfer_outside_game);
             assertFalse(name, new File(b.files, "evil").exists());
             assertFalse(name, new File(b.files.getParentFile(), "evil").exists());
             assertFalse(name, new File(folder.getRoot().getParentFile(), "evil").exists());
@@ -432,14 +443,14 @@ public class TransferBundleTest {
     public void somethingThatIsNotAZipIsRefused() throws IOException {
         final File html = folder.newFile();
         TestArchives.write(html, "<html>503 Service Unavailable</html>");
-        assertRefused(html, "not an exported KeeperFX installation");
-        assertRefused(folder.newFile(), "not an exported KeeperFX installation");
+        assertRefused(html, R.string.transfer_not_a_bundle);
+        assertRefused(folder.newFile(), R.string.transfer_not_a_bundle);
     }
 
     @Test
     public void anUnrelatedZipIsRefused() throws IOException {
         assertRefused(TestArchives.zip(folder.newFile("holiday.zip"), TestArchives.entries(
-            "photo.jpg", "x", "install/keeperfx.cfg", "x")), "not an exported KeeperFX installation");
+            "photo.jpg", "x", "install/keeperfx.cfg", "x")), R.string.transfer_not_a_bundle);
     }
 
     @Test
@@ -447,14 +458,14 @@ public class TransferBundleTest {
         final Map<String, byte[]> entries = readBundle(a.export());
         final byte[] marker = entries.remove(TransferBundle.MARKER_ENTRY);
         entries.put(TransferBundle.MARKER_ENTRY, marker);
-        assertRefused(writeBundle(entries), "not an exported KeeperFX installation");
+        assertRefused(writeBundle(entries), R.string.transfer_not_a_bundle);
     }
 
     @Test
     public void aMarkerFromTheFutureAsksForAnUpdate() throws IOException {
         final Map<String, byte[]> entries = readBundle(a.export());
         setMarker(entries, "format=1", "format=2");
-        assertRefused(writeBundle(entries), "newer KeeperFX app");
+        assertRefused(writeBundle(entries), R.string.transfer_from_newer_app);
     }
 
     @Test
@@ -473,7 +484,7 @@ public class TransferBundleTest {
         }) {
             final Map<String, byte[]> entries = readBundle(a.export());
             setMarker(entries, change[0], change[1]);
-            assertRefused(writeBundle(entries), "not an exported KeeperFX installation");
+            assertRefused(writeBundle(entries), R.string.transfer_not_a_bundle);
         }
     }
 
@@ -481,7 +492,7 @@ public class TransferBundleTest {
     public void aMarkerIsNotAllowedToBeHuge() throws IOException {
         final Map<String, byte[]> entries = new LinkedHashMap<>();
         entries.put(TransferBundle.MARKER_ENTRY, new byte[1024 * 1024]);
-        assertRefused(writeBundle(entries), "not an exported KeeperFX installation");
+        assertRefused(writeBundle(entries), R.string.transfer_not_a_bundle);
     }
 
     // ------------------------------------------------------- not what it says it is
@@ -542,7 +553,7 @@ public class TransferBundleTest {
             damaged[indexOf(bytes, name.getBytes(StandardCharsets.UTF_8)) + name.length() + 2] ^= 0x40;
             final File file = folder.newFile();
             Files.write(file.toPath(), damaged);
-            assertRefused(file, "");
+            assertRefused(file);
         }
     }
 
@@ -550,29 +561,29 @@ public class TransferBundleTest {
     public void entriesMissingFromTheFileAreCaught() throws IOException {
         final Map<String, byte[]> entries = readBundle(a.export());
         assertTrue(entries.remove("install/save/settings.toml") != null);
-        assertRefused(writeBundle(entries), "incomplete or damaged");
+        assertRefused(writeBundle(entries), R.string.transfer_damaged);
     }
 
     @Test
     public void aDeclaredCountThatDoesNotMatchIsCaught() throws IOException {
         final Map<String, byte[]> tooMany = readBundle(a.export());
         setMarker(tooMany, "entries=" + declared(tooMany, "entries"), "entries=" + (declared(tooMany, "entries") + 1));
-        assertRefused(writeBundle(tooMany), "incomplete or damaged");
+        assertRefused(writeBundle(tooMany), R.string.transfer_damaged);
 
         final Map<String, byte[]> tooFew = readBundle(a.export());
         setMarker(tooFew, "entries=" + declared(tooFew, "entries"), "entries=" + (declared(tooFew, "entries") - 1));
-        assertRefused(writeBundle(tooFew), "more than it says");
+        assertRefused(writeBundle(tooFew), R.string.transfer_holds_more);
     }
 
     @Test
     public void declaredBytesThatDoNotMatchAreCaught() throws IOException {
         final Map<String, byte[]> tooMany = readBundle(a.export());
         setMarker(tooMany, "bytes=" + declared(tooMany, "bytes"), "bytes=" + (declared(tooMany, "bytes") + 1));
-        assertRefused(writeBundle(tooMany), "incomplete or damaged");
+        assertRefused(writeBundle(tooMany), R.string.transfer_damaged);
 
         final Map<String, byte[]> tooFew = readBundle(a.export());
         setMarker(tooFew, "bytes=" + declared(tooFew, "bytes"), "bytes=" + (declared(tooFew, "bytes") - 1));
-        assertRefused(writeBundle(tooFew), "more than it says");
+        assertRefused(writeBundle(tooFew), R.string.transfer_holds_more);
     }
 
     /** The whole point of the check: it stops writing, rather than noticing at the end. */
@@ -597,7 +608,7 @@ public class TransferBundleTest {
             });
             fail("more than it declares");
         } catch (TransferBundle.RefusedException expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("more than it says"));
+            assertEquals(R.string.transfer_holds_more, expected.message.resource);
         }
         assertTrue(furthest.get() + " of " + declaredBytes, furthest.get() <= declaredBytes);
         assertEquals(before, b.snapshot());
@@ -612,35 +623,35 @@ public class TransferBundleTest {
         System.arraycopy(taken, 0, bytes, indexOf(bytes, other), other.length);
         final File twice = folder.newFile();
         Files.write(twice.toPath(), bytes);
-        assertRefused(twice, "incomplete or damaged");
+        assertRefused(twice, R.string.transfer_damaged);
     }
 
     @Test
     public void aSaveCountThatDoesNotMatchIsCaught() throws IOException {
         final Map<String, byte[]> entries = readBundle(a.export());
         setMarker(entries, "saves=2", "saves=7");
-        assertRefused(writeBundle(entries), "incomplete or damaged");
+        assertRefused(writeBundle(entries), R.string.transfer_damaged);
     }
 
     @Test
     public void anIncompleteInstallationIsRefused() throws IOException {
         //noinspection ResultOfMethodCallIgnored
         new File(a.install, "data/bluepal.dat").delete();
-        assertRefused(a.export(), "complete installation");
+        assertRefused(a.export(), R.string.transfer_not_complete);
     }
 
     @Test
     public void noListOfFilesIsRefused() throws IOException {
         //noinspection ResultOfMethodCallIgnored
         new File(a.manifests, TransferBundle.STABLE_MANIFEST).delete();
-        assertRefused(a.export(), "incomplete or damaged");
+        assertRefused(a.export(), R.string.transfer_damaged);
     }
 
     @Test
     public void aListOfFilesThatContradictsThemIsRefusedFromThisApp() throws IOException {
         TestArchives.write(new File(a.manifests, TransferBundle.STABLE_MANIFEST),
             "1\tkeeperfx.cfg\n1\tldata/intromix.smk\n");
-        assertRefused(a.export(), "incomplete or damaged");
+        assertRefused(a.export(), R.string.transfer_damaged);
     }
 
     /**
@@ -668,8 +679,9 @@ public class TransferBundleTest {
             b.importFile(writeBundle(entries));
             fail("no test machine has 4 TB free, I hope");
         } catch (FileUtil.NoRoomException expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("unpacking this file needs"));
-            assertTrue(expected.getMessage(), expected.getMessage().contains("are free"));
+            final String text = StringResources.text(expected.message);
+            assertTrue(text, text.contains("unpacking this file needs 4096.0 GB"));
+            assertTrue(text, text.contains("Free now: "));
         }
         assertEquals(before, b.snapshot());
     }
@@ -779,15 +791,15 @@ public class TransferBundleTest {
         final long more = 1024L * 1024 * 1024 * 1024;
         final long needed = directory.getUsableSpace() + more;
         try {
-            FileUtil.requireRoom(directory, needed, 0, "this");
+            FileUtil.requireRoom(directory, needed, 0, R.string.no_room_export);
             fail("that much is not free");
         } catch (FileUtil.NoRoomException expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("this needs"));
+            assertEquals(R.string.no_room_export, expected.message.resource);
         }
         try {
-            FileUtil.requireRoom(directory, needed, 2 * more, "this");
+            FileUtil.requireRoom(directory, needed, 2 * more, R.string.no_room_export);
         } catch (FileUtil.NoRoomException e) {
-            fail(e.getMessage());
+            fail(StringResources.text(e.message));
         }
     }
 
@@ -801,8 +813,8 @@ public class TransferBundleTest {
         try {
             TransferBundle.writeExport(a.exports, "x.zip", plan, marker, TestProgress.QUIET);
             fail("the marker would no longer be true");
-        } catch (IOException expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("changed while"));
+        } catch (Message.Failure expected) {
+            assertEquals(new Message(R.string.export_file_changed, "install/save/fx1g0000.sav"), expected.message);
             assertEquals(Collections.emptyList(), Arrays.asList(a.exports.list()));
         }
     }
@@ -817,8 +829,8 @@ public class TransferBundleTest {
         try {
             TransferBundle.writeExport(a.exports, "x.zip", plan, marker, TestProgress.QUIET);
             fail("the marker would no longer be true");
-        } catch (IOException expected) {
-            assertTrue(expected.getMessage(), expected.getMessage().contains("changed while"));
+        } catch (Message.Failure expected) {
+            assertEquals(new Message(R.string.export_file_changed, "install/save/fx1g0000.sav"), expected.message);
         }
     }
 
@@ -854,8 +866,8 @@ public class TransferBundleTest {
 
     @Test
     public void thereIsAlwaysSomethingToSayAboutWhereAFileIs() {
-        assertEquals("Download/Inbox/x.zip", PhoneTransfer.whereIs("primary:Download/Inbox/x.zip", "x.zip"));
-        assertEquals("x.zip", PhoneTransfer.whereIs("msf:1234", "x.zip"));
-        assertEquals("The file you picked", PhoneTransfer.whereIs("", ""));
+        assertEquals(Message.plain("Download/Inbox/x.zip"), PhoneTransfer.whereIs("primary:Download/Inbox/x.zip", "x.zip"));
+        assertEquals(Message.plain("x.zip"), PhoneTransfer.whereIs("msf:1234", "x.zip"));
+        assertEquals(new Message(R.string.import_bundle_picked_file), PhoneTransfer.whereIs("", ""));
     }
 }

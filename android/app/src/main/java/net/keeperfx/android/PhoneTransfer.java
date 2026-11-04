@@ -53,8 +53,8 @@ final class PhoneTransfer {
     /** What the confirmation names, or why an export is not offered. */
     static final class ExportOffer {
         /** Null when it can go ahead. */
-        final String refusal;
-        final String version;
+        final Message refusal;
+        final Message version;
         final boolean music;
         final int saves;
         final int files;
@@ -62,9 +62,9 @@ final class PhoneTransfer {
         final long needed;
         final long free;
 
-        ExportOffer(String refusal) {
+        ExportOffer(Message refusal) {
             this.refusal = refusal;
-            this.version = "";
+            this.version = null;
             this.music = false;
             this.saves = 0;
             this.files = 0;
@@ -73,7 +73,7 @@ final class PhoneTransfer {
             this.free = 0;
         }
 
-        ExportOffer(String version, boolean music, TransferBundle.Plan plan, long free) {
+        ExportOffer(Message version, boolean music, TransferBundle.Plan plan, long free) {
             this.refusal = null;
             this.version = version;
             this.music = music;
@@ -91,19 +91,15 @@ final class PhoneTransfer {
      */
     private static TransferBundle.Plan planExport(Context context) throws IOException {
         if (!GameData.isComplete(context)) {
-            throw new TransferBundle.RefusedException(
-                "The game is not completely installed yet, so there is nothing to export.");
+            throw new TransferBundle.RefusedException(R.string.export_not_installed);
         }
         if (!GameData.hasManifest(context)) {
-            throw new TransferBundle.RefusedException("This installation came from a folder, "
-                + "so nothing can tell whether it is whole. \"Check for downloads\" offers "
-                + "the official release, then it can be exported.");
+            throw new TransferBundle.RefusedException(R.string.export_no_manifest);
         }
         final InstallManifest.Report report = GameData.verifyInstalledFiles(context);
         if (!report.isClean()) {
             final int damaged = report.stableProblems.size() + report.alphaProblems.size();
-            throw new TransferBundle.RefusedException(damaged + " files are missing or damaged. "
-                + "\"Check for downloads\" repairs them, then it can be exported.");
+            throw new TransferBundle.RefusedException(R.string.export_damaged, damaged);
         }
         return TransferBundle.plan(GameData.gameDirectory(context),
             GameData.manifestDirectory(context), GameData.alphaBackupDirectory(context),
@@ -118,14 +114,14 @@ final class PhoneTransfer {
             final File previous = TransferBundle.finishedExport(exportDirectory(context));
             final long reclaimable = (previous == null) ? 0 : previous.length();
             FileUtil.requireRoom(directory, plan.fileSizeAtMost(), reclaimable,
-                "packing everything");
+                R.string.no_room_export);
             return new ExportOffer(GameData.describeInstalledVersion(context),
                 GameData.hasMusic(context), plan, directory.getUsableSpace() + reclaimable);
         } catch (TransferBundle.RefusedException | FileUtil.NoRoomException e) {
-            return new ExportOffer(e.getMessage());
+            return new ExportOffer(e.message);
         } catch (IOException e) {
             Log.e(TAG, "Could not look at the installation", e);
-            return new ExportOffer("Could not look at the installation: " + e.getMessage());
+            return new ExportOffer(new Message(R.string.export_cannot_look, Message.detailOf(e)));
         }
     }
 
@@ -177,13 +173,13 @@ final class PhoneTransfer {
     /** What the confirmation names, or why this file will not be imported. */
     static final class ImportOffer {
         /** Null when it can go ahead. */
-        final String refusal;
+        final Message refusal;
         final TransferBundle.Marker marker;
         final int savesHere;
         final boolean installedHere;
         final long free;
 
-        ImportOffer(String refusal) {
+        ImportOffer(Message refusal) {
             this.refusal = refusal;
             this.marker = null;
             this.savesHere = 0;
@@ -204,23 +200,24 @@ final class PhoneTransfer {
     /** Blocking, it reads from a content provider; call from a background thread. */
     static ImportOffer inspect(Context context, Uri file) {
         if (GameProcess.isAlive(context)) {
-            return new ImportOffer(context.getString(R.string.game_still_open));
+            return new ImportOffer(new Message(R.string.game_still_open));
         }
         try (InputStream in = context.getContentResolver().openInputStream(file)) {
             if (in == null) {
-                return new ImportOffer("Cannot read this file.");
+                return new ImportOffer(new Message(R.string.import_bundle_cannot_read));
             }
             final TransferBundle.Marker marker = TransferBundle.readMarker(in);
             final File directory = context.getFilesDir();
-            FileUtil.requireRoom(directory, marker.bytes, "unpacking this file");
+            FileUtil.requireRoom(directory, marker.bytes, R.string.no_room_import);
             final File install = GameData.gameDirectory(context);
             return new ImportOffer(marker, TransferBundle.countSaves(install),
                 install.isDirectory(), directory.getUsableSpace());
         } catch (TransferBundle.RefusedException | FileUtil.NoRoomException e) {
-            return new ImportOffer(e.getMessage());
+            return new ImportOffer(e.message);
         } catch (IOException | RuntimeException e) {
             Log.e(TAG, "Could not read the picked file", e);
-            return new ImportOffer("Cannot read this file: " + e.getMessage());
+            return new ImportOffer(new Message(R.string.import_bundle_cannot_read_detail,
+                Message.detailOf(e)));
         }
     }
 
@@ -228,11 +225,11 @@ final class PhoneTransfer {
     static void runImport(Context context, Uri file, TransferBundle.Progress progress)
             throws IOException {
         if (GameProcess.isAlive(context)) {
-            throw new TransferBundle.RefusedException(context.getString(R.string.game_still_open));
+            throw new TransferBundle.RefusedException(R.string.game_still_open);
         }
         try (InputStream in = context.getContentResolver().openInputStream(file)) {
             if (in == null) {
-                throw new IOException("Cannot read the file");
+                throw new Message.Failure(R.string.import_bundle_cannot_read);
             }
             swap(context).install(in, BundledConfig.relativePaths(context),
                 AppUpdater.installedVersionName(context), progress);
@@ -290,9 +287,9 @@ final class PhoneTransfer {
     /** The file an import read, for offering to delete it afterwards. */
     static final class ImportedFile {
         final Uri uri;
-        final String where;
+        final Message where;
 
-        ImportedFile(Uri uri, String where) {
+        ImportedFile(Uri uri, Message where) {
             this.uri = uri;
             this.where = where;
         }
@@ -328,12 +325,13 @@ final class PhoneTransfer {
      * its document ids ("primary:Download/x.zip"), other providers use opaque numbers,
      * and for those the name is all anyone can say.
      */
-    static String whereIs(String documentId, String displayName) {
+    static Message whereIs(String documentId, String displayName) {
         final int colon = documentId.indexOf(':');
         if (colon > 0 && documentId.indexOf('/', colon) > 0) {
-            return documentId.substring(colon + 1);
+            return Message.plain(documentId.substring(colon + 1));
         }
-        return displayName.isEmpty() ? "The file you picked" : displayName;
+        return displayName.isEmpty()
+            ? new Message(R.string.import_bundle_picked_file) : Message.plain(displayName);
     }
 
     /**

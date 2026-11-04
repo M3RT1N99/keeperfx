@@ -292,14 +292,11 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private void refreshStatus() {
         final boolean hasKeeperfx = GameData.isKeeperfxInstalled(this);
         final boolean hasOriginal = GameData.hasOriginalDkFiles(this);
-        final String installed = prefs.getInstalledVersion();
 
         if (hasKeeperfx) {
-            final String version = installed.isEmpty() && prefs.getInstalledAlphaVersion().isEmpty()
-                ? getString(R.string.version_unknown)
-                : GameData.describeInstalledVersion(this);
-            keeperfxStatus.setText(getString(R.string.status_keeperfx_ready, version,
-                GameData.describeSize(GameData.gameDirectory(this))));
+            keeperfxStatus.setText(getString(R.string.status_keeperfx_ready,
+                GameData.describeInstalledVersion(this).in(this),
+                GameData.describeSize(GameData.gameDirectory(this)).in(this)));
         } else {
             keeperfxStatus.setText(R.string.status_keeperfx_missing);
         }
@@ -336,7 +333,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 int shown = 0;
                 for (String entry : missing) {
                     if (shown++ >= 8) {
-                        sb.append("  … ").append(missing.size() - 8).append(" more\n");
+                        sb.append("  ").append(getString(R.string.status_missing_more,
+                            missing.size() - 8)).append('\n');
                         break;
                     }
                     sb.append("  • ").append(entry).append('\n');
@@ -359,7 +357,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         exportPanel.setVisibility(export != null ? View.VISIBLE : View.GONE);
         if (export != null) {
             exportStatus.setText(getString(R.string.export_waiting, export.getName(),
-                GameData.describeBytes(export.length())));
+                GameData.describeBytes(export.length()).in(this)));
         }
     }
 
@@ -425,7 +423,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     private void showUpdateDialog(UpdateManager.Result found) {
         final List<UpdateManager.Item> items = found.items;
-        final StringBuilder body = new StringBuilder(UpdateManager.describe(items)).append('\n');
+        final StringBuilder body =
+            new StringBuilder(UpdateManager.describe(items, Message.strings(this))).append('\n');
         if (UpdateManager.contains(items, UpdateManager.Kind.GAME_DATA)) {
             body.append('\n').append(getString(R.string.updates_replaces_data));
         }
@@ -574,19 +573,25 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     private void showExportDialog(PhoneTransfer.ExportOffer offer) {
         if (offer.refusal != null) {
-            showMessage(R.string.export_title, offer.refusal);
+            showMessage(R.string.export_title, offer.refusal.in(this));
             return;
         }
+        final StringBuilder body = new StringBuilder(getString(R.string.export_offer_intro))
+            .append("\n\n").append(getString(R.string.export_offer_game, offer.version.in(this)))
+            .append('\n');
+        if (offer.music) {
+            body.append(getString(R.string.export_offer_music)).append('\n');
+        }
+        body.append(getString(R.string.export_offer_saves, offer.saves)).append("\n\n")
+            .append(getString(R.string.export_offer_size,
+                GameData.describeBytes(offer.bytes).in(this),
+                offer.files,
+                GameData.describeBytes(offer.needed).in(this),
+                GameData.describeBytes(offer.free).in(this)))
+            .append("\n\n").append(getString(R.string.export_offer_own_devices));
         new AlertDialog.Builder(this)
             .setTitle(R.string.export_title)
-            .setMessage(getString(R.string.export_offer,
-                offer.version,
-                offer.music ? getString(R.string.export_offer_music) : "",
-                offer.saves,
-                GameData.describeBytes(offer.bytes),
-                offer.files,
-                GameData.describeBytes(offer.needed),
-                GameData.describeBytes(offer.free)))
+            .setMessage(body.toString())
             .setPositiveButton(R.string.export_confirm, (dialog, which) -> {
                 requestNotificationPermission();
                 setBusy(true);
@@ -629,14 +634,14 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     private void showImportDialog(Uri file, PhoneTransfer.ImportOffer offer) {
         if (offer.refusal != null) {
-            showMessage(R.string.import_bundle_title, offer.refusal);
+            showMessage(R.string.import_bundle_title, offer.refusal.in(this));
             return;
         }
         final TransferBundle.Marker marker = offer.marker;
         final StringBuilder body = new StringBuilder(getString(R.string.import_bundle_offer,
-            GameData.describeVersion(marker.release, marker.alpha),
+            GameData.describeVersion(marker.release, marker.alpha).in(this),
             marker.saves,
-            GameData.describeBytes(marker.bytes)));
+            GameData.describeBytes(marker.bytes).in(this)));
         final int savesHere = offer.savesHere;
         body.append("\n\n").append(!offer.installedHere
             ? getString(R.string.import_bundle_nothing_here)
@@ -644,7 +649,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 ? getString(R.string.import_bundle_replaces, savesHere)
                 : getString(R.string.import_bundle_replaces_no_saves));
         body.append("\n\n").append(getString(R.string.import_bundle_room,
-            GameData.describeBytes(marker.bytes), GameData.describeBytes(offer.free)));
+            GameData.describeBytes(marker.bytes).in(this), GameData.describeBytes(offer.free).in(this)));
         body.append("\n\n").append(getString(R.string.import_bundle_trust));
         final String thisApp = AppUpdater.installedVersionName(this);
         if (!marker.app.equals(thisApp) || marker.engine != BuildConfig.ENGINE_BUILD) {
@@ -666,13 +671,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private void offerToDeleteImportedFile(PhoneTransfer.ImportedFile file) {
         new AlertDialog.Builder(this)
             .setTitle(R.string.import_bundle_done_title)
-            .setMessage(getString(R.string.import_bundle_done, file.where))
+            .setMessage(getString(R.string.import_bundle_done, file.where.in(this)))
             .setPositiveButton(R.string.import_bundle_delete, (dialog, which) -> new Thread(() -> {
                 final boolean deleted = PhoneTransfer.deleteImported(this, file.uri);
                 postIfAlive(() -> {
                     if (!deleted) {
                         showMessage(R.string.import_bundle_done_title,
-                            getString(R.string.import_bundle_not_deleted, file.where));
+                            getString(R.string.import_bundle_not_deleted, file.where.in(this)));
                     }
                 });
             }, "kfx-import-delete").start())
@@ -735,7 +740,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                     .setPositiveButton(R.string.app_update_install, (d, w) -> {
                         final List<UpdateManager.Item> only = new ArrayList<>();
                         only.add(new UpdateManager.Item(UpdateManager.Kind.APP,
-                            found.versionName, "", found));
+                            Message.plain(found.versionName), found));
                         runUpdates(only);
                     })
                     .setNegativeButton(android.R.string.cancel, null)
@@ -834,13 +839,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             }
 
             @Override
-            public void onFinished(boolean success, String message) {
+            public void onFinished(Message failure) {
                 postIfAlive(() -> {
                     runningImport = null;
                     setBusy(false);
                     refreshStatus();
-                    if (!success) {
-                        showMessage(R.string.import_failed, message);
+                    if (failure != null) {
+                        showMessage(R.string.import_failed, failure.in(LauncherActivity.this));
                     }
                 });
             }
@@ -957,7 +962,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         // updating the APK also updates the configuration its engine expects.
         setBusy(true);
         new Thread(() -> {
-            String failure = null;
+            Message failure = null;
             try {
                 BundledConfig.install(this);
                 // After the bundled copy, which is what creates keeperfx.cfg the
@@ -965,13 +970,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 // built in English.
                 GameLanguage.applyToConfig(this, prefs.getLanguage());
             } catch (Exception e) {
-                failure = e.getMessage();
+                failure = Message.detailOf(e);
             }
-            final String message = failure;
+            final Message message = failure;
             postIfAlive(() -> {
                 setBusy(false);
                 if (message != null) {
-                    showMessage(R.string.config_failed, message);
+                    showMessage(R.string.config_failed, message.in(this));
                     return;
                 }
                 // The process is gone, but the system may have kept the record of a game it

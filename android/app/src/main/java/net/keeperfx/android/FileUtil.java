@@ -26,8 +26,8 @@ import java.io.OutputStream;
 final class FileUtil {
 
     /** Nothing is wrong with what was being installed, there is just no room for it. */
-    static final class NoRoomException extends IOException {
-        NoRoomException(String message) {
+    static final class NoRoomException extends Message.Failure {
+        NoRoomException(Message message) {
             super(message);
         }
     }
@@ -35,25 +35,28 @@ final class FileUtil {
     private FileUtil() {
     }
 
-    /** Says so up front, rather than after running into a full disk half way. */
-    static void requireRoom(File directory, long bytes, String what) throws NoRoomException {
-        requireRoom(directory, bytes, 0, what);
+    /**
+     * Says so up front, rather than after running into a full disk half way.
+     *
+     * @param sentence a string that says what needs the room, with what it needs and what is free
+     */
+    static void requireRoom(File directory, long bytes, int sentence) throws NoRoomException {
+        requireRoom(directory, bytes, 0, sentence);
     }
 
     /** @param reclaimable what the job will free before it needs the room, which counts as free */
-    static void requireRoom(File directory, long bytes, long reclaimable, String what)
+    static void requireRoom(File directory, long bytes, long reclaimable, int sentence)
             throws NoRoomException {
         final long usable = directory.getUsableSpace() + reclaimable;
         if (bytes > usable) {
-            throw new NoRoomException("Not enough free storage: " + what + " needs "
-                + GameData.describeBytes(bytes) + " and " + GameData.describeBytes(usable)
-                + " are free");
+            throw new NoRoomException(new Message(sentence,
+                GameData.describeBytes(bytes), GameData.describeBytes(usable)));
         }
     }
 
     static void ensureDirectory(File dir) throws IOException {
         if (dir != null && !dir.isDirectory() && !dir.mkdirs()) {
-            throw new IOException("Cannot create " + dir.getAbsolutePath());
+            throw new Message.Failure(R.string.file_cannot_create, dir.getAbsolutePath());
         }
     }
 
@@ -82,7 +85,7 @@ final class FileUtil {
         if (!partial.renameTo(target)) {
             //noinspection ResultOfMethodCallIgnored
             partial.delete();
-            throw new IOException("Cannot write " + target.getAbsolutePath());
+            throw new Message.Failure(R.string.file_cannot_write, target.getAbsolutePath());
         }
     }
 

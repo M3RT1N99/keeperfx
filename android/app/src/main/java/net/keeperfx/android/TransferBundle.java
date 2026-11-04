@@ -91,16 +91,14 @@ final class TransferBundle {
     private static final long MAX_BYTES = 1L << 42;
     private static final Pattern PLAIN_VERSION = Pattern.compile("[0-9A-Za-z._-]{0,64}");
 
-    private static final String NOT_A_BUNDLE =
-        "This is not an exported KeeperFX installation. Nothing was changed.";
-    private static final String DAMAGED =
-        "This file is incomplete or damaged, probably cut off on its way here. "
-            + "Nothing was changed. Export it again.";
-
     /** Why a file will not be installed, in words for the player. */
-    static final class RefusedException extends IOException {
-        RefusedException(String message) {
+    static final class RefusedException extends Message.Failure {
+        RefusedException(Message message) {
             super(message);
+        }
+
+        RefusedException(int resource, Object... args) {
+            super(resource, args);
         }
     }
 
@@ -163,15 +161,14 @@ final class TransferBundle {
             try {
                 values.load(new ByteArrayInputStream(raw));
             } catch (IllegalArgumentException e) {
-                throw new RefusedException(DAMAGED);
+                throw new RefusedException(R.string.transfer_damaged);
             }
             final long format = number(values, "format", Integer.MAX_VALUE);
             if (format > FORMAT_VERSION) {
-                throw new RefusedException("This file was made by a newer KeeperFX app than this "
-                    + "one. Update the app here first. Nothing was changed.");
+                throw new RefusedException(R.string.transfer_from_newer_app);
             }
             if (format != FORMAT_VERSION) {
-                throw new RefusedException(NOT_A_BUNDLE);
+                throw new RefusedException(R.string.transfer_not_a_bundle);
             }
             return new Marker(version(values, "app"),
                 (int) number(values, "engine", Integer.MAX_VALUE),
@@ -191,14 +188,14 @@ final class TransferBundle {
             } catch (NumberFormatException ignored) {
                 // Refused below, the same as a number out of range.
             }
-            throw new RefusedException(NOT_A_BUNDLE);
+            throw new RefusedException(R.string.transfer_not_a_bundle);
         }
 
         /** Ends up in the launcher's records and its dialogs, so only what a version looks like. */
         private static String version(Properties values, String key) throws IOException {
             final String value = values.getProperty(key, "").trim();
             if (!PLAIN_VERSION.matcher(value).matches()) {
-                throw new RefusedException(NOT_A_BUNDLE);
+                throw new RefusedException(R.string.transfer_not_a_bundle);
             }
             return value;
         }
@@ -335,7 +332,7 @@ final class TransferBundle {
         final File[] children = directory.listFiles();
         if (children == null) {
             // Leaving it out would pass for a complete bundle.
-            throw new IOException("Cannot read " + directory);
+            throw new Message.Failure(R.string.file_cannot_read, directory);
         }
         Arrays.sort(children);
         for (File child : children) {
@@ -368,7 +365,7 @@ final class TransferBundle {
         try {
             values.load(new ByteArrayInputStream(raw));
         } catch (IllegalArgumentException e) {
-            throw new RefusedException(DAMAGED);
+            throw new RefusedException(R.string.transfer_damaged);
         }
         final Map<String, String> settings = new TreeMap<>();
         for (String key : values.stringPropertyNames()) {
@@ -413,7 +410,7 @@ final class TransferBundle {
         }
 
         /** Copies to the end of the stream, which is also what makes a zip check its CRC. */
-        long pump(InputStream in, OutputStream out, long limit, String whenOver)
+        long pump(InputStream in, OutputStream out, long limit, Message whenOver)
                 throws IOException {
             long copied = 0;
             int read;
@@ -450,13 +447,13 @@ final class TransferBundle {
                     zip.write(plan.settings);
                     meter.add(plan.settings.length);
                 } else if (item.file != null) {
-                    final String changed = item.entry + " changed while it was being packed";
+                    final Message changed = new Message(R.string.export_file_changed, item.entry);
                     final long copied;
                     try (InputStream in = new FileInputStream(item.file)) {
                         copied = meter.pump(in, zip, item.size, changed);
                     }
                     if (copied != item.size) {
-                        throw new IOException(changed);
+                        throw new RefusedException(changed);
                     }
                 }
                 zip.closeEntry();
@@ -480,7 +477,7 @@ final class TransferBundle {
         FileUtil.ensureDirectory(directory);
         final File previous = finishedExport(directory);
         FileUtil.requireRoom(directory, plan.fileSizeAtMost(),
-            (previous == null) ? 0 : previous.length(), "packing everything");
+            (previous == null) ? 0 : previous.length(), R.string.no_room_export);
         FileUtil.deleteContents(directory);
 
         final File finished = new File(directory, fileName);
@@ -495,7 +492,7 @@ final class TransferBundle {
         if (!partial.renameTo(finished)) {
             //noinspection ResultOfMethodCallIgnored
             partial.delete();
-            throw new IOException("Cannot write " + finished);
+            throw new Message.Failure(R.string.file_cannot_write, finished);
         }
         return finished;
     }
@@ -530,14 +527,14 @@ final class TransferBundle {
         try (ZipInputStream zip = new ZipInputStream(new BufferedInputStream(in, BUFFER_BYTES))) {
             return readMarkerEntry(zip);
         } catch (ZipException | EOFException e) {
-            throw new RefusedException(NOT_A_BUNDLE);
+            throw new RefusedException(R.string.transfer_not_a_bundle);
         }
     }
 
     private static Marker readMarkerEntry(ZipInputStream zip) throws IOException {
         final ZipEntry first = zip.getNextEntry();
         if (first == null || !MARKER_ENTRY.equals(first.getName())) {
-            throw new RefusedException(NOT_A_BUNDLE);
+            throw new RefusedException(R.string.transfer_not_a_bundle);
         }
         return Marker.parse(readSmallEntry(zip));
     }
@@ -549,7 +546,7 @@ final class TransferBundle {
         while ((read = zip.read(buffer)) != -1) {
             bytes.write(buffer, 0, read);
             if (bytes.size() > MAX_SMALL_ENTRY) {
-                throw new RefusedException(NOT_A_BUNDLE);
+                throw new RefusedException(R.string.transfer_not_a_bundle);
             }
         }
         return bytes.toByteArray();
@@ -610,18 +607,16 @@ final class TransferBundle {
     static Unpacked unpack(InputStream in, Staging staging, Progress progress) throws IOException {
         try (ZipInputStream zip = new ZipInputStream(new BufferedInputStream(in, BUFFER_BYTES))) {
             final Marker marker = readMarkerEntry(zip);
-            FileUtil.requireRoom(staging.root, marker.bytes, "unpacking this file");
+            FileUtil.requireRoom(staging.root, marker.bytes, R.string.no_room_import);
 
             final Meter meter = new Meter(marker.bytes, progress);
-            final String tooMuch = "This file holds more than it says it does, so it is not "
-                + "what it claims to be. Nothing was changed.";
             Map<String, String> settings = Collections.emptyMap();
             long entries = 0;
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 meter.checkCancelled();
                 if (++entries > marker.entries) {
-                    throw new RefusedException(tooMuch);
+                    throw new RefusedException(R.string.transfer_holds_more);
                 }
                 final String name = entry.getName();
                 if (name.equals(SETTINGS_ENTRY)) {
@@ -632,8 +627,7 @@ final class TransferBundle {
                 }
                 final File out = staging.targetFor(name);
                 if (out == null) {
-                    throw new RefusedException("This file tries to write outside the game "
-                        + "(" + name + "), so it will not be installed. Nothing was changed.");
+                    throw new RefusedException(R.string.transfer_outside_game, name);
                 }
                 if (entry.isDirectory()) {
                     FileUtil.ensureDirectory(out);
@@ -642,19 +636,20 @@ final class TransferBundle {
                 // Staging starts empty, so this is a name the file holds twice, and
                 // the second copy would make the first one's bytes count for nothing.
                 if (out.exists()) {
-                    throw new RefusedException(DAMAGED);
+                    throw new RefusedException(R.string.transfer_damaged);
                 }
                 FileUtil.ensureDirectory(out.getParentFile());
                 try (OutputStream file = new FileOutputStream(out)) {
-                    meter.pump(zip, file, marker.bytes - meter.done(), tooMuch);
+                    meter.pump(zip, file, marker.bytes - meter.done(),
+                        new Message(R.string.transfer_holds_more));
                 }
             }
             if (entries != marker.entries || meter.done() != marker.bytes) {
-                throw new RefusedException(DAMAGED);
+                throw new RefusedException(R.string.transfer_damaged);
             }
             return new Unpacked(marker, settings);
         } catch (ZipException | EOFException e) {
-            throw new RefusedException(DAMAGED);
+            throw new RefusedException(R.string.transfer_damaged);
         }
     }
 
@@ -675,11 +670,10 @@ final class TransferBundle {
             throws IOException {
         if (!GameData.findMissingKeeperfxEntries(staging.install).isEmpty()
                 || !GameData.findMissingOriginalDkFiles(staging.install).isEmpty()) {
-            throw new RefusedException("This file does not hold a complete installation, so the "
-                + "game could not start from it. Nothing was changed.");
+            throw new RefusedException(R.string.transfer_not_complete);
         }
         if (countSaves(staging.install) != marker.saves) {
-            throw new RefusedException(DAMAGED);
+            throw new RefusedException(R.string.transfer_damaged);
         }
         final Map<String, Long> stable =
             InstallManifest.read(new File(staging.manifests, STABLE_MANIFEST));
@@ -687,11 +681,11 @@ final class TransferBundle {
             InstallManifest.read(new File(staging.manifests, ALPHA_MANIFEST));
         if (stable.isEmpty()) {
             // An export is only offered for an installation that has one.
-            throw new RefusedException(DAMAGED);
+            throw new RefusedException(R.string.transfer_damaged);
         }
         if (sameApp && !InstallManifest.verify(staging.install, stable, alpha, staging.backup,
                 overlay).isClean()) {
-            throw new RefusedException(DAMAGED);
+            throw new RefusedException(R.string.transfer_damaged);
         }
     }
 }

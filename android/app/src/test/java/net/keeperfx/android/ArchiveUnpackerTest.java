@@ -187,8 +187,8 @@ public class ArchiveUnpackerTest {
         try {
             ArchiveUnpacker.unzipAllOrNothing(archive, root, staging(), TestArchives.QUIET);
             fail("nothing was installed, so it has to say so");
-        } catch (IOException expected) {
-            assertEquals("The archive holds no files", expected.getMessage());
+        } catch (Message.Failure expected) {
+            assertEquals(new Message(R.string.archive_empty), expected.message);
         }
     }
 
@@ -214,10 +214,10 @@ public class ArchiveUnpackerTest {
     @Test
     public void runningOutOfRoomIsItsOwnFailure() {
         try {
-            FileUtil.requireRoom(root, Long.MAX_VALUE, "this");
+            FileUtil.requireRoom(root, Long.MAX_VALUE, R.string.no_room_unpack);
             fail("no disk has that much");
         } catch (FileUtil.NoRoomException expected) {
-            assertTrue(expected.getMessage().contains("this needs"));
+            assertEquals(R.string.no_room_unpack, expected.message.resource);
         }
     }
 

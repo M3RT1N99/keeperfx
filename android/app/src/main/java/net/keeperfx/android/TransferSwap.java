@@ -87,7 +87,7 @@ class TransferSwap {
         // installation there is.
         recover();
         if (commitMark.exists()) {
-            throw new IOException("An earlier import could neither be finished nor undone");
+            throw new Message.Failure(R.string.transfer_earlier_import_stuck);
         }
         FileUtil.deleteTree(trash);
         FileUtil.ensureDirectory(staging.root);
@@ -186,7 +186,7 @@ class TransferSwap {
         final Map<String, String> values =
             TransferBundle.decodeSettings(Files.readAllBytes(settingsFile.toPath()));
         if (!settings.replace(values, marker.release, marker.alpha)) {
-            throw new IOException("Cannot write the launcher's settings");
+            throw new Message.Failure(R.string.transfer_settings_not_written);
         }
     }
 
@@ -237,7 +237,7 @@ class TransferSwap {
     /** One step of a swap, and what a test makes fail. */
     void move(File from, File to) throws IOException {
         if (!from.renameTo(to)) {
-            throw new IOException("Cannot move " + from + " to " + to);
+            throw new Message.Failure(R.string.file_cannot_move, from, to);
         }
     }
 }
