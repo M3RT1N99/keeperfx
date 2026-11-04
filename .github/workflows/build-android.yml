@@ -161,10 +161,11 @@ jobs:
 
   # One release per build, tagged with its version, so there is a history to go
   # back through. Action artifacts expire after 90 days and cannot be fetched
-  # without a GitHub account; a release is a permanent, login-free URL.
+  # without a GitHub account; a release is a permanent, login-free URL. A release
+  # reaches every installed app, so a desktop regression has to stop it as well.
   publish:
     name: "Publish the release"
-    needs: build-android
+    needs: [build-android, build-linux-regression]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     permissions:
