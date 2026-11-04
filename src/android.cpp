@@ -312,7 +312,7 @@ static jlong lan_network_handle(void)
     return handle;
 }
 
-extern "C" void android_lan_bind_socket(int socket, const char *what)
+extern "C" void android_lan_bind_socket(int fd, const char *what)
 {
     const jlong handle = lan_network_handle();
     switch (handle)
@@ -327,7 +327,7 @@ extern "C" void android_lan_bind_socket(int socket, const char *what)
         LbNetLog("LAN: %s socket left unbound, could not ask for the networks\n", what);
         return;
     }
-    if (android_setsocknetwork(static_cast<net_handle_t>(handle), socket) != 0)
+    if (android_setsocknetwork(static_cast<net_handle_t>(handle), fd) != 0)
     {
         LbNetLog("LAN: %s socket left unbound, binding to Wi-Fi network %lld failed: %s\n",
             what, static_cast<long long>(handle), strerror(errno));

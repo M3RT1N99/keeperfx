@@ -166,7 +166,7 @@ uint16_t holepunch_stun_query(ENetHost *host, char *output_ip, size_t output_ip_
 #ifdef __ANDROID__
     // A local game has no use for a public address, and the phones playing one may have
     // no internet. A gateway that swallows DNS, as a hotspot or router without an upstream
-    // can, holds the game on this thread for over a minute with these three lookups.
+    // can, holds the game on this thread for about a minute with these three lookups.
     if (frontnet_service_selected(FrontendNetSvc_LAN)) {
         LbNetLog("STUN: skipped for a local game\n");
         return 0;

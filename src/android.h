@@ -62,7 +62,7 @@ int android_lan_broadcast_targets(char targets[ANDROID_LAN_TARGETS_MAX][ANDROID_
  * that cannot be bound stays usable as it was.
  * @param what What the socket is for, for the log.
  */
-void android_lan_bind_socket(int socket, const char *what);
+void android_lan_bind_socket(int fd, const char *what);
 
 /** Implemented in bflib_sndlib.cpp, called when the activity goes away and comes back. */
 void android_audio_enter_background(int engine_keeps_running);
