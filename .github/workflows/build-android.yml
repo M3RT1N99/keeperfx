@@ -26,10 +26,12 @@ jobs:
       build-number: ${{ steps.apk.outputs.build-number }}
 
     steps:
+    # Not persist-credentials: false. That makes checkout run git submodule foreach
+    # inside this step, and it dies on upstream's external/vcpkg, a gitlink with no
+    # entry in .gitmodules. The token it leaves behind can only read, see above.
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        persist-credentials: false
 
     - uses: actions/setup-java@v4
       with:
