@@ -65,11 +65,13 @@ int android_lan_broadcast_targets(char targets[ANDROID_LAN_TARGETS_MAX][ANDROID_
 void android_lan_bind_socket(int fd, const char *what);
 
 /**
- * The same for a local game's socket whose peer has gone quiet, for the network service
- * path to call as often as it likes: at most once a second it asks where the socket
- * belongs now and puts it there. Logs when that answer changes.
+ * The same for a game socket whose game has nobody to hear, and the discovery socket that
+ * goes with it (-1 if there is none), for the network service path to call as often as it
+ * likes: at most once a second it asks where they belong now and puts them there. Together,
+ * because the limit is on asking, and a socket that called second would never get a turn.
+ * Logs when that answer changes.
  */
-void android_lan_follow_network(int fd);
+void android_lan_follow_network(int game_fd, int discovery_fd);
 
 /** Implemented in bflib_sndlib.cpp, called when the activity goes away and comes back. */
 void android_audio_enter_background(int engine_keeps_running);

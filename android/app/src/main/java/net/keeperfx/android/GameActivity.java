@@ -296,8 +296,8 @@ public class GameActivity extends SDLActivity {
 
     /**
      * Which network a local game's socket belongs on, asked by the engine when it
-     * makes one (android_lan_bind_socket), and again once a second while a peer of a
-     * running game is not answering (android_lan_follow_network).
+     * makes one (android_lan_bind_socket), and again once a second while a peer is not
+     * answering or a lobby is still empty (android_lan_follow_network).
      *
      * A hotspot without internet leaves the Wi-Fi unvalidated with cellular as the
      * default network, and a socket that is not told otherwise then sends its

@@ -34,6 +34,7 @@
 
 #ifdef __ANDROID__
 #include "android.h"
+#include "net_lan.h"
 #endif
 
 #include "post_inc.h"
@@ -867,18 +868,29 @@ namespace
      * another Wi-Fi would lose its own clients by following that Wi-Fi. This way nothing
      * asks the system anything either, unless the game is in trouble already. ENet pings
      * every half a second, so two seconds is several unanswered pings.
+     *
+     * A host still waiting in its lobby has nobody to hear, and the player may only now be
+     * joining the Wi-Fi the others are on. Its replies to their looking for games would go
+     * out where the default network says, and they would never see the game.
      */
     void lan_follow_network_when_quiet(void)
     {
         if (!host || !frontnet_service_selected(FrontendNetSvc_LAN)) {
             return;
         }
+        bool anyone_connected = false;
         for (size_t peer_index = 0; peer_index < host->peerCount; peer_index++) {
             const ENetPeer *peer = &host->peers[peer_index];
-            if (peer->state == ENET_PEER_STATE_CONNECTED && ENET_TIME_DIFFERENCE(host->serviceTime, peer->lastReceiveTime) >= 2000) {
-                android_lan_follow_network(host->socket);
-                return;
+            if (peer->state == ENET_PEER_STATE_CONNECTED) {
+                anyone_connected = true;
+                if (ENET_TIME_DIFFERENCE(host->serviceTime, peer->lastReceiveTime) >= 2000) {
+                    android_lan_follow_network(host->socket, lan_host_discovery_fd());
+                    return;
+                }
             }
+        }
+        if (!anyone_connected && !client_peer && (netstate.phase == NetPhase_Lobby)) {
+            android_lan_follow_network(host->socket, lan_host_discovery_fd());
         }
     }
 

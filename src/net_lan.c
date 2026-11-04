@@ -102,6 +102,13 @@ void lan_host_start(uint16_t port)
     LbNetLog("LAN: host discovery socket ready, discovery_port=%d game_port=%d\n", LAN_DISCOVERY_PORT, port);
 }
 
+#ifdef __ANDROID__
+int lan_host_discovery_fd(void)
+{
+    return (host_socket == ENET_SOCKET_NULL) ? -1 : (int)host_socket;
+}
+
+#endif
 void lan_host_update(void)
 {
     if (host_socket == ENET_SOCKET_NULL)

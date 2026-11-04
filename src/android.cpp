@@ -345,7 +345,7 @@ extern "C" void android_lan_bind_socket(int fd, const char *what)
     lan_place_socket(fd, lan_network_handle(), what, true);
 }
 
-extern "C" void android_lan_follow_network(int fd)
+extern "C" void android_lan_follow_network(int game_fd, int discovery_fd)
 {
     static Uint64 asked_at = 0;
     static jlong last_said = LAN_NETWORKS_UNKNOWN;
@@ -354,7 +354,9 @@ extern "C" void android_lan_follow_network(int fd)
         return;
     asked_at = now;
     const jlong answer = lan_network_handle();
-    lan_place_socket(fd, answer, "quiet game", answer != last_said);
+    lan_place_socket(game_fd, answer, "following game", answer != last_said);
+    if (discovery_fd >= 0)
+        lan_place_socket(discovery_fd, answer, "following discovery", answer != last_said);
     last_said = answer;
 }
 
