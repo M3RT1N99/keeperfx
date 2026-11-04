@@ -157,7 +157,10 @@ android {
     }
 
     lint {
-        abortOnError false
+        // A call newer than minSdk only fails on a phone nobody here tests on, so it
+        // has to stop the release build: lintVitalRelease, part of assembleRelease,
+        // looks only at fatal issues. See lint.xml for the one hit that is ignored.
+        fatal "NewApi"
     }
 
     testOptions {

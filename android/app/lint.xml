@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <issue id="NewApi">
+        <!-- SDLGenericMotionListener_API29 calls this API 29 method, but
+             SDLActivity.getMotionListener() only creates it on API 29 and newer. That
+             guard is out of lint's sight, and SDL's sources are used unmodified. This
+             method and no more, so that a new hit in SDL after a bump still stops the
+             build. -->
+        <ignore regexp="android\.view\.InputDevice#isExternal" />
+    </issue>
+</lint>
