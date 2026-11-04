@@ -41,7 +41,9 @@
 #include "bflib_planar.h"
 #include "bflib_video.h"
 #include "front_input.h"
+#include "frontend.h"
 #include "frontmenu_ingame_evnt.h"
+#include "game_legacy.h"
 #include "kjm_input.h"
 #include "kfx/platform/WindowSystemSDL.h"
 #include "kfx/renderer/RendererManager.h"
@@ -393,6 +395,9 @@ static void touch_reset_state(void)
     touch_camera_release(NULL, false);
     touch_camera_catch();
     touch_tapped_back = false;
+    // Whatever counts the hold down stops here, so nothing else would ever let go of the key.
+    if (touch_back_key_frames > 0)
+        lbKeyOn[KC_ESCAPE] = 0;
     touch_back_key_frames = 0;
     touch_possess_reset();
     touch_attacks_owed = 0;
@@ -1010,7 +1015,7 @@ void update_touch_inputs(void)
     touch_sync_steering();
     if (!touch_controls_active())
     {
-        if (touch_button_down_left || touch_button_down_right)
+        if (touch_button_down_left || touch_button_down_right || (touch_back_key_frames > 0))
             touch_reset_state();
         return;
     }
@@ -1084,7 +1089,7 @@ void update_touch_inputs(void)
     {
         touch_tapped_back = false;
         lbKeyOn[KC_ESCAPE] = 1;
-        lbKeyPressed[KC_ESCAPE] = 1;
+        touch_keep_escape_for_turn();
         lbInkey = KC_ESCAPE;
         touch_back_key_frames = 2;
     }
@@ -1197,6 +1202,16 @@ TbBool touch_allows_edge_scroll(void)
     if (touch_control_mode == TCMode_Auto)
         return (last_used_input_device == ID_Keyboard_Mouse);
     return true;
+}
+
+void touch_keep_escape_for_turn(void)
+{
+    // A level looks at the keyboard once per turn however many polls come in between, and
+    // clears this array after each look. The menus look at the key being down after every
+    // poll and nothing there clears it, so a press left in it would wait for whichever
+    // screen asks next, and that screen would close again as soon as it opened.
+    if ((frontend_menu_state == FeSt_INITIAL) && (game.game_kind != GKind_Unset))
+        lbKeyPressed[KC_ESCAPE] = 1;
 }
 
 int touch_game_key_pressed(long key_id, TbBool clear_pressed)

@@ -95,6 +95,9 @@ TbBool touch_gesture_committed(void);
 /** False when the pointer being at the edge of the screen does not mean to scroll. */
 TbBool touch_allows_edge_scroll(void);
 
+/** An Escape press that has to reach a level's next look, however short it was. Not kept in the menus. */
+void touch_keep_escape_for_turn(void);
+
 /**
  * Touch equivalent of the controller term in is_game_key_pressed().
  * @return non-zero when an active gesture maps onto the given game key.

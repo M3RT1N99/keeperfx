@@ -342,7 +342,7 @@ static void process_event(const SDL_Event *ev)
                 return;
             }
             back_pressed_this_poll = true;
-            lbKeyPressed[KC_ESCAPE] = 1;
+            touch_keep_escape_for_turn();
         }
 #endif
         x = keyboard_keys_mapping(&ev->key);
