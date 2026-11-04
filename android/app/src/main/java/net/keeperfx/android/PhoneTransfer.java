@@ -40,10 +40,6 @@ final class PhoneTransfer {
 
     private static final String TAG = "KeeperFX";
 
-    private static final String GAME_OPEN =
-        "The game is still open in the background. Quit it first, because this replaces the "
-            + "files it is using.";
-
     private PhoneTransfer() {
     }
 
@@ -206,8 +202,8 @@ final class PhoneTransfer {
 
     /** Blocking, it reads from a content provider; call from a background thread. */
     static ReceiveOffer inspect(Context context, Uri file) {
-        if (GameActivity.isOpen()) {
-            return new ReceiveOffer(GAME_OPEN);
+        if (GameProcess.isAlive(context)) {
+            return new ReceiveOffer(context.getString(R.string.game_still_open));
         }
         try (InputStream in = context.getContentResolver().openInputStream(file)) {
             if (in == null) {
@@ -230,8 +226,8 @@ final class PhoneTransfer {
     /** Runs on the service's thread. Leaves everything as it was unless this returns. */
     static void runImport(Context context, Uri file, TransferBundle.Progress progress)
             throws IOException {
-        if (GameActivity.isOpen()) {
-            throw new TransferBundle.RefusedException(GAME_OPEN);
+        if (GameProcess.isAlive(context)) {
+            throw new TransferBundle.RefusedException(context.getString(R.string.game_still_open));
         }
         try (InputStream in = context.getContentResolver().openInputStream(file)) {
             if (in == null) {
@@ -255,31 +251,36 @@ final class PhoneTransfer {
                 new File(files, "updates"),
                 exportDirectory(context),
             },
-            new File(files, "transfer"), new File(files, "transfer-trash"),
+            transferWork(context), new File(files, "transfer-trash"),
             prefs::replaceWithTransferred);
     }
 
-    /**
-     * Picks up after a process that died in the middle of an import. Has to come before
-     * anything looks at the installation. Quick, when there is nothing to do it is one
-     * look at the disk.
-     */
-    static void finishInterruptedImport(Context context) {
-        if (!DownloadService.isRunning()) {
-            swap(context).recover();
-        }
+    private static File transferWork(Context context) {
+        return new File(context.getFilesDir(), "transfer");
     }
 
-    /** For every start of the launcher. */
+    /**
+     * Whether an import is running or a dead process left one behind, for the engine's
+     * process to ask. It can only see the disk: this process's service is not its own.
+     */
+    static boolean importUnfinished(Context context) {
+        return transferWork(context).exists();
+    }
+
+    /**
+     * For every start of the launcher, before anything looks at the installation: picks
+     * up after a process that died in the middle of an import. Quick, when there is
+     * nothing to do it is one look at the disk.
+     */
     static void cleanUpAtStart(Context context) {
-        finishInterruptedImport(context);
         if (DownloadService.isRunning()) {
             return;
         }
+        final TransferSwap swap = swap(context);
+        swap.recover();
         if (TransferBundle.removeExpired(exportDirectory(context), System.currentTimeMillis())) {
             DownloadService.cancelFinishedNotification(context);
         }
-        final TransferSwap swap = swap(context);
         new Thread(swap::emptyTrash, "kfx-transfer-cleanup").start();
     }
 

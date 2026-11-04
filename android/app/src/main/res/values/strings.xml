@@ -47,6 +47,9 @@
     <string name="receive_keep">Keep it</string>
     <string name="receive_not_deleted">It could not be deleted from here, so it is still there:\n\n%1$s\n\nA file manager can delete it.</string>
 
+    <string name="game_still_open_title">The game is still open</string>
+    <string name="game_still_open">The game is still open in the background. Quit it first, because this replaces or deletes files it is using.</string>
+
     <string name="version_unknown">imported folder</string>
 
     <string name="status_keeperfx_ready">KeeperFX %1$s installed (%2$s)</string>

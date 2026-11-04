@@ -26,6 +26,7 @@ import android.net.NetworkCapabilities;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Process;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -61,9 +62,6 @@ public class GameActivity extends SDLActivity {
     /** Present but not competing with the game for attention. */
     private static final float IDLE_ALPHA = 0.55f;
 
-    /** Whether the engine may be alive, paused behind the launcher, with its files open. */
-    private static volatile boolean open = false;
-
     private String[] arguments = new String[0];
     private boolean rightClickActive = false;
     private boolean keyboardVisible = false;
@@ -71,10 +69,14 @@ public class GameActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // Android can bring this back from the recent apps without the launcher ever
-        // starting, and that must not play on a swap a dead process left half done.
-        PhoneTransfer.finishInterruptedImport(this);
-        open = true;
+        // Android can bring this back from the recent apps without the launcher starting,
+        // and that must not play on an import that is running or that a dead process left
+        // half done. Only the launcher's process may sort that out, and starting it does.
+        if (PhoneTransfer.importUnfinished(this)) {
+            startActivity(getPackageManager().getLaunchIntentForPackage(getPackageName()));
+            Process.killProcess(Process.myPid());
+            return;
+        }
         String[] extra = null;
         if (getIntent() != null) {
             extra = getIntent().getStringArrayExtra(EXTRA_ARGUMENTS);
@@ -127,14 +129,28 @@ public class GameActivity extends SDLActivity {
         });
     }
 
+    /**
+     * SDL finishes the activity when the engine's main has returned, and that is the end
+     * of this process. Android would only destroy the activity once the launcher has
+     * settled, and a Play in the meantime would land here and be turned away by SDL.
+     */
     @Override
-    protected void onDestroy() {
-        open = false;
-        super.onDestroy();
+    public void finish() {
+        super.finish();
+        if (mSDLMainFinished) {
+            Process.killProcess(Process.myPid());
+        }
     }
 
-    static boolean isOpen() {
-        return open;
+    /**
+     * This process exists for this activity, and SDL refuses another one in it, so the
+     * next start has to find it gone, as it would after an exe has exited. SDL has
+     * asked the engine to quit by now and waited for it.
+     */
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Process.killProcess(Process.myPid());
     }
 
     /**

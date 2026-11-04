@@ -890,6 +890,11 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             refreshStatus();
             return;
         }
+        // Only back to it: what follows would rewrite files the engine has open.
+        if (GameProcess.isAlive(this)) {
+            startActivity(new Intent(this, GameActivity.class));
+            return;
+        }
         // Refreshed on every launch rather than only at install time, so that
         // updating the APK also updates the configuration its engine expects.
         setBusy(true);

@@ -286,8 +286,8 @@ for ((i = 0; i < LEVEL_TIMEOUT_S; i++)); do
     if adb shell cat "${LOG}" 2>/dev/null | grep -q 'Started level'; then
         break
     fi
-    if [ -z "$(adb shell pidof "${PKG}" | tr -d '\r')" ]; then
-        fail "the process died before a level started"
+    if [ -z "$(adb shell pidof "${PKG}:game" | tr -d '\r')" ]; then
+        fail "the engine's process died before a level started"
     fi
 done
 [ "${i}" -lt "${LEVEL_TIMEOUT_S}" ] || fail "no level started within ${LEVEL_TIMEOUT_S}s"
@@ -295,9 +295,9 @@ say "$(adb shell cat "${LOG}" | grep -m1 'Started level' | tr -d '\r')"
 
 # --- Is it really playing? ---------------------------------------------------
 
-PID="$(adb shell pidof "${PKG}" | tr -d '\r')"
+PID="$(adb shell pidof "${PKG}:game" | tr -d '\r')"
 sleep 15
-[ "$(adb shell pidof "${PKG}" | tr -d '\r')" = "${PID}" ] || fail "the process died after the level started"
+[ "$(adb shell pidof "${PKG}:game" | tr -d '\r')" = "${PID}" ] || fail "the engine's process died after the level started"
 adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' | grep -q 'GameActivity' \
     || fail "the game is not what is on screen"
 frame_a="$(adb exec-out screencap -p | md5sum)"

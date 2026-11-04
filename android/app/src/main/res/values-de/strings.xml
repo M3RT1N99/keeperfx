@@ -18,6 +18,9 @@
     <string name="log_copy_failed">Das Protokoll konnte nicht kopiert werden. Nimm stattdessen Teilen.</string>
     <string name="button_log">Protokoll</string>
 
+    <string name="game_still_open_title">Das Spiel ist noch offen</string>
+    <string name="game_still_open">Das Spiel ist im Hintergrund noch offen. Beende es zuerst, denn das hier ersetzt oder löscht Dateien, die es gerade benutzt.</string>
+
     <string name="version_unknown">importierter Ordner</string>
 
     <string name="status_keeperfx_ready">KeeperFX %1$s installiert (%2$s)</string>

@@ -78,10 +78,12 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- In the engine's process, see GameActivity below: it is there to keep that one alive. -->
         <service
             android:name=".NetworkGameService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync"
+            android:process=":game" />
 
         <!-- Hands out the shared log copy, the downloaded APK and a packed installation, nothing else. -->
         <provider
@@ -95,8 +97,10 @@
         </provider>
 
         <!--
-          SDLActivity expects to own the process; launchMode singleInstance and
-          the configChanges list follow SDL's own android-project template.
+          SDLActivity expects to own the process, so it gets one: SDL ends the process
+          when a second activity is started in it, and a process ending that way or by a
+          native crash must not take the launcher and what it is doing with it. launchMode
+          singleInstance and the configChanges list follow SDL's own android-project template.
         -->
         <activity
             android:name=".GameActivity"
@@ -106,6 +110,7 @@
             android:label="@string/app_name"
             android:launchMode="singleInstance"
             android:preferMinimalPostProcessing="true"
+            android:process=":game"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Theme.KeeperFX.Game" />
     </application>
