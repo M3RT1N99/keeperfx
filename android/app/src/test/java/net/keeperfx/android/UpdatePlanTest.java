@@ -240,6 +240,20 @@ public class UpdatePlanTest {
     }
 
     @Test
+    public void theDialogListsTitleDetailAndWhatChangedInTheApp() {
+        facts.alphaVersion = "";
+        facts.appUpdate = new AppRelease("1.60", "https://example.test/app.apk", 1,
+            Arrays.asList("first change", "second change"));
+        final List<UpdateManager.Item> items = UpdateManager.plan(facts);
+        final String text = UpdateManager.describe(items);
+        assertTrue(text, text.contains("\u2022 KeeperFX alpha 1.4.0.5591\n    Files the current engine"));
+        assertTrue(text, text.contains("\u2022 KeeperFX app 1.60\n    Currently 1.57\n"
+            + "    \u2022 first change\n    \u2022 second change\n"));
+        assertTrue(UpdateManager.contains(items, UpdateManager.Kind.APP));
+        assertFalse(UpdateManager.contains(items, UpdateManager.Kind.GAME_DATA));
+    }
+
+    @Test
     public void anAppUpdateCarriesTheRelease() {
         final AppRelease release = new AppRelease("1.60", "https://example.test/app.apk", 1,
             Collections.<String>emptyList());

@@ -326,11 +326,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 setBusy(false);
                 refreshStatus();
                 if (items.isEmpty()) {
-                    new AlertDialog.Builder(this)
-                        .setTitle(R.string.updates_none_title)
-                        .setMessage(R.string.updates_none)
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show();
+                    showMessage(R.string.updates_none_title, getString(R.string.updates_none));
                     return;
                 }
                 showUpdateDialog(items);
@@ -339,30 +335,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     }
 
     private void showUpdateDialog(List<UpdateManager.Item> items) {
-        final StringBuilder body = new StringBuilder();
-        boolean replacesData = false;
-        for (UpdateManager.Item item : items) {
-            body.append("• ").append(item.title).append('\n');
-            if (!item.detail.isEmpty()) {
-                body.append("    ").append(item.detail).append('\n');
-            }
-            // The point of publishing a release per build is that the player can
-            // see why an update is being offered. This dialog is the one they
-            // actually reach, so the changelog has to be here and not only in
-            // the app-only dialog behind the version button.
-            if (item.appUpdate != null) {
-                final String changelog = item.appUpdate.changelog();
-                if (!changelog.isEmpty()) {
-                    for (String line : changelog.split("\n")) {
-                        body.append("    ").append(line).append('\n');
-                    }
-                }
-            }
-            if (item.kind == UpdateManager.Kind.GAME_DATA) {
-                replacesData = true;
-            }
-        }
-        if (replacesData) {
+        final StringBuilder body = new StringBuilder(UpdateManager.describe(items)).append('\n');
+        if (UpdateManager.contains(items, UpdateManager.Kind.GAME_DATA)) {
             body.append('\n').append(getString(R.string.updates_replaces_data));
         }
         body.append('\n').append(getString(R.string.updates_use_wifi));
@@ -382,13 +356,8 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
      * through onDownloadState().
      */
     private void runUpdates(List<UpdateManager.Item> items) {
-        boolean needsInstallPermission = false;
-        for (UpdateManager.Item item : items) {
-            if (item.kind == UpdateManager.Kind.APP) {
-                needsInstallPermission = true;
-            }
-        }
-        if (needsInstallPermission && !AppUpdater.canInstallPackages(this)) {
+        if (UpdateManager.contains(items, UpdateManager.Kind.APP)
+                && !AppUpdater.canInstallPackages(this)) {
             new AlertDialog.Builder(this)
                 .setTitle(R.string.updates_permission_title)
                 .setMessage(R.string.updates_permission)
@@ -437,7 +406,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         refreshStatus();
         if (state.error != null) {
             DownloadService.errorShown();
-            showError(R.string.install_failed, state.error);
+            showMessage(R.string.install_failed, state.error);
         }
         // One finished download can open the way to the next: the alpha patch and
         // the music are only offered once the release is in place, and on a fresh
@@ -478,17 +447,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 updateAppButton.setText(getString(R.string.button_update_app,
                     AppUpdater.installedVersionName(this)));
                 if (!online) {
-                    showError(R.string.app_update_title,
+                    showMessage(R.string.app_update_title,
                         getString(R.string.app_update_offline));
                     return;
                 }
                 if (found == null) {
-                    new AlertDialog.Builder(this)
-                        .setTitle(R.string.app_update_title)
-                        .setMessage(getString(R.string.app_update_none,
-                            AppUpdater.installedVersionName(this)))
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show();
+                    showMessage(R.string.app_update_title, getString(R.string.app_update_none,
+                        AppUpdater.installedVersionName(this)));
                     return;
                 }
                 final StringBuilder text = new StringBuilder(
@@ -610,7 +575,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                     }
                     refreshStatus();
                     if (!success) {
-                        showError(R.string.import_failed, message);
+                        showMessage(R.string.import_failed, message);
                     }
                 });
             }
@@ -654,7 +619,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         });
     }
 
-    private void showError(int titleRes, String message) {
+    private void showMessage(int titleRes, String message) {
         new AlertDialog.Builder(this)
             .setTitle(titleRes)
             .setMessage(message)
@@ -709,7 +674,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             postIfAlive(() -> {
                 setBusy(false);
                 if (message != null) {
-                    showError(R.string.config_failed, message);
+                    showMessage(R.string.config_failed, message);
                     return;
                 }
                 Intent intent = new Intent(this, GameActivity.class);

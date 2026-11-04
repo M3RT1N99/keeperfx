@@ -65,6 +65,39 @@ public final class UpdateManager {
     private UpdateManager() {
     }
 
+    static boolean contains(List<Item> items, Kind kind) {
+        for (Item item : items) {
+            if (item.kind == kind) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The list as a dialog shows it.
+     *
+     * The point of publishing a release per build is that the player can see why an
+     * update is being offered. This dialog is the one they actually reach, so the
+     * changelog has to be here and not only in the app-only dialog behind the
+     * version button.
+     */
+    static String describe(List<Item> items) {
+        final StringBuilder body = new StringBuilder();
+        for (Item item : items) {
+            body.append("\u2022 ").append(item.title).append('\n');
+            if (!item.detail.isEmpty()) {
+                body.append("    ").append(item.detail).append('\n');
+            }
+            if (item.appUpdate != null && !item.appUpdate.changelog().isEmpty()) {
+                for (String line : item.appUpdate.changelog().split("\n")) {
+                    body.append("    ").append(line).append('\n');
+                }
+            }
+        }
+        return body.toString();
+    }
+
     /**
      * Everything the list of downloads depends on. The fields that come from the
      * network are null when the question could not be answered: being offline
