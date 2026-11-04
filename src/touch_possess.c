@@ -34,6 +34,7 @@
 #include "gui_frontmenu.h"
 #include "keeperfx.hpp"
 #include "kfx/renderer/RendererManager.h"
+#include "local_camera.h"
 #include "local_possession.h"
 #include "observer.h"
 #include "player_data.h"
