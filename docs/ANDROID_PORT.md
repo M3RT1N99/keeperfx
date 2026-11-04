@@ -1,60 +1,179 @@
 # KeeperFX on Android
 
-Native ARM64 Android port: an APK with a touch launcher that imports an existing
-KeeperFX installation and starts the unmodified engine on top of it.
+An unofficial, native ARM64 port: an APK with a touch launcher that installs
+KeeperFX and starts the engine, built from this fork's source, on top of it. It is
+not made or supported by the KeeperFX team, and every build says so in its version
+string, its log and its release notes.
 
-This document describes what the port does, what it deliberately leaves out, and
-how to build it.
-
----
+This document describes how the port is built and how it works, for someone
+reading the code. Rules for working on it are in `AGENTS.md`.
 
 ## Status
 
-**Verified:** the APK builds end to end in CI. `libkeeperfx.so` is a 4.7 MB
-aarch64 ELF that exports `SDL_main`; every `DT_NEEDED` entry resolves either
-inside the package (SDL2, SDL2_image, SDL2_mixer, SDL2_net, OpenAL,
-`libc++_shared`) or against a system library. The manifest declares both
-activities, and all launcher classes plus `SDLActivity` are in `classes.dex`.
-The same workflow builds the Linux x86_64 target, which stays green.
+This describes port version 1.132 on `feature/android-sdl3`, engine build 5591.
 
-**Not verified:** the engine has never been executed on Android. Nobody has
-launched this APK on a device or emulator. Expect runtime work on at least the
-video mode setup, the touch gestures against the real GUI, and the data paths.
-Treat the current state as "compiles, links and installs", not "plays".
+| | |
+|---|---|
+| **Run on** | x86_64 emulators, API 36, 1544x720, software GPU, with the arm64 libraries under translation |
+| **Built by** | a copy of CI's environment in WSL. The workflow itself has not run on this code yet |
+| **Not run** | any phone, any Android older than 16, real Wi-Fi radios, a game against a desktop client |
+| **Not heard** | the emulators start with `-no-audio`, so nobody has listened to this build |
+
+An earlier build on SDL2 did play on a real phone, which is where several of the
+decisions below come from. Nothing since the move to SDL3 has. Numbers given below
+are from the emulators unless they say otherwise.
 
 ## What is in the APK
 
-| Component | Notes |
+| Library | Notes |
 |---|---|
-| `libkeeperfx.so` | The full engine, compiled for `arm64-v8a` |
-| `libSDL2.so` + image/mixer/net | Built from the pinned SDL2 sources |
-| `libopenal.so` | OpenAL Soft, OpenSL ES backend |
-| `LauncherActivity` | Data import, verification and settings |
-| `GameActivity` | `SDLActivity` subclass that starts the engine |
+| `libkeeperfx.so` | The whole engine for `arm64-v8a`, with the libraries named below linked in statically |
+| `libSDL3.so`, `libSDL3_image.so`, `libSDL3_mixer.so` | The SDL versions the desktop ports pin, from source |
+| `libopenal.so` | OpenAL Soft 1.24.3, because 1.25 needs a newer libc++ than NDK r26 has |
+| `libc++_shared.so` | From the NDK |
 
-**No game data.** The APK contains the engine and nothing else — no KeeperFX
-release files and nothing from Dungeon Keeper.
+Linked in: zlib and minizip, libspng, enet6, centijson, centitoml, astronomy, curl
+with mbedTLS for the lobby server's `wss://`, miniupnpc and libnatpmp, LuaJIT, and
+FFmpeg cut down to the Smacker demuxer and its two decoders for the intro and the
+cutscenes.
 
----
+LuaJIT is built with `-DLUAJIT_DISABLE_JIT`: the interpreter is API compatible, and
+Android's W^X policy makes writable-executable mappings unreliable across vendors.
 
-## Getting to a playable installation
+The APK holds no game data except `config/`, about 2 MB, packaged as an asset (see
+below). Nothing from Dungeon Keeper is in it.
 
-A playable installation is two independent halves, exactly as on the desktop,
-and the launcher follows the same flow as the Qt launcher:
+## The port inside the engine
+
+`src/android.cpp` is the entry point. `SDLActivity.nativeRunMain()` calls its `main`
+on SDL's thread, it consumes `-datadir` and `chdir()`s there, sets the SDL hints, and
+calls `kfxmain()`. The engine then resolves its data against the working directory as
+it does everywhere. `src/android.h` declares what shared code calls on Android.
+`src/kfx/platform/PlatformAndroid.h` is `PlatformLinux` under another name, since
+bionic provides what that uses.
+
+Only the software renderer exists here. The OpenGL backend speaks desktop GL through
+glad and Android only has GLES, so `android/app/CMakeLists.txt` leaves it out, and
+`RendererResolveType()` sends a request for it to the software renderer, which is the
+normal path, since the bundled configuration asks for OpenGL.
+
+Nothing is stubbed. That CMake file also leaves out `PlatformWindows.cpp` and
+`WindowCompositorWin.cpp`, and takes everything else under `src/`.
+
+A few things differ under `#ifdef __ANDROID__` in shared files:
+
+- `SDL_IOFromFile` does not resolve a relative path against the working directory on
+  Android, it looks at the internal storage root and in the APK's assets. What goes to
+  SDL by name, music, speech and screenshots, goes through `android_absolute_path()`.
+  Everything through `LbFileOpen` is plain stdio and unaffected.
+- Bionic's iconv lacks the double byte code pages, so `bflib_text.c` decodes them
+  through `java.lang.String` with `android_codepage_to_utf8()`, as Shift_JIS, GBK and
+  EUC-KR. Bytes no table knows become U+FFFD and the game starts, as on Windows.
+- The draw limit also holds in the menus, in `wait_at_frontend()`, through
+  `LbSleepUntilExt()`. `LbSleepFor` and `LbSleepUntil` busy-spin any wait under 20 ms,
+  and that kept a core saturated on a real phone.
+- `android_frame_watch()` logs one line a minute when frames were slow, as a summary
+  because a line per slow frame made the next frame slow on a real phone.
+- `bflib_crash.c` keeps its signal handlers and drops backtraces, since bionic has no
+  `<execinfo.h>`.
+
+The launcher passes `-fps_draw 60` by default, because the engine's own default is
+unlimited, which holds a core flat out in the software renderer. The extra arguments
+field comes later on the command line and wins.
+
+### Audio
+
+Effects play through OpenAL and music through SDL3_mixer. `src/android.cpp` asks SDL
+for the `openslES` audio driver, and the log says which one opened. Speech plays
+through its own OpenAL source rather than a mixer track, because the mixer path
+stuttered on a real phone with every other layer ruled out: mp3 goes straight into
+the source through dr_mp3, anything else through SDL3_mixer's decoder, and the mixer
+remains the fallback.
+
+If a language's speech file is absent, `play_description_speech()` falls back to the
+first folder in the campaign's `[speech]` block. A video with no audio device plays
+silently rather than failing.
+
+### ARM64
+
+What arm64 needs beyond the desktop builds:
+
+- `-fsigned-char`, because plain `char` is unsigned on ARM and the engine uses -1 as a
+  sentinel in `char` all over
+- `-ffp-contract=off`, because arm64 clang fuses multiply and add by default and the
+  x86 builds do not, which can change float results in a lockstep game
+- unaligned reads through `memcpy` in `bflib_vidraw.c` and `engine_render.c`
+- `get_named_field_value()` and `assign_default()` in `config.c` through `memcpy`, and
+  a `long` field read at its full width on Android
+- `check_map_for_gold()` starts its `unsigned short` array at an even offset, and
+  `fill_in_explored_area()` reads a byte instead of a misaligned 4-byte load
+- `#pragma pack(1)` is off under `__ANDROID__` in the headers whose structs hold
+  pointers in static tables
+
+## Two processes
+
+The launcher is the app's main process. `GameActivity` and `NetworkGameService` run in
+`:game` (`android:process` in the manifest), because SDL does not let a second activity
+start in a process whose engine has run and a native crash takes the process with it.
+So `pidof net.keeperfx.android` finds the launcher and `pidof net.keeperfx.android:game`
+the engine. No static crosses between them, and `GameProcess.isAlive()` asks
+`ActivityManager`. The `:game` process ends with its activity: `GameActivity` kills it
+in `finish()` once the engine's main has returned, and in `onDestroy()`.
+
+**Only Play starts a game.** The launcher's Play refreshes the configuration, then
+starts `GameActivity` with `FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_CLEAR_TASK`, which
+replaces any record the system kept. With the game alive it only brings it back, past
+`onCreate`. `GameActivity.onCreate()` hands over to the launcher and removes its task
+when it finds no arguments, a saved state, `FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY` or an
+unfinished import. That covers a card in the task switcher, a process the system took
+and a reboot.
+
+**The refusals.** With the game open behind the launcher, anything that replaces or
+deletes files it has open is refused with "The game is still open": downloads that
+change the installation, the two folder imports, Reset and taking the alpha patch off,
+through `refuseWhileGameOpen()`, and receiving from another phone, through
+`PhoneTransfer`. Play is locked during a job by `setBusy()`.
+
+**Behind a paused activity.** Alone, the engine stops: SDL blocks in its event pump and
+OpenAL's device is paused. In a network game it carries on, because stopping would hold
+everyone else up until the 15 s `PEER_TIMEOUT_MS`. It draws nothing, sound is muted, and
+it pumps events twice a second. `GameActivity.onPause()` starts `NetworkGameService`, a
+foreground service that does no work and ends itself after five minutes: on API 36 the
+network of a process off screen is cut after about ten seconds and it is frozen after
+about a minute.
+
+SDL3 reads `SDL_HINT_ANDROID_BLOCK_ON_PAUSE` once when video starts, too early to know
+which of the two a pause is, so `reread_block_on_pause_hint()` in
+`android/scripts/fetch-deps.sh` adds one line to SDL that reads it at every pause.
+`background_watch()` in `src/android.cpp` sets it from an event watch before that.
+
+## Getting a playable installation
+
+Two halves, as on the desktop:
 
 | Half | Where it comes from | Size |
 |---|---|---|
-| KeeperFX release | Downloaded from `keeperfx.net/api/v1/release/stable/latest`, or imported from a folder | ~360 MB |
-| Original Dungeon Keeper files | Picked out of the player's own Dungeon Keeper folder | 14 files |
+| KeeperFX release | `keeperfx.net/api/v1/release/stable/latest` | 374,587,275 bytes for 1.4.0 |
+| Original Dungeon Keeper files | The player's own copy | 14 files |
 
-**Install KeeperFX** asks the same API the desktop launcher uses, downloads the
-7z release and unpacks it. Windows binaries in the archive are skipped. The
-installed version is recorded, and every time the launcher opens it re-queries
-the API; when a newer release exists the button turns into *Update to X*.
+The launcher's first button reads **Install KeeperFX** until the release is there and
+**Check for downloads** afterwards. It offers everything fetchable at once, then what
+that made possible:
 
-**Import original Dungeon Keeper** takes any folder — the game directory, its
-`DATA` subfolder, a mounted CD image — and searches it for the files below,
-case insensitively, then copies only those. Nothing else is taken.
+- **The release**, a 7z that `DownloadService` fetches and `ArchiveUnpacker` unpacks
+  into `files/keeperfx`, skipping Windows binaries. It unpacks over what is there, so
+  saves and the imported originals stay.
+- **The alpha patch**, on by default, because the engine is built from upstream's
+  master and the stable release lacks what it has gained, the CJK fonts among them.
+  `ReleaseApi.alphaForEngine()` asks for the patch numbered `ENGINE_BUILD`, which is the
+  one that fits, and falls back to the newest, in which case the launcher says the two
+  differ. `AlphaBackup` copies aside what the patch replaces, so turning the option off
+  restores the plain release without a download.
+- **The music**, workshop item 393, the same as the desktop launcher.
+- **The app itself**, see "Versions and releases".
+
+**Import original Dungeon Keeper** takes a folder or a zip through the system picker,
+searches it case insensitively and copies only these:
 
 ```
 data/    bluepal.dat  bluepall.dat  dogpal.pal   hitpall.dat  lightng.pal
@@ -63,198 +182,344 @@ data/    bluepal.dat  bluepall.dat  dogpal.pal   hitpall.dat  lightng.pal
 sound/   atmos1.sbk   atmos2.sbk    bullfrog.sbk
 ```
 
-This is the list the official Qt launcher copies. `docs/files_required_from_original_dk.txt`
-additionally names `main.pal` and `mapfadeg.dat`; they are copied when found but
-no longer required — the engine generates the fade table itself.
+This is the list the official Qt launcher copies.
 
-**Import KeeperFX folder** stays available for anyone who already has an
-installation on the device and would rather not download 360 MB.
+**Folder** imports a whole KeeperFX installation from a folder instead. **Reset** deletes
+the installation and everything that describes it, the saves included.
 
-Reinstalling or updating KeeperFX replaces the whole tree, so the original game
-files have to be imported again afterwards. The launcher shows both halves
-separately and says which one is missing.
+`InstallManifest` records every file an unpack writes, by path and size, in
+`files/manifests/`, and the check for downloads verifies it: what is missing or damaged
+becomes a *Repair* item. Presence checks had called an interrupted unpack complete on a
+real phone. The check skips what the bundled configuration overlays.
 
----
+`BundledConfig` lays the engine's own `config/` tree from the APK's assets over the
+installation at every Play, because the engine and the data have different origins and
+a config file the engine expects can be missing from the release. `keeperfx.cfg` is kept
+on a Play, and replaced after an install, a patch or an import.
+
+`LogActivity` shows `keeperfx.log`, which `src/logging.c` flushes per line so that it
+survives a crash, and adds a header with the versions and the state of the data when
+it is shared.
+
+### Saves
+
+Saves are `save/fx1gNNNN.sav` in the installation. Upstream replaced the old dump of
+`struct Game` with the KFXS format, described in `src/kfx/save/FORMAT.txt`: chunks,
+zlib, and a schema that matches fields by name and converts between widths. A real save
+came to about a quarter of a megabyte.
+
+The old reason a PC save could not load on a phone is gone, and upstream's
+`save-tests.yml` reads every platform's sample on every platform, `linux-arm64` and
+`windows-i686` among them. Android is not one of those platforms, and no save has been
+carried between a desktop and a phone here, so treat it as designed for and untried.
+Loading only warns about a different version.
+
+### Moving to another phone
+
+**Send to another phone** packs the whole installation, saves and settings included, into
+one zip and hands it to the share sheet. Quick Share has no way into another app's storage,
+so it lands in Download on the other phone, and **Import from another phone** picks it
+there. An installation is only sent when its manifest verifies clean.
+
+- `TransferBundle` writes and reads the file. It is a stream with no seeking, so the
+  first entry, `keeperfx-bundle.properties`, declares how many entries and bytes follow.
+  A received file is untrusted: every name goes through `ArchivePaths`, only the install
+  folder, the two manifests, the alpha backup and the settings can be written at all, and
+  settings pass the allow-list in `Prefs.acceptTransferred()`, which keeps the extra
+  arguments out. The dialog says the game runs the scripts inside.
+- `TransferSwap` puts it in place, all or nothing. A file stands in as the point of no
+  return: before it exists nothing live has been touched, and once it exists whoever
+  finds it finishes the swap, the job or the next start.
+- `PhoneTransfer` connects those two, which know nothing of Android, to content URIs and
+  the share sheet.
+
+The packed file stays in `files/exports` until it is deleted or for a day. A bundle from
+another build can be imported, and the launcher says so.
 
 ## Controls
 
-The port does **not** use SDL's touch-to-mouse translation. That emulation
-collapses every finger into one synthetic mouse, which makes multi touch
-impossible; it is switched off explicitly with `SDL_HINT_TOUCH_MOUSE_EVENTS=0`.
-
-Instead `src/bflib_input_touch.cpp` consumes `SDL_FINGER*` events directly and
-feeds the result into the same device independent layer the keyboard and the
-controller already use — the pattern established by the controller support in
-PR #4657.
+The port does not use SDL's touch-to-mouse translation, which collapses every finger
+into one synthetic mouse. `src/android.cpp` turns it off, and
+`src/bflib_input_touch.cpp` takes the finger events.
 
 | Gesture | Action |
 |---|---|
 | Tap | Left click at the touched point |
-| Press and hold (~0.4 s) | Right click — slap, drop creature, cancel |
-| Drag one finger | Left button held: paint a dig area or a room |
-| Drag two fingers | Pan the map; the world follows the fingers |
-| Pinch two fingers | Zoom in and out |
-| Twist two fingers | Rotate the camera |
-| Two finger tap | Back — leaves the open menu |
-| Three finger tap | Toggle the map view |
-| Four finger tap | Pause menu |
+| Hold about 0.42 s | Right click |
+| Drag one finger | Left button held: tag or paint |
+| Two fingers | Hold the map: move, pinch and twist together |
+| Release with speed | The map rolls on; a touch catches it |
+| Two finger tap | Right click where the first finger landed |
+| Three finger tap | Escape |
+| System back, back arrow | Escape |
 
-The system back button and the back gesture do the same as a two finger tap.
-SDL would otherwise close the activity on back, dropping the player straight
-out of the game, so it is trapped and mapped to Escape.
+The back arrow and a right click toggle sit in the top right corner, added by
+`GameActivity` and on by default; while the toggle is on a plain tap is a right click.
+The back key is trapped with `SDL_HINT_ANDROID_TRAP_BACK_BUTTON` and mapped to `KC_ESCAPE`
+in `bflib_inputctrl.cpp`, which also keeps a press alive until the next look at the
+keyboard, since a level only looks once per game turn.
 
-Positioning is **absolute**: the in-game pointer jumps to the finger through
-`LbMouseSetPositionInitial()`, which does not warp the host cursor. Camera
-gestures are published as axis values on `Gkey_MoveUp/Down/Left/Right`,
-`Gkey_ZoomIn/ZoomOut` and `Gkey_RotateCW/RotateCCW`, so they honour the player's
-own key bindings and required no changes inside `front_input.c` beyond two
-additive lookups.
+The launcher offers three modes, passed as `-inputmode`: automatic (default, follows the
+device used last, and the back key does not count as using a keyboard), touch, and mouse
+and keyboard. On the desktop ports the default is mouse and keyboard, which leaves the
+whole layer inert.
 
-### Input mode
+`touch_assist_gui_pointer()` in `front_input.c` moves the pointer onto the nearest button
+when a tap lands within a finger's width of one, in or around a menu, and leaves the
+minimap and the play area alone. An edge of the screen only scrolls under a finger
+dragging there (`touch_allows_edge_scroll()`), since a pointer stays where the last
+finger left it.
 
-The launcher offers three modes, passed to the engine as `-inputmode`:
+The launcher's touch tuning screen and `-touchtune name=value,...` adjust `longpress`,
+`dragslop`, `panslop`, `zoomgate`, `rotategate`, `flickdecay`, `looksens` and `stickradius`.
 
-* **Automatic** (default) — follows the device used last. Touch the screen and
-  the touch scheme takes over; move an attached mouse or press a key and it
-  steps aside immediately. Until a touch screen has been used at all, the layer
-  stays completely inert.
-* **Touch** — always on.
-* **Mouse & keyboard** — always off.
+### Two fingers hold the map
 
-`-inputmode` also works on the desktop ports, where the default is
-**Mouse & keyboard**; a Windows or Linux machine with a touch screen therefore
-behaves exactly as before unless the option is passed explicitly.
+`src/touch_gesture.c` is the maths, with no SDL and no engine. `src/touch_camera.c` writes
+the previous and the destination pose of the local camera on every drawn frame, from
+`touch_frame_update()` before the cameras are interpolated, so a finger reaches the
+picture in the same frame even though the game's input runs at 20 turns a second. Position
+and angle reach the dungeon camera as absolute values in every turn's packet. Zoom only
+moves in flags of one step, so `touch_camera_packet_zoom()` sends flags that chase the
+local zoom, and `update_local_cameras()` masks them out of its own step.
 
----
+Each of the three movements opens on its own gate and they flow together, as in a map
+app. Measured: a point stays under the finger to 3 px over a 300 px drag, at every zoom
+and rotated.
 
-## What the Android build leaves out
+The land view and the parchment map have no such camera and still go through the game
+key lane, `touch_game_key_axis_value()` on `Gkey_MoveUp` and friends.
 
-Three modules depend on libraries that are not bundled. They are replaced by
-Android-only stubs, so no existing source file needed conditional compilation:
+### A possessed creature
 
-| Excluded | Replaced by | Why |
+`src/touch_steer.c` holds the rules, again without SDL or engine, and `src/touch_possess.c`
+the wiring and the drawing.
+
+| Where a finger lands | What it is |
+|---|---|
+| The left 45% of the width beside the panel | A floating stick that walks the creature |
+| Anywhere else | Turns the view by its travel, and a tap attacks |
+| The fly buttons, for a creature that flies | Up and down |
+| The panel, a menu, the pause box | The game's pointer |
+
+A two finger tap is a right click, which leaves the creature, and three fingers are
+Escape. The look goes straight into the packet with `touch_possess_take_look()` rather
+than through the pointer, at 0.2 degrees per pixel on a screen 720 high, and what the
+creature's turning limit keeps back stays owed. The ability buttons on the panel take a
+tap through `gui_choose_instance()`, which sends what the number keys send.
+
+### Ends and pauses
+
+The key to finish a level is Space, which a touch screen does not have.
+
+- **A won level** ends from the menu's Quit: `gui_quit_game()` sends `PckA_FinishGame` on
+  Android, so the win counts. A plain quit would throw it away. No tap ends it, because
+  the game goes on behind the victory line and a stray tap must not.
+- **A lost level** ends from a tap on the play area, via `finish_level_requested()`, not
+  on the panel, a menu or the minimap. Nothing is at stake there.
+- **A paused game** goes on from a tap on the pause box at the top, which is upstream's
+  `get_paused_message_inputs()`. While a creature is steered a finger on the box gets the
+  pointer role, and on the box a tap is a left click whatever the right click toggle says.
+  A joiner that times out pauses the game this way.
+
+### The lobby keyboard
+
+On a desktop the lobby holds text input open. On a phone that is the keyboard, covering
+Start Game and Cancel, so on Android only a tap on the chat line raises it
+(`frontnet_chat_line_tapped()`), and the line being typed is drawn at the top of the
+menu while it is up. `GameActivity.watchKeyboard()` tells SDL when the keyboard's own hide
+button took it away, which SDL does not hear of by itself.
+
+## Network
+
+### Versions
+
+`ver_defs.h.in` takes `VER_BUILD` from `BUILD_NUMBER`, and `build.gradle` passes the
+commit count at the merge base with upstream, 5591 now. `net_versions_match()` compares
+all four numbers, and `check_frontend_version_mismatch()` refuses to start a level on a
+difference and shows both versions.
+
+| Other side | Result |
+|---|---|
+| This port, same merge base | Plays |
+| An official alpha with the same number | Should play, not tried: same source, and the same number from `git rev-list --count` |
+| Official stable 1.4.0, which announces 5136 | By reading: `net_lobby.c` lets it into a phone's lobby and the level does not start. A phone will not join a stable host from the list |
+| Any other official build | By reading: refused at the join, either way round |
+
+An upstream merge moves the number. `MATCHMAKING_VERSION` no longer exists upstream. A
+lobby's metadata carries the four numbers, and the `list` request sends the whole
+`VER_STRING`, suffix included. The bare `1.4.0` in the library is `net_lan.c`'s label for
+a LAN host too old to announce a version.
+
+The game is deterministic lockstep and the fork changes no wire format, checksum or
+simulation. Whether arm64 and i686 stay in step over a whole game has not been tried.
+
+### LAN and hotspots
+
+A hotspot without internet leaves Wi-Fi unvalidated with cellular as the default network,
+and a phone that owns a hotspot has no Wi-Fi network at all. Upstream's discovery goes to
+255.255.255.255, which follows the default network. So on Android:
+
+- `lan_service()` also sends to each subnet's own broadcast address, from
+  `android_lan_broadcast_targets()`, which reads `getifaddrs` anew each time.
+  `lan_subnet_broadcast()` in `src/android_lan_rules.h` is the arithmetic.
+- `android_lan_bind_socket()` puts a local game's socket on the Wi-Fi network when Wi-Fi
+  exists and is not the default, asking `GameActivity.lanNetworkHandle()`. An online game
+  stays unbound and follows the default.
+- `holepunch_stun_query()` skips STUN for a local game, because a gateway that swallows
+  DNS held the game for about a minute with three lookups.
+- `lan_follow_network_when_quiet()` in `bflib_enet.cpp` asks again, once a second, only
+  when every connected peer has gone quiet for two seconds, or for a host alone in its
+  lobby. Wi-Fi that comes back is a new network object, and a socket bound to the old one
+  gets nothing but `ENETUNREACH`. One quiet peer among others that are heard is not
+  enough (`lan_should_follow_network()`), or a client on a long level load could take a
+  host off the hotspot its other clients are on.
+
+Measured on two emulators sharing a simulated radio, with Android's real hostapd and
+tethering: hotspot games in both directions without a desync over several thousand turns,
+and a 5 s Wi-Fi drop survived. `GameActivity` also holds a multicast lock while on screen.
+
+Online play goes through the upstream lobby server. Listing and creating a lobby has been
+measured, a whole online game has not. curl verifies the server against
+`/system/etc/security/cacerts`, its compiled in `CURL_CA_PATH`, which may be stale on
+Android 14 and later, where the trust store moved into an updatable module. miniupnpc and
+libnatpmp are linked and have not been measured here.
+
+## Versions and releases
+
+| Number | Example | What it is |
 |---|---|---|
-| `bflib_fmvids.cpp` | `android_stub_fmvids.cpp` | FFmpeg is not bundled; intro and outro movies are skipped |
-| `net_matchmaking.c` | `android_stub_matchmaking.c` | Needs libcurl **and** OpenSSL for `wss://`; the public lobby browser is unavailable |
-| `net_portforward.cpp` | `android_stub_portforward.c` | Needs miniupnpc and libnatpmp |
+| `versionName` | `1.132` | The port's own: `keeperfx.portBaseMinor` plus the first-parent commits since `keeperfx.portBaseCommit`, so a merge from upstream counts as one |
+| `versionCode` | `1045785` | From `version.mk` and the commit count of `HEAD`. Android only needs it to rise |
+| `ENGINE_BUILD` | `5591` | The commit count at the merge base with upstream: the wire version, and which alpha patch fits |
+| `VER_STRING` | `1.4.0.5591 Android-Unofficial_7452fa083` | What the game and the log show |
 
-Multiplayer over direct IP works — enet6 is fully included. Automatic port
-forwarding would help on home Wi-Fi but cannot work on mobile networks anyway,
-where carrier grade NAT sits above the router.
+`.github/workflows/build-android.yml` runs on a push to `feature/android-support`, on a
+manual run, and on a pull request made ready for review or given a reviewer:
 
-**LuaJIT is built with `-DLUAJIT_DISABLE_JIT`.** The interpreter is API and ABI
-identical, and Android's W^X policy makes writable-executable mappings
-unreliable across vendors. Level scripts are not performance critical.
+- `build-android` runs the launcher's unit tests and the touch tests, builds the APK,
+  checks that the libraries are there and that the suffix is in `libkeeperfx.so`, and
+  uploads an artifact named `keeperfx-android-arm64-unofficial-<rev>`. It holds a token
+  that can only read, because it runs code from a long list of third party projects.
+- `build-linux-regression` builds the Linux x86_64 target, because the port touches shared
+  sources.
+- `publish` `needs` both and runs for a push or a manual run. It refuses a version behind
+  the newest release, then creates `android-v<version>` with the changelog, and moves
+  `android-latest`, a prerelease kept so that builds up to 1.4.0.5289 can still find their
+  update. Both carry `keeperfx-android-arm64.apk` and `version.json`, and those names must
+  not change.
 
----
+`AppUpdater` asks GitHub's `/releases/latest` and `AppRelease` looks for that asset. On
+Android 11 granting the install permission ends every process of the app, so the launcher
+holds that offer back until no other download is running. That comes from reading the
+platform's source, no such device has been tried.
 
-## ARM64 portability
-
-The engine had never been compiled for a strict-alignment 64-bit target. The
-portability fixes on this branch are the same set that the macOS ARM64 work
-validated on real hardware:
-
-* unaligned 16/32-bit reads in `bflib_vidraw.c` and `engine_render.c` replaced
-  by `memcpy`, which is UB-free and still compiles to an unaligned load
-* `get_named_field_value()` / `assign_default()` in `config.c` read and write
-  every field through `memcpy`
-* `check_map_for_gold()` rounds the `unsigned short` sub-array up to an even
-  offset instead of starting it at an odd byte
-* `fill_in_explored_area()` reads a byte instead of doing a misaligned 4-byte load
-* `#pragma pack(1)` removed from structs that are never serialised, so their
-  members stop being unaligned by construction
-* `find_command_desc()` no longer indexes past the end of a command name
-
-`bflib_crash.c` keeps its POSIX signal handlers but drops backtraces, because
-bionic has no `<execinfo.h>`.
-
----
+`android/app/keeperfx-ci.keystore` is committed so that CI builds install over each other.
+That means anyone can sign an APK that Android accepts as an update, so the updater's real
+trust is its TLS connection to GitHub. These builds are for sideloading, not for a store.
 
 ## Building
 
-### In CI
-
-`.github/workflows/build-android.yml` builds the APK on every push to the
-branch and uploads it as an artifact. The same workflow also builds the Linux
-x86_64 target as a regression guard, because the port touches shared sources.
-
-### Locally
-
-Requirements: JDK 17, Gradle 8.11+, Android SDK with NDK `26.3.11579264` and
-CMake `3.22.1`, plus `bash`, `curl`, `git` and `make` for the dependency step.
+Requirements: JDK 17, Gradle 8.11+, Android SDK with NDK `26.3.11579264` and CMake
+`3.22.1`, plus `bash`, `curl`, `git`, `tar`, `make` and a host C compiler for LuaJIT.
 
 ```bash
-bash android/scripts/fetch-deps.sh     # pinned dependency sources, ~15 min once
+bash android/scripts/fetch-deps.sh
 cd android
-gradle assembleRelease
+gradle assembleRelease \
+  -Pkeeperfx.buildNumber="$(git rev-list --count HEAD)" \
+  -Pkeeperfx.engineBuild="$(git rev-list --count "$(git merge-base HEAD upstream/master)")" \
+  -Pkeeperfx.gitRevision="$(git describe --always)"
 ```
 
-The APK lands in `android/app/build/outputs/apk/release/`.
+This needs the `upstream` remote. The APK lands in
+`android/app/build/outputs/apk/release/`. Without those properties `VER_BUILD` is 0 and
+`versionCode` too low to update an installed build.
 
-`fetch-deps.sh` writes to `android/.deps/` and is idempotent; that directory is
-what CI caches. CMake itself never touches the network.
+`fetch-deps.sh` writes to `android/.deps/` and CMake itself never touches the network.
+Every tarball is pinned to a SHA-256 and every git source to a commit, and a mismatch stops
+the script. The SHA-256 values were taken from the downloads themselves, so they prove the
+sources have not changed since, not that they were right. Gradle and the Actions are pinned
+by version or tag only. The script also applies the one-line SDL patch above and stops if
+SDL's source no longer looks as expected.
 
-### Signing
+Delete `src/ver_defs.h` if a desktop build has run in the same tree: quoted includes find it
+before the generated one, and the APK would report the desktop's version.
 
-`android/app/keeperfx-ci.keystore` is committed on purpose. An APK has to be
-signed to be installable at all, and a stable key lets CI builds be installed
-over each other instead of forcing an uninstall. The key is public and grants
-nothing — these builds are for sideloading, not for the Play Store.
+`NewApi` is fatal in lint, which `assembleRelease` runs. `android/app/lint.xml` ignores the
+one hit in SDL's sources, an API 29 call that SDL only reaches on API 29.
 
----
+### Tests
+
+| What | Where | Run with |
+|---|---|---|
+| Gesture maths, steering rules, LAN rules | `tests/touch`, no device, no engine, no SDL | `bash tests/touch/build.sh out && ./out` |
+| The launcher's decisions: update plan, archives, resumable download, manifest, transfer | `android/app/src/test` | `cd android && gradle testReleaseUnitTest` |
+| A fresh install played through | `android/scripts/emulator-smoke.sh <apk> <folder of the original game>` | A device that allows `adb root`, in practice an emulator |
+
+The smoke test installs on a clean slate, drives the launcher through the release, the
+patch, the music and the import with plain adb, presses Play, and checks that a level
+starts, keeps running and changes its picture, with nothing in the crash buffer.
 
 ## Installing and running
 
-Requires **Android 9 (API 28)** or newer on an arm64 device. The floor is set by
-`iconv`, which `bflib_text.c` uses for the double byte languages and which
-bionic only gained in API 28.
+Requires Android 9 (API 28) or newer on an arm64 device. Lint guards that floor, and only
+API 36 has actually been run.
 
-1. Build or download the APK and install it (allow installation from unknown
-   sources).
-2. Open KeeperFX and tap **Install KeeperFX**. It downloads and unpacks the
-   current release; use Wi-Fi, it is around 360 MB.
-3. Put your Dungeon Keeper folder somewhere on the device — internal storage, an
-   SD card, or a mounted CD image — and tap **Import original Dungeon Keeper**.
-   The launcher finds and copies the 14 files it needs.
-4. Both status lines turn green. Tap **Play**.
+1. Install the APK, allowing unknown sources. Play Protect warns about an unknown developer.
+2. Open it and tap **Install KeeperFX**.
+3. Tap **Import original Dungeon Keeper** and pick your Dungeon Keeper folder.
+4. Tap **Play**.
 
-Anyone who already has a KeeperFX installation on the device can skip step 2 and
-use **Import KeeperFX folder** instead.
-
-The imported copy lives in `/data/data/net.keeperfx.android/files/keeperfx`,
-which is also the engine's working directory, so saves, screenshots and
-`keeperfx.log` all land there.
-
----
+The installation lives in `/data/data/net.keeperfx.android/files/keeperfx`, which is also the
+engine's working directory, so saves, screenshots and `keeperfx.log` land there. That is
+private storage, and a screenshot only comes from a key: no gesture takes one.
 
 ## Layout
 
 ```
 android/
 ├── app/
-│   ├── CMakeLists.txt              native build: engine + all dependencies
+│   ├── CMakeLists.txt              native build: engine and all dependencies
+│   ├── build.gradle                versions, lint, what gets packaged
+│   ├── lint.xml                    the one ignored NewApi hit
 │   ├── keeperfx-ci.keystore        sideload signing key
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── java/net/keeperfx/android/
-│       │   ├── LauncherActivity.java   UI, install, import, settings
-│       │   ├── GameActivity.java       SDLActivity subclass
-│       │   ├── ReleaseDownloader.java  release API, download, 7z unpack
-│       │   ├── DataImporter.java       folder copy and original-game search
-│       │   ├── GameData.java           paths and the two-half check
-│       │   └── Prefs.java              settings to command line
-│       └── res/
-├── scripts/fetch-deps.sh           pinned dependency sources
-└── gradle.properties               ABI, NDK and CMake pins
+│   └── src/
+│       ├── main/java/net/keeperfx/android/
+│       │   ├── LauncherActivity        the launcher's screen and its dialogs
+│       │   ├── GameActivity            SDLActivity subclass, in :game
+│       │   ├── GameProcess             whether :game is alive
+│       │   ├── NetworkGameService      keeps a network game alive off screen, in :game
+│       │   ├── DownloadService         downloads, patches and transfers, in the foreground
+│       │   ├── UpdateManager           what can be fetched, and the plan for it
+│       │   ├── ReleaseApi, ReleaseDownloader, ResumableDownload, Http
+│       │   ├── ArchiveUnpacker, ArchivePaths, FileUtil
+│       │   ├── InstallManifest, AlphaBackup, BundledConfig, GameData, GameLanguage
+│       │   ├── DataImporter            folder imports and the search for the originals
+│       │   ├── TransferBundle, TransferSwap, PhoneTransfer
+│       │   ├── AppUpdater, AppRelease, AppVersion
+│       │   ├── LogActivity, TouchTuningActivity
+│       │   └── Prefs                   settings, and the engine's command line
+│       └── test/                   the launcher's unit tests
+├── gradle.properties               ABI, NDK and CMake pins, the port version's base
+└── scripts/
+    ├── fetch-deps.sh               pinned dependency sources, and the SDL patch
+    └── emulator-smoke.sh           a fresh install played through
 
 src/
-├── android.cpp                     platform layer (entry point, -datadir, file find)
-├── android_stub_*.{c,cpp}          replacements for the three excluded modules
+├── android.cpp, android.h          entry point and what shared code calls on Android
+├── android_lan_rules.h             the arithmetic of finding a local game
+├── kfx/platform/PlatformAndroid.h
 ├── bflib_touch.h                   touch API, SDL-free so C modules can include it
-└── bflib_input_touch.cpp           gesture recognition
+├── bflib_input_touch.cpp           finger events, tap and long press, the game key lane
+├── touch_gesture.[ch]              the maths of holding the map
+├── touch_camera.[ch]               what that does to the cameras
+├── touch_steer.[ch]                the rules of steering a creature
+└── touch_possess.[ch]              what those do to the game
+
+tests/touch/                        host tests of the pure modules
 ```
 
-The Windows build file gains one source file (`bflib_input_touch.cpp`) in
-`Makefile`; the CMake build collects `src/` by glob and picks it up on its own.
-`android.cpp` and the `android_stub_*` files are compiled out everywhere except
-Android, so they cost the desktop builds nothing.
+`android.cpp` is compiled out everywhere but Android. The `touch_*` modules build on every
+platform, since the CMake build collects `src/` by glob, and stay inert unless the player
+passes `-inputmode`.

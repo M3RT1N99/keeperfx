@@ -29,20 +29,27 @@ reaches the version string there too:
   get the commit into the version string, and that overrides the composition
   above. It therefore reads `version.mk` itself and produces
   `Android-Unofficial_<sha>`. An APK built by CI once carried a plain
-  `Android_<sha>` for exactly this reason — check the built artifact, not the
-  source, when changing any of this:
+  `Android_<sha>` for exactly this reason, so the workflow now refuses an APK
+  whose library lacks the suffix. Check the built artifact, not the source, when
+  changing any of this:
 
   ```bash
   unzip -p app.apk lib/arm64-v8a/libkeeperfx.so | strings | grep -E '^1\.4\.'
   ```
 
+  That prints the version with its suffix and also a bare `1.4.0`. The bare one
+  is `src/net_lan.c`'s label for a LAN host too old to announce a version, not
+  this build's version.
+
 Anything published from here — GitHub releases, artifacts, forum posts — says
 "unofficial" in its title and its notes for the same reason.
 
-One deliberate exception: `MATCHMAKING_VERSION` in `src/net_matchmaking.c` is
-built from `VER_MAJOR`/`VER_MINOR`/`VER_RELEASE` only and does **not** carry the
-suffix. That is what keeps the online lobby browser compatible with official
-clients. Do not "fix" it.
+One deliberate exception: what other clients compare carries no suffix.
+`net_current_version` in `src/net_main.h`, the `version` in a lobby's metadata
+(`src/net_lobby.c`) and in the punch request (`src/net_matchmaking.c`) are built
+from `VER_MAJOR`, `VER_MINOR`, `VER_RELEASE` and `VER_BUILD` only. Do not "fix"
+that. Only the `list` request in `src/net_matchmaking.c` sends the whole
+`VER_STRING`, which is upstream's own line.
 
 ## Do not send this fork's changes upstream on your own
 
@@ -56,15 +63,91 @@ a change to their project.
 The Android work lives alongside the existing ports rather than replacing
 anything:
 
-- New platform code goes in new files (`src/android.cpp`,
-  `src/bflib_input_touch.cpp`), guarded by `#ifdef __ANDROID__` where it sits in
-  a shared file.
-- Modules that need a library the port cannot bundle are **excluded in
-  `android/app/CMakeLists.txt`** and replaced by a stub next to them, so no
-  existing source file grows a platform branch.
+- New platform code goes in new files: `src/android.cpp`, `src/android.h`,
+  `src/android_lan_rules.h`, `src/kfx/platform/PlatformAndroid.h`, the
+  `src/touch_*` modules, `src/bflib_input_touch.cpp`.
+- A change to a shared file stays inside `#ifdef __ANDROID__`, or it is a hook or
+  a portability fix that changes nothing on the desktop, such as the `touch_*`
+  calls in `src/front_input.c`, which do nothing while the touch layer is in its
+  desktop default.
+- Nothing is stubbed. Every library the engine needs is built from source for
+  Android, FFmpeg included, cut down to the Smacker video. `android/app/CMakeLists.txt`
+  leaves out only the Windows platform files and the OpenGL backend, and
+  `RendererResolveType()` sends a request for OpenGL to the software renderer.
 - A change to shared engine code has to leave Windows and Linux behaving
   exactly as before. The CI workflow builds the Linux x86_64 target for
-  precisely this reason — treat a regression there as a blocker.
+  precisely this reason, and a failure there stops the release.
+
+## Multiplayer stays compatible
+
+Lockstep peers have to compute the same thing, so this fork makes no change to
+the wire format, the checksums or the simulation.
+
+- `src/bflib_enet.cpp`, `src/net_holepunch.c` and `src/net_lan.[ch]` have small
+  additions under `#ifdef __ANDROID__`, for finding and reaching a game on a local
+  network and nothing else. Keep it that way, and look at the diff again after every
+  merge from upstream.
+- `-fsigned-char` and `-ffp-contract=off` on the `keeperfx` target give arm64 the
+  semantics of the x86 builds. Do not remove them.
+- `VER_BUILD` goes on the wire and has to be the number an official client built
+  from the same source announces. On Android it is the commit count at the merge
+  base with `dkfans/keeperfx`, `keeperfx.engineBuild` in Gradle and
+  `BuildConfig.ENGINE_BUILD` in the launcher, never this fork's own count.
+  `net_versions_match()` compares all four numbers, so a phone can only start a
+  game with builds of that same number, and an upstream merge moves it.
+
+## Releases reach installed apps
+
+`.github/workflows/build-android.yml` publishes a release from every push to
+`feature/android-support` and from every manual run. Its `publish` job needs both
+the APK and the Linux regression job, and installed apps offer what it publishes,
+so do not push to that branch or start the workflow unless the owner asks. Work
+happens on other branches.
+
+- Installed updaters look for the release asset `keeperfx-android-arm64.apk`
+  behind tags named `android-v<version>`, and the oldest ones for the moving
+  `android-latest`. Do not rename any of these.
+- The app's version is `1.<minor>`, where the minor is `keeperfx.portBaseMinor`
+  plus the first-parent commits since `keeperfx.portBaseCommit`
+  (`android/gradle.properties`). So anything merged into `feature/android-support`
+  must fast-forward it or keep the incoming branch as first parent, or the count
+  comes out far too low. The job refuses a version behind the newest release.
+
+## Rules of the Android code
+
+- The engine has a process of its own. `GameActivity` and `NetworkGameService` run
+  in `:game`, everything else in the launcher's process, and no static crosses
+  between them. `pidof net.keeperfx.android` finds the launcher,
+  `pidof net.keeperfx.android:game` the engine, and `GameProcess.isAlive()` is how
+  the launcher asks.
+- Only Play starts a game. `GameActivity.onCreate()` sends a start from a task
+  switcher card, a saved state or a restart to the launcher.
+- Whatever replaces or deletes installation files asks `GameProcess.isAlive()` first,
+  in the launcher through `refuseWhileGameOpen()`, because the engine has them open.
+- `NewApi` is fatal in lint, because `minSdk` is 28 and only API 36 gets run here.
+  A hit in our code gets a version check. A hit in third party code gets read: if
+  its guard is really there, `android/app/lint.xml` ignores that one method with
+  the reason next to it, and nothing wider.
+- Everything `android/scripts/fetch-deps.sh` downloads is pinned to a checksum or a
+  commit. To move a pin, change it, check the value the failure prints against what
+  the project publishes, and put it next to the pin. The script's one-line SDL patch
+  stops the script if SDL's source no longer looks as it expects.
+- What decides something goes in code a host can test. `src/touch_gesture.c`,
+  `src/touch_steer.c` and `src/android_lan_rules.h` include neither SDL nor the
+  engine and are pinned by `tests/touch`, and the launcher's decisions by the JVM
+  tests under `android/app/src/test`.
+- `Prefs.TOUCH_TUNABLES` mirrors the table in `touch_tune()`: same names, defaults
+  and ranges, or the engine ignores a value.
+- A received bundle or a downloaded archive is untrusted. Every name goes through
+  `ArchivePaths`, and settings through the allow-list in `Prefs.acceptTransferred()`,
+  which keeps the extra arguments out.
+
+## Say what was measured
+
+The SDL3 build has only run on x86_64 emulators at API 36, with the arm64 libraries
+under translation. No phone has run it, and no game has been played against a desktop
+client. Anything you write about it, a commit message, release notes or a document,
+says which of those a claim rests on, and "by reading" when nothing ran.
 
 ## Conventions
 
@@ -78,15 +161,31 @@ anything:
 
 ## Building
 
-The desktop builds are upstream's; see `docs/` and `build-cmake.sh`. For
-Android:
+The desktop builds are upstream's; see `docs/` and `build-cmake.sh`. For Android,
+with JDK 17, Gradle 8.11+, NDK 26.3.11579264 and CMake 3.22.1:
 
 ```bash
 bash android/scripts/fetch-deps.sh     # once, downloads pinned sources
-cd android && gradle assembleRelease   # JDK 17, Gradle 8.11+, NDK 26.3.11579264
+cd android && gradle assembleRelease \
+  -Pkeeperfx.buildNumber="$(git rev-list --count HEAD)" \
+  -Pkeeperfx.engineBuild="$(git rev-list --count "$(git merge-base HEAD upstream/master)")" \
+  -Pkeeperfx.gitRevision="$(git describe --always)"
 ```
 
-`.github/workflows/build-android.yml` does both in CI and publishes the APK.
+Without those properties `VER_BUILD` is 0 and the APK cannot update an installed
+one, which is enough for a compile check and nothing else. If a desktop build has
+run in the same tree, delete `src/ver_defs.h` first: sources find it before the
+Android one, and the APK would report the desktop's version and suffix.
+
+```bash
+bash tests/touch/build.sh /tmp/kfx_touch_tests && /tmp/kfx_touch_tests
+cd android && gradle testReleaseUnitTest
+bash android/scripts/emulator-smoke.sh <apk> <folder of the original game>
+```
+
+`.github/workflows/build-android.yml` runs the first two, builds the APK and the
+Linux x86_64 target, and publishes. See `docs/ANDROID_PORT.md` for how the port
+works.
 
 ## Private notes
 
