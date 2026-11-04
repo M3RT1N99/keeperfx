@@ -20,6 +20,7 @@
 package net.keeperfx.android;
 
 import android.content.Context;
+import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -69,21 +70,24 @@ public class GameActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // Android can bring this back from the recent apps without the launcher starting,
-        // and that must not play on an import that is running or that a dead process left
-        // half done. Only the launcher's process may sort that out, and starting it does.
-        if (PhoneTransfer.importUnfinished(this)) {
+        final Intent intent = getIntent();
+        final String[] extra = (intent == null) ? null : intent.getStringArrayExtra(EXTRA_ARGUMENTS);
+        // Only Play starts a game: what has to be checked before one, an unpack or a patch
+        // running, a half done install, the configuration to refresh, is all in the launcher.
+        // Android also starts this by itself, and then the launcher takes over, as it does
+        // for an import that a dead process left half done. A game that has ended leaves its
+        // card in the recent apps, and that card starts it again with the flag below. Taking
+        // the process from a game in the background and coming back brings a saved state. A
+        // card kept over a reboot has lost its extras, and an engine without arguments has no
+        // idea where its data is. A game that is alive is only brought back, past onCreate.
+        if ((extra == null) || (savedInstanceState != null)
+                || ((intent.getFlags() & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0)
+                || PhoneTransfer.importUnfinished(this)) {
             startActivity(getPackageManager().getLaunchIntentForPackage(getPackageName()));
             Process.killProcess(Process.myPid());
             return;
         }
-        String[] extra = null;
-        if (getIntent() != null) {
-            extra = getIntent().getStringArrayExtra(EXTRA_ARGUMENTS);
-        }
-        if (extra != null) {
-            arguments = extra;
-        }
+        arguments = extra;
         // Window flags only, before super.onCreate() creates SDL's surface. The
         // engine takes its video mode from the first size it is handed and
         // never revisits it, so the bars have to be gone by the time the window
