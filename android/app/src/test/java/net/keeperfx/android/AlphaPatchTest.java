@@ -91,7 +91,6 @@ public class AlphaPatchTest {
         final UpdateManager.Facts facts = new UpdateManager.Facts();
         facts.dataInstalled = true;
         facts.stableVersion = "1.4.0";
-        facts.hasManifest = true;
         facts.verified = report;
         facts.alphaEnabled = true;
         facts.alphaVersion = alphaVersion;

@@ -44,7 +44,6 @@ public class UpdatePlanTest {
         facts = new UpdateManager.Facts();
         facts.dataInstalled = true;
         facts.stableVersion = "1.4.0";
-        facts.hasManifest = true;
         facts.alphaEnabled = true;
         facts.alphaVersion = "1.4.0.5591";
         facts.hasMusic = true;
@@ -104,7 +103,6 @@ public class UpdatePlanTest {
         facts.dataInstalled = false;
         facts.missingEntries = Arrays.asList("(nothing installed yet)");
         facts.stableVersion = "";
-        facts.hasManifest = false;
         facts.alphaVersion = "";
         facts.hasMusic = false;
         assertEquals(Arrays.asList(UpdateManager.Kind.GAME_DATA), plannedKinds());
@@ -176,12 +174,6 @@ public class UpdatePlanTest {
         facts.stableVersion = "1.3.2";
         assertEquals(Arrays.asList(UpdateManager.Kind.GAME_DATA), plannedKinds());
         assertTrue(plannedDetail(0).startsWith("Update from 1.3.2"));
-    }
-
-    @Test
-    public void anInstallFromBeforeManifestsIsOfferedOneVerifyingReinstall() {
-        facts.hasManifest = false;
-        assertEquals("Verify KeeperFX 1.4.0", plannedTitle(0));
     }
 
     @Test

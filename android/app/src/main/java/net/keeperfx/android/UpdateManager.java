@@ -139,7 +139,6 @@ public final class UpdateManager {
         boolean dataInstalled;
         List<String> missingEntries = new ArrayList<>();
         String stableVersion = "";
-        boolean hasManifest;
         InstallManifest.Report verified = new InstallManifest.Report();
         boolean alphaEnabled;
         String alphaVersion = "";
@@ -170,7 +169,6 @@ public final class UpdateManager {
         facts.missingEntries = GameData.findMissingKeeperfxEntries(context);
         facts.dataInstalled = facts.missingEntries.isEmpty();
         facts.stableVersion = prefs.getInstalledVersion();
-        facts.hasManifest = GameData.hasManifest(context);
         // Local disk work, no network: every file the archives said they
         // unpacked, compared with what is actually there.
         facts.verified = GameData.verifyInstalledFiles(context);
@@ -274,16 +272,6 @@ public final class UpdateManager {
                 items.add(new Item(Kind.GAME_DATA,
                     "KeeperFX " + release.version,
                     "Update from " + current + ", " + size, null));
-            } else if (!f.hasManifest) {
-                // Installed by a build that did not record what it unpacked. A
-                // device in the wild carried the torso of an interrupted unpack
-                // for weeks - campgns/keeporig_ger existed but held no speech -
-                // and nothing could tell. Reinstalling once writes the manifest
-                // and settles the question for good.
-                items.add(new Item(Kind.GAME_DATA,
-                    "Verify KeeperFX " + current,
-                    "This installation predates file verification."
-                        + "\n    Reinstalling checks every file once, " + size, null));
             } else if (!f.verified.stableProblems.isEmpty()) {
                 final List<String> gaps = f.verified.stableProblems;
                 final StringBuilder detail = new StringBuilder()

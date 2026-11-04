@@ -21,24 +21,20 @@ final class AppVersion {
     }
 
     /**
-     * Orders two app versions against each other.
+     * Orders two app versions against each other, the way "sort -V" does in the
+     * workflow that refuses to publish one behind the newest release.
      *
-     * A version is the port's own "major.minor" and nothing else - which
-     * KeeperFX the engine is has its own place and moves for entirely separate
-     * reasons. The major is weighted so that a bump still comes out above every
-     * minor below it. Anything that does not parse sorts lowest, which is what
-     * the versions from before this scheme did.
+     * A version is the port's own "major.minor" and nothing else. The major is weighted
+     * so that a bump still comes out above every minor below it, and anything else
+     * sorts lowest: a tag somebody made by hand must never look like an update.
      */
     static int rank(String versionName) {
+        final String[] parts = versionName.trim().split("\\.", -1);
+        if (parts.length != 2) {
+            return 0;
+        }
         try {
-            final String port = versionName.trim();
-            final int dot = port.indexOf('.');
-            if (dot < 0) {
-                return Integer.parseInt(port) * 100000;
-            }
-            final int major = Integer.parseInt(port.substring(0, dot).trim());
-            final int minor = Integer.parseInt(port.substring(dot + 1).trim());
-            return major * 100000 + minor;
+            return Integer.parseInt(parts[0]) * 100000 + Integer.parseInt(parts[1]);
         } catch (NumberFormatException e) {
             return 0;
         }
