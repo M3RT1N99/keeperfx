@@ -63,7 +63,7 @@
     <string name="job_packing_failed">Packing failed: %1$s</string>
 
     <string name="import_bundle_title">Import installation</string>
-    <string name="import_bundle_explanation">Pick the file that was exported from another device. Whatever received it decides where it landed, so if it is not in Download, look there.</string>
+    <string name="import_bundle_explanation">Pick the file that was exported from another device. The app that received it decides where it is stored, so if it is not in Download, look in that app\'s folder.</string>
     <string name="import_bundle_choose">Choose file</string>
     <string name="import_bundle_offer">This file holds KeeperFX %1$s, the original game files, campaign progress and saved games (%2$d). Size: %3$s.</string>
     <string name="import_bundle_trust">Only import what you exported yourself or got from someone you trust: the game runs the scripts inside.</string>

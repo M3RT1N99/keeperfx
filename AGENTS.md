@@ -104,14 +104,19 @@ the APK and the Linux regression job, and installed apps offer what it publishes
 so do not push to that branch or start the workflow unless the owner asks. Work
 happens on other branches.
 
-- Installed updaters look for the release asset `keeperfx-android-arm64.apk`
-  behind tags named `android-v<version>`, and the oldest ones for the moving
-  `android-latest`. Do not rename any of these.
-- The app's version is `1.<minor>`, where the minor is `keeperfx.portBaseMinor`
-  plus the first-parent commits since `keeperfx.portBaseCommit`
-  (`android/gradle.properties`). So anything merged into `feature/android-support`
-  must fast-forward it or keep the incoming branch as first parent, or the count
-  comes out far too low. The job refuses a version behind the newest release.
+- Installed updaters look for the release asset `keeperfx-android-arm64.apk` behind
+  tags named `android-v<version>`. Do not rename either.
+- The app's version is `1.<minor>`, counted by first-parent commits: the first commit
+  after `keeperfx.portBaseCommit` is `1.<keeperfx.portBaseMinor>`, and each later one
+  adds one (`android/gradle.properties`). So a release commit that names its own parent
+  as the base carries exactly the minor it writes, and anything merged into
+  `feature/android-support` must fast-forward it or keep the incoming branch as first
+  parent, or the count comes out wrong. The job refuses a version behind the newest
+  release, by `sort -V`, and `AppVersion` has to agree with that. `versionCode` counts
+  every commit of `HEAD` instead, because it has to keep rising over everything ever
+  installed.
+- The notes start with the paragraph saying this is unofficial, which the KeeperFX team
+  asked for, and the title says "(unofficial)". They carry no test matrix.
 
 ## Rules of the Android code
 
@@ -132,6 +137,14 @@ happens on other branches.
   commit. To move a pin, change it, check the value the failure prints against what
   the project publishes, and put it next to the pin. The script's one-line SDL patch
   stops the script if SDL's source no longer looks as it expects.
+- Every word a player reads comes from `res/values/strings.xml`, whole sentences with
+  numbered placeholders. A class without a Context names a `Message`, and it becomes words
+  where Android is, through the activity's or the service's own context: the application's
+  does not have the chosen language. Log lines and the preamble of a shared log stay
+  English. `StringResourcesTest` holds every `values-*` folder against the English.
+- The language box decides the launcher's language as well as the game's, through
+  `GameLanguage.localized()` in `attachBaseContext`. The game's own window keeps the phone's
+  configuration, and does not mirror: its overlay asks for the right, not the end.
 - What decides something goes in code a host can test. `src/touch_gesture.c`,
   `src/touch_steer.c` and `src/android_lan_rules.h` include neither SDL nor the
   engine and are pinned by `tests/touch`, and the launcher's decisions by the JVM
@@ -142,12 +155,12 @@ happens on other branches.
   `ArchivePaths`, and settings through the allow-list in `Prefs.acceptTransferred()`,
   which keeps the extra arguments out.
 
-## Say what was measured
+## Do not claim what did not happen
 
-The SDL3 build has only run on x86_64 emulators at API 36, with the arm64 libraries
-under translation. No phone has run it, and no game has been played against a desktop
-client. Anything you write about it, a commit message, release notes or a document,
-says which of those a claim rests on, and "by reading" when nothing ran.
+Never claim a test that did not happen. A commit message says "by reading" when nothing
+ran, and says what ran when something did. What has been measured, and what has not, is
+kept in `AGENTS.local.md`. Release notes and everything else a player reads carry no test
+matrix, and neither do the public documents.
 
 ## Conventions
 

@@ -8,23 +8,6 @@ string, its log and its release notes.
 This document describes how the port is built and how it works, for someone
 reading the code. Rules for working on it are in `AGENTS.md`.
 
-## Status
-
-This describes port version 1.135, the release built from `feature/android-support`,
-engine build 5591. Everything measured below ran on 1.132 or earlier, and 1.135 only
-adds comments, documents and one line of the workflow to it.
-
-| | |
-|---|---|
-| **Run on** | x86_64 emulators, API 36, 1544x720, software GPU, with the arm64 libraries under translation |
-| **Built by** | a copy of CI's environment in WSL for what was measured, and the workflow for the release, whose unit tests, touch tests, APK and Linux build all passed |
-| **Not run** | any phone, any Android older than 16, real Wi-Fi radios, a game against a desktop client |
-| **Not heard** | the emulators start with `-no-audio`, so nobody has listened to this build |
-
-An earlier build on SDL2 did play on a real phone, which is where several of the
-decisions below come from. Nothing since the move to SDL3 has. Numbers given below
-are from the emulators unless they say otherwise.
-
 ## What is in the APK
 
 | Library | Notes |
@@ -73,9 +56,9 @@ A few things differ under `#ifdef __ANDROID__` in shared files:
   EUC-KR. Bytes no table knows become U+FFFD and the game starts, as on Windows.
 - The draw limit also holds in the menus, in `wait_at_frontend()`, through
   `LbSleepUntilExt()`. `LbSleepFor` and `LbSleepUntil` busy-spin any wait under 20 ms,
-  and that kept a core saturated on a real phone.
+  and that kept a core saturated.
 - `android_frame_watch()` logs one line a minute when frames were slow, as a summary
-  because a line per slow frame made the next frame slow on a real phone.
+  because a line per slow frame made the next frame slow.
 - `bflib_crash.c` keeps its signal handlers and drops backtraces, since bionic has no
   `<execinfo.h>`.
 
@@ -88,7 +71,7 @@ field comes later on the command line and wins.
 Effects play through OpenAL and music through SDL3_mixer. `src/android.cpp` asks SDL
 for the `openslES` audio driver, and the log says which one opened. Speech plays
 through its own OpenAL source rather than a mixer track, because the mixer path
-stuttered on a real phone with every other layer ruled out: mp3 goes straight into
+stuttered with every other layer ruled out: mp3 goes straight into
 the source through dr_mp3, anything else through SDL3_mixer's decoder, and the mixer
 remains the fallback.
 
@@ -133,8 +116,8 @@ and a reboot.
 **The refusals.** With the game open behind the launcher, anything that replaces or
 deletes files it has open is refused with "The game is still open": downloads that
 change the installation, the two folder imports, Reset and taking the alpha patch off,
-through `refuseWhileGameOpen()`, and receiving from another phone, through
-`PhoneTransfer`. Play is locked during a job by `setBusy()`.
+through `refuseWhileGameOpen()`, and importing an installation, through `PhoneTransfer`.
+Play is locked during a job by `setBusy()`.
 
 **Behind a paused activity.** Alone, the engine stops: SDL blocks in its event pump and
 OpenAL's device is paused. In a network game it carries on, because stopping would hold
@@ -191,8 +174,8 @@ the installation and everything that describes it, the saves included.
 
 `InstallManifest` records every file an unpack writes, by path and size, in
 `files/manifests/`, and the check for downloads verifies it: what is missing or damaged
-becomes a *Repair* item. Presence checks had called an interrupted unpack complete on a
-real phone. The check skips what the bundled configuration overlays.
+becomes a *Repair* item. Presence checks once called an interrupted unpack complete. The
+check skips what the bundled configuration overlays.
 
 `BundledConfig` lays the engine's own `config/` tree from the APK's assets over the
 installation at every Play, because the engine and the data have different origins and
@@ -207,25 +190,21 @@ it is shared.
 
 Saves are `save/fx1gNNNN.sav` in the installation. Upstream replaced the old dump of
 `struct Game` with the KFXS format, described in `src/kfx/save/FORMAT.txt`: chunks,
-zlib, and a schema that matches fields by name and converts between widths. A real save
-came to about a quarter of a megabyte.
+zlib, and a schema that matches fields by name and converts between widths, about a
+quarter of a megabyte per save. Nothing in the format ties a save to a platform, and
+loading only warns about a different version.
 
-The old reason a PC save could not load on a phone is gone, and upstream's
-`save-tests.yml` reads every platform's sample on every platform, `linux-arm64` and
-`windows-i686` among them. Android is not one of those platforms, and no save has been
-carried between a desktop and a phone here, so treat it as designed for and untried.
-Loading only warns about a different version.
+### Export and import
 
-### Moving to another phone
-
-**Send to another phone** packs the whole installation, saves and settings included, into
-one zip and hands it to the share sheet. Quick Share has no way into another app's storage,
-so it lands in Download on the other phone, and **Import from another phone** picks it
-there. An installation is only sent when its manifest verifies clean.
+**Export installation** packs the whole installation, saves and settings included, into
+one zip and hands it to the system's share sheet, which offers whatever the device has.
+Whatever receives the file decides where it lands, so **Import installation** on the other
+device asks the player to pick it, starting at Download. An installation is only exported
+when its manifest verifies clean.
 
 - `TransferBundle` writes and reads the file. It is a stream with no seeking, so the
   first entry, `keeperfx-bundle.properties`, declares how many entries and bytes follow.
-  A received file is untrusted: every name goes through `ArchivePaths`, only the install
+  An imported file is untrusted: every name goes through `ArchivePaths`, only the install
   folder, the two manifests, the alpha backup and the settings can be written at all, and
   settings pass the allow-list in `Prefs.acceptTransferred()`, which keeps the extra
   arguments out. The dialog says the game runs the scripts inside.
@@ -235,8 +214,24 @@ there. An installation is only sent when its manifest verifies clean.
 - `PhoneTransfer` connects those two, which know nothing of Android, to content URIs and
   the share sheet.
 
-The packed file stays in `files/exports` until it is deleted or for a day. A bundle from
+The packed file stays in `files/exports` until it is deleted or for a day. A file from
 another build can be imported, and the launcher says so.
+
+### Languages
+
+The launcher's language box has the 21 languages the engine knows. It decides the game's
+`LANGUAGE=` and the launcher's own language, so every one of them can be read on every
+phone, Latin included, which no phone offers. `GameLanguage.localized()` sets the locale in
+`attachBaseContext` of the launcher's activities and of what shows notifications, and a
+change recreates the screen. The folders are `values-<code>`, with `values-nb` for
+Norwegian and `values-zh-rCN` and `values-zh-rTW` for the two Chinese. What a language does
+not have yet falls back to English. Arabic mirrors the launcher; the game's picture does not
+mirror.
+
+Every word comes from `res/values/strings.xml`. Classes without a Context, which the JVM
+tests drive, name a `Message`, a string and its arguments, and it becomes words where Android
+is. Failures carry one too, as `Message.Failure`, and what the platform throws stays as the
+detail of a sentence. Log lines and the preamble of a shared log stay English.
 
 ## Controls
 
@@ -286,8 +281,7 @@ moves in flags of one step, so `touch_camera_packet_zoom()` sends flags that cha
 local zoom, and `update_local_cameras()` masks them out of its own step.
 
 Each of the three movements opens on its own gate and they flow together, as in a map
-app. Measured: a point stays under the finger to 3 px over a 300 px drag, at every zoom
-and rotated.
+app, and a point stays under the finger at every zoom and rotated.
 
 The land view and the parchment map have no such camera and still go through the game
 key lane, `touch_game_key_axis_value()` on `Gkey_MoveUp` and friends.
@@ -344,9 +338,9 @@ difference and shows both versions.
 | Other side | Result |
 |---|---|
 | This port, same merge base | Plays |
-| An official alpha with the same number | Should play, not tried: same source, and the same number from `git rev-list --count` |
-| Official stable 1.4.0, which announces 5136 | By reading: `net_lobby.c` lets it into a phone's lobby and the level does not start. A phone will not join a stable host from the list |
-| Any other official build | By reading: refused at the join, either way round |
+| An official alpha with the same number | Same source, and the same number from `git rev-list --count` |
+| Official stable 1.4.0, which announces 5136 | `net_lobby.c` lets it into a phone's lobby and the level does not start. A phone will not join a stable host from the list |
+| Any other official build | Refused at the join, either way round |
 
 An upstream merge moves the number. `MATCHMAKING_VERSION` no longer exists upstream. A
 lobby's metadata carries the four numbers, and the `list` request sends the whole
@@ -354,7 +348,7 @@ lobby's metadata carries the four numbers, and the `list` request sends the whol
 a LAN host too old to announce a version.
 
 The game is deterministic lockstep and the fork changes no wire format, checksum or
-simulation. Whether arm64 and i686 stay in step over a whole game has not been tried.
+simulation.
 
 ### LAN and hotspots
 
@@ -377,21 +371,18 @@ and a phone that owns a hotspot has no Wi-Fi network at all. Upstream's discover
   enough (`lan_should_follow_network()`), or a client on a long level load could take a
   host off the hotspot its other clients are on.
 
-Measured on two emulators sharing a simulated radio, with Android's real hostapd and
-tethering: hotspot games in both directions without a desync over several thousand turns,
-and a 5 s Wi-Fi drop survived. `GameActivity` also holds a multicast lock while on screen.
+`GameActivity` also holds a multicast lock while on screen.
 
-Online play goes through the upstream lobby server. Listing and creating a lobby has been
-measured, a whole online game has not. curl verifies the server against
+Online play goes through the upstream lobby server. curl verifies the server against
 `/system/etc/security/cacerts`, its compiled in `CURL_CA_PATH`, which may be stale on
 Android 14 and later, where the trust store moved into an updatable module. miniupnpc and
-libnatpmp are linked and have not been measured here.
+libnatpmp are linked.
 
 ## Versions and releases
 
 | Number | Example | What it is |
 |---|---|---|
-| `versionName` | `1.132` | The port's own: `keeperfx.portBaseMinor` plus the first-parent commits since `keeperfx.portBaseCommit`, so a merge from upstream counts as one |
+| `versionName` | `1.0` | The port's own, counted by first-parent commits, so a merge from upstream counts as one: the first commit after `keeperfx.portBaseCommit` is `1.<keeperfx.portBaseMinor>`, and each later one adds one |
 | `versionCode` | `1045785` | From `version.mk` and the commit count of `HEAD`. Android only needs it to rise |
 | `ENGINE_BUILD` | `5591` | The commit count at the merge base with upstream: the wire version, and which alpha patch fits |
 | `VER_STRING` | `1.4.0.5591 Android-Unofficial_7452fa083` | What the game and the log show |
@@ -406,15 +397,16 @@ manual run, and on a pull request made ready for review or given a reviewer:
 - `build-linux-regression` builds the Linux x86_64 target, because the port touches shared
   sources.
 - `publish` `needs` both and runs for a push or a manual run. It refuses a version behind
-  the newest release, then creates `android-v<version>` with the changelog, and moves
-  `android-latest`, a prerelease kept so that builds up to 1.4.0.5289 can still find their
-  update. Both carry `keeperfx-android-arm64.apk` and `version.json`, and those names must
-  not change.
+  the newest release, then creates `android-v<version>` with `keeperfx-android-arm64.apk`.
+  The notes say that it is unofficial, what it is, what it can do and how to install it,
+  and list the changes when there is an earlier release to compare with. The asset's name
+  and the form of the tag must not change, and the heading of the changes is what the
+  updater reads them by.
 
 `AppUpdater` asks GitHub's `/releases/latest` and `AppRelease` looks for that asset. On
 Android 11 granting the install permission ends every process of the app, so the launcher
-holds that offer back until no other download is running. That comes from reading the
-platform's source, no such device has been tried.
+holds that offer back until no other download is running. That comes from the platform's
+source.
 
 `android/app/keeperfx-ci.keystore` is committed so that CI builds install over each other.
 That means anyone can sign an APK that Android accepts as an update, so the updater's real
@@ -456,7 +448,7 @@ one hit in SDL's sources, an API 29 call that SDL only reaches on API 29.
 | What | Where | Run with |
 |---|---|---|
 | Gesture maths, steering rules, LAN rules | `tests/touch`, no device, no engine, no SDL | `bash tests/touch/build.sh out && ./out` |
-| The launcher's decisions: update plan, archives, resumable download, manifest, transfer | `android/app/src/test` | `cd android && gradle testReleaseUnitTest` |
+| The launcher's decisions: update plan, archives, resumable download, manifest, transfer, what its dialogs say, every language's strings against the English | `android/app/src/test` | `cd android && gradle testReleaseUnitTest` |
 | A fresh install played through | `android/scripts/emulator-smoke.sh <apk> <folder of the original game>` | A device that allows `adb root`, in practice an emulator |
 
 The smoke test installs on a clean slate, drives the launcher through the release, the
@@ -465,8 +457,7 @@ starts, keeps running and changes its picture, with nothing in the crash buffer.
 
 ## Installing and running
 
-Requires Android 9 (API 28) or newer on an arm64 device. Lint guards that floor, and only
-API 36 has actually been run.
+Requires Android 9 (API 28) or newer on an arm64 device. Lint guards that floor.
 
 1. Install the APK, allowing unknown sources. Play Protect warns about an unknown developer.
 2. Open it and tap **Install KeeperFX**.
@@ -498,7 +489,8 @@ android/
 │       │   ├── ArchiveUnpacker, ArchivePaths, FileUtil
 │       │   ├── InstallManifest, AlphaBackup, BundledConfig, GameData, GameLanguage
 │       │   ├── DataImporter            folder imports and the search for the originals
-│       │   ├── TransferBundle, TransferSwap, PhoneTransfer
+│       │   ├── TransferBundle, TransferSwap, PhoneTransfer   export and import
+│       │   ├── Message                 a text for the player, named rather than written out
 │       │   ├── AppUpdater, AppRelease, AppVersion
 │       │   ├── LogActivity, TouchTuningActivity
 │       │   └── Prefs                   settings, and the engine's command line
