@@ -39,6 +39,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.util.List;
@@ -55,6 +56,7 @@ public class DownloadService extends Service {
 
     private static final String CHANNEL_ID = "downloads";
     private static final int NOTIFICATION_ID = 1;
+    private static final long NOTIFICATION_INTERVAL_MS = 500;
 
     // ------------------------------------------------------------ shared state
 
@@ -155,7 +157,7 @@ public class DownloadService extends Service {
     private Thread worker;
     /** Only touched by the worker, and by the main thread once the worker is done. */
     private volatile Intent installIntent;
-    private int lastPercent;
+    private long lastNotified;
     private String lastStage = "";
 
     @Override
@@ -291,10 +293,12 @@ public class DownloadService extends Service {
 
     private void report(String stage, int percent, String detail) {
         publish(new State(true, stage, percent, detail, null));
-        // A notification per 256 KB is more than Android accepts: it starts dropping
-        // them, and then possibly the last one that says how it all ended.
-        if (percent != lastPercent || !stage.equals(lastStage)) {
-            lastPercent = percent;
+        // A notification per 256 KB, or per percent on a fast line, is more than
+        // Android accepts: it starts dropping them, and then also the last one that
+        // says how it all ended. Seen leaving "Downloading the music" up for good.
+        final long now = SystemClock.elapsedRealtime();
+        if (!stage.equals(lastStage) || now - lastNotified >= NOTIFICATION_INTERVAL_MS) {
+            lastNotified = now;
             lastStage = stage;
             updateNotification(stage, percent);
         }
