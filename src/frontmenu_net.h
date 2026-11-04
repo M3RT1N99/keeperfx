@@ -124,6 +124,9 @@ void frontnet_messages_down_maintain(struct GuiButton *gbtn);
 void frontnet_messages_scroll(struct GuiButton *gbtn);
 void frontnet_draw_messages_scroll_tab(struct GuiButton *gbtn);
 void frontnet_draw_current_message(struct GuiButton *gbtn);
+#ifdef __ANDROID__
+void frontnet_chat_line_tapped(struct GuiButton *gbtn);
+#endif
 void frontnet_draw_messages(struct GuiButton *gbtn);
 void frontnet_start_game_maintain(struct GuiButton *gbtn);
 void frontnet_return_to_session_menu(struct GuiButton *gbtn);

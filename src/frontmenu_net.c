@@ -129,9 +129,14 @@ TbBool frontnet_start_input(void)
     if (game_is_busy_doing_gui_string_input()) {
         return false;
     }
+#ifndef __ANDROID__
+    // On a phone text input is the keyboard: raised here it would cover Start Game and Cancel, come
+    // back after every Back, and, since this also runs right after the click that left the lobby,
+    // outlive the lobby. There it takes a tap on the chat line, see frontnet_chat_line_tapped().
     if (!LbIsTextInputActive()) {
         LbStartTextInput();
     }
+#endif
     if (lbInkey == KC_RETURN) {
         if (local_state.mp_message_text[0] != '\0') {
             send_network_chat_message(netstate.my_id, local_state.mp_message_text);
@@ -415,9 +420,24 @@ void frontnet_draw_current_message(struct GuiButton *gbtn)
     // Prepare text buffer and font
     snprintf(text, sizeof(text), "%s%s", local_state.mp_message_text, print_with_cursor?"_":"");
     font_idx = frontend_button_caption_font(gbtn, 0);
+#ifdef __ANDROID__
+    // The keyboard covers this line, and nothing else shows what is being typed.
+    struct GuiButton lifted = *gbtn;
+    if (LbIsTextInputActive()) {
+        lifted.scr_pos_y = get_active_menu(gbtn->gmenu_idx)->pos_y;
+        gbtn = &lifted;
+    }
+#endif
     // And draw the message
     frontnet_draw_scroll_selection_box(gbtn, font_idx, text);
 }
+
+#ifdef __ANDROID__
+void frontnet_chat_line_tapped(struct GuiButton *gbtn)
+{
+    LbStartTextInput();
+}
+#endif
 
 void frontnet_draw_messages(struct GuiButton *gbtn)
 {

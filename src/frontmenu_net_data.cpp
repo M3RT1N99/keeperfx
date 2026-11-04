@@ -156,7 +156,11 @@ struct GuiButtonInit frontend_net_start_buttons[] = {
   { LbBtnT_HoldableBtn,BID_DEFAULT, 0, 0, frontnet_messages_up,NULL,  frontend_over_button,    0, 10 + LOBBY_MESSAGES_WIDTH, 303, 10 + LOBBY_MESSAGES_WIDTH, 303,  26, 14, frontnet_draw_slider_button,       0, GUIStr_Empty, 0,  {38},    0, frontnet_messages_up_maintain },
   { LbBtnT_HoldableBtn,BID_DEFAULT, 0, 0, frontnet_messages_down,NULL,frontend_over_button,    0, 10 + LOBBY_MESSAGES_WIDTH, 377, 10 + LOBBY_MESSAGES_WIDTH, 377,  26, 14, frontnet_draw_slider_button,       0, GUIStr_Empty, 0,  {39},    0, frontnet_messages_down_maintain },
   { LbBtnT_DraggableBtn,BID_DEFAULT, 0, 0, frontnet_messages_scroll,               NULL,   NULL,                    0, 14 + LOBBY_MESSAGES_WIDTH, 317, 14 + LOBBY_MESSAGES_WIDTH, 317,  20, 60, frontnet_draw_messages_scroll_tab, 0, GUIStr_Empty, 0,  {40},    0, NULL },
+#ifdef __ANDROID__
+  { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_chat_line_tapped,NULL,NULL,                 0,  10, 393,  10, 393, LOBBY_MESSAGES_WIDTH, 28, frontnet_draw_current_message,     0, GUIStr_Empty, 0,  {43},    0, NULL },
+#else
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,   NULL,                    0,  10, 393,  10, 393, LOBBY_MESSAGES_WIDTH, 28, frontnet_draw_current_message,     0, GUIStr_Empty, 0,  {43},    0, NULL },
+#endif
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, NULL,               NULL,   NULL,                    0,  17, 308,  17, 308, LOBBY_MESSAGES_WIDTH - 12, 78, frontnet_draw_messages,            0, GUIStr_Empty, 0,  {44},    0, NULL },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, set_packet_start,   NULL,   frontend_over_button,    0, LOBBY_START_BUTTON_X, 422, LOBBY_START_BUTTON_X, 422, LOBBY_BUTTON_WIDTH, 46, frontend_draw_small_menu_button,   0, GUIStr_Empty, 0,  {15},    0, frontnet_start_game_maintain },
   { LbBtnT_NormalBtn,  BID_DEFAULT, 0, 0, frontnet_return_to_session_menu,NULL,frontend_over_button,1, LOBBY_CANCEL_BUTTON_X, 422, LOBBY_CANCEL_BUTTON_X, 422, LOBBY_BUTTON_WIDTH, 46, frontend_draw_small_menu_button,   0, GUIStr_Empty, 0,  {16},    0, NULL },

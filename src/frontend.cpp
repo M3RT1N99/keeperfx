@@ -2854,7 +2854,9 @@ FrontendMenuState frontend_setup_state(FrontendMenuState nstate)
       case FeSt_NET_START:
           frontnet_start_setup();
           turn_on_menu(GMnu_FENET_START);
+#ifndef __ANDROID__
           LbStartTextInput();
+#endif
           set_flag(local_system_flags, GSF_NetworkActive);
           set_pointer_graphic_menu();
           break;
