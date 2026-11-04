@@ -211,24 +211,22 @@ public class TouchTuningActivity extends Activity {
 
     private int labelFor(Prefs.TouchTunable tunable) {
         switch (tunable.key) {
-            case "panspeed":    return R.string.tuning_panspeed;
             case "longpress":   return R.string.tuning_longpress;
             case "dragslop":    return R.string.tuning_dragslop;
-            case "commitpan":   return R.string.tuning_commitpan;
-            case "commitpinch": return R.string.tuning_commitpinch;
-            case "committwist": return R.string.tuning_committwist;
+            case "panslop":     return R.string.tuning_panslop;
+            case "zoomgate":    return R.string.tuning_zoomgate;
+            case "rotategate":  return R.string.tuning_rotategate;
             default:            return R.string.tuning_flickdecay;
         }
     }
 
     private int hintFor(Prefs.TouchTunable tunable) {
         switch (tunable.key) {
-            case "panspeed":    return R.string.tuning_panspeed_hint;
             case "longpress":   return R.string.tuning_longpress_hint;
             case "dragslop":    return R.string.tuning_dragslop_hint;
-            case "commitpan":   return R.string.tuning_commitpan_hint;
-            case "commitpinch": return R.string.tuning_commitpinch_hint;
-            case "committwist": return R.string.tuning_committwist_hint;
+            case "panslop":     return R.string.tuning_panslop_hint;
+            case "zoomgate":    return R.string.tuning_zoomgate_hint;
+            case "rotategate":  return R.string.tuning_rotategate_hint;
             default:            return R.string.tuning_flickdecay_hint;
         }
     }

@@ -7,8 +7,9 @@
  * @par Purpose:
  *     Turns SDL multi touch events into game actions without going through
  *     the operating system mouse. Finger positions drive the in-game pointer
- *     directly and multi finger gestures are fed into the same device
- *     independent game key layer that the keyboard and the controller use.
+ *     directly. Two fingers hold the map, see touch_camera.c; where there is no
+ *     map to hold, gestures are fed into the same device independent game key
+ *     layer that the keyboard and the controller use.
  * @par Comment:
  *     This module deliberately does not use SDL's touch-to-mouse translation
  *     (SDL_HINT_TOUCH_MOUSE_EVENTS); that emulation collapses multi touch into
@@ -41,6 +42,8 @@
 #include "front_input.h"
 #include "kfx/platform/WindowSystemSDL.h"
 #include "kfx/renderer/RendererManager.h"
+#include "touch_camera.h"
+#include "touch_gesture.h"
 #include <SDL3/SDL.h>
 #include "post_inc.h"
 
@@ -80,16 +83,35 @@ static float touch_longpress_ms = 420.0f;
 #define TOUCH_TAP_MAX_MS touch_longpress_ms
 
 /**
+ * How long a first finger has to be down before moving it starts a drag. Two fingers
+ * never land at once, and until the second is there a moving first finger looks like
+ * a drag: its press would tag a block or place a room on the way into a camera gesture.
+ */
+#define TOUCH_SECOND_FINGER_GRACE_MS 100
+
+/* The gates of two fingers holding the map, see touch_gesture.h. A share of the
+   screen's short side says the same on any panel; the pixels come from it per frame. */
+static float touch_pan_slop_percent = 1.4f;
+static float touch_zoom_gate_percent = 2.0f;
+static float touch_rotate_gate_rad = 0.10f;
+/** A channel whose gate has opened has caught up with the fingers after about three of these. */
+#define TOUCH_CATCH_UP_MS 33.0f
+/** Twist for one quarter turn of the front view, which has no angles in between. */
+#define TOUCH_FRONT_VIEW_STEP_RAD 0.5f
+/** Speed a release needs to roll on, in shares of the short side per second. */
+#define TOUCH_FLICK_MIN_SPEED_SHARE 0.25f
+static float touch_flick_decay = 0.93f;
+
+/*
+ * The rest of this block is the game key lane, for what has no map to hold: walking a
+ * possessed creature and scrolling the land view.
+ */
+
+/**
  * Finger travel per game frame, in pixels, that corresponds to a fully
  * deflected pan axis.
- *
- * The camera is velocity driven and its speed is capped by the engine, so the
- * map can never quite chase the finger; what this decides is how much of that
- * speed an ordinary drag gets. At 18 a normal drag sat at about half throttle
- * and the map crawled, which is the wrong trade - overshooting slightly is far
- * less annoying than a map that will not keep up.
  */
-static float touch_pan_full_speed_px = 7.0f;
+#define TOUCH_PAN_FULL_SPEED_PX 7.0f
 
 /** Pinch distance change in pixels that corresponds to a fully deflected zoom axis. */
 #define TOUCH_PINCH_FULL_SPEED_PX 16.0f
@@ -106,15 +128,10 @@ static float touch_pan_full_speed_px = 7.0f;
  * before its channel unlocks. Two fingers on a screen always produce a little
  * of all three movements at once; below these thresholds that is treated as
  * noise, above them the channel flows for the rest of the gesture.
- *
- * Panning is deliberately the easiest to reach: it is the movement people
- * make constantly, and a net centre drift is cheap to produce. Zoom and
- * rotate ask for more because their signals - net distance change, net twist -
- * barely move during an honest pan, so once crossed the intent is clear.
  */
-static float touch_commit_pan_px = 20.0f;
-static float touch_commit_pinch_px = 34.0f;
-static float touch_commit_twist_rad = 0.30f;
+#define TOUCH_COMMIT_PAN_PX 20.0f
+#define TOUCH_COMMIT_PINCH_PX 34.0f
+#define TOUCH_COMMIT_TWIST_RAD 0.30f
 
 /** M_PI is not guaranteed by the C standard on every toolchain we build with. */
 #define TOUCH_PI 3.14159265358979323846f
@@ -182,30 +199,6 @@ static float touch_pan_accum_x, touch_pan_accum_y;
    panel carries a fraction of the movement a deadzone is meant to filter. */
 static float touch_pinch_accum, touch_twist_accum;
 
-/* Travel for the camera's direct consumption, kept apart from the axis
-   accumulator above: the axes are rebuilt every frame while the camera reads
-   on the game's own cadence, and whatever landed on the frames in between
-   used to be thrown away - at 60 frames against 20 turns, two thirds of every
-   drag. These only empty when the camera takes them. Pinch and twist get the
-   same treatment as the pan: their per-frame axes lost two thirds of the
-   motion the same way, and a careful pinch of a pixel or two per frame never
-   even cleared the per-frame deadzone - "zooming does not work" made literal. */
-static float touch_pan_drain_x, touch_pan_drain_y;
-static float touch_pinch_drain;
-static float touch_twist_drain;
-static TbBool touch_pan_drained;
-static TbBool touch_zoom_rotate_drained;
-
-/** Frames per game turn at the default caps; the drains are normalised by it
- *  so "full speed" keeps meaning what it does for a held key, which is read
- *  once per turn rather than once per frame. */
-#define TOUCH_FRAMES_PER_TURN 3.0f
-/* A flick keeps the map rolling after the fingers lift, like every map
-   application does; its speed is the recent per-frame travel. */
-static float touch_pan_frame_x, touch_pan_frame_y;
-static float touch_flick_vx, touch_flick_vy;
-static float touch_flick_decay = 0.90f;
-
 /* State since the two finger gesture began, used to unlock the channels. */
 static float touch_start_dist;
 static long touch_start_cx, touch_start_cy;
@@ -227,6 +220,11 @@ static TbBool touch_button_down_right = false;
 
 /** Highest number of fingers seen during the current contact. */
 static int touch_max_fingers_this_contact = 0;
+/* What decides whether a contact of several fingers was a tap: all of it counts, not
+   just the finger that happens to lift last. Its own tolerance, the drag threshold: a
+   sloppy tap may well cross the much smaller slop of the camera. */
+static Uint64 touch_contact_start_ticks = 0;
+static TbBool touch_contact_moved = false;
 
 /******************************************************************************/
 
@@ -255,12 +253,11 @@ TbBool touch_sticky_right_click(void)
 TbBool touch_tune(const char *name, float value)
 {
     static const struct { const char *name; float *target; float min; float max; } tunables[] = {
-        { "panspeed",    &touch_pan_full_speed_px,      1.0f,  60.0f },
         { "longpress",   &touch_longpress_ms,         120.0f, 2000.0f },
         { "dragslop",    &touch_drag_threshold_min_px,  2.0f,  80.0f },
-        { "commitpan",   &touch_commit_pan_px,          4.0f, 200.0f },
-        { "commitpinch", &touch_commit_pinch_px,        4.0f, 200.0f },
-        { "committwist", &touch_commit_twist_rad,      0.02f,   2.0f },
+        { "panslop",     &touch_pan_slop_percent,       0.2f,  10.0f },
+        { "zoomgate",    &touch_zoom_gate_percent,      0.2f,  20.0f },
+        { "rotategate",  &touch_rotate_gate_rad,       0.02f,   1.0f },
         { "flickdecay",  &touch_flick_decay,            0.0f,   0.99f },
     };
     for (size_t i = 0; i < sizeof(tunables) / sizeof(tunables[0]); i++)
@@ -327,11 +324,6 @@ static void touch_reset_gesture_axes(void)
 {
     touch_pan_accum_x = touch_pan_accum_y = 0.0f;
     touch_pinch_accum = touch_twist_accum = 0.0f;
-    touch_pan_drain_x = touch_pan_drain_y = 0.0f;
-    touch_pinch_drain = touch_twist_drain = 0.0f;
-    touch_pan_frame_x = touch_pan_frame_y = 0.0f;
-    // The flick is deliberately not cleared here: it is set at the very
-    // moment the gesture ends, which is also when this runs.
     touch_t2f_pan = touch_t2f_zoom = touch_t2f_rotate = false;
     touch_total_twist = 0.0f;
     touch_axis_pan_left = touch_axis_pan_right = 0.0f;
@@ -340,19 +332,21 @@ static void touch_reset_gesture_axes(void)
     touch_axis_rotate_cw = touch_axis_rotate_ccw = 0.0f;
 }
 
-/**
- * Ends a pan gesture: a real swipe keeps its speed and rolls out, fingers
- * that were resting stop the map dead. The velocity itself is an average
- * update_touch_inputs() maintains from the recent frames' travel.
- */
-static void touch_end_pan_flick(void)
+/** The camera tuning for the screen as it is now, in pixels of that screen. */
+static struct TgTuning touch_current_tuning(void)
 {
-    if ((touch_gesture != TGest_Camera) || !touch_t2f_pan
-     || (touch_flick_decay <= 0.0f)
-     || ((fabsf(touch_flick_vx) < 2.0f) && (fabsf(touch_flick_vy) < 2.0f)))
-    {
-        touch_flick_vx = touch_flick_vy = 0.0f;
-    }
+    const long width = RendererPhysicalWidth();
+    const long height = RendererPhysicalHeight();
+    const float short_side = (float)((width < height) ? width : height);
+    struct TgTuning tuning;
+    tuning.pan_slop_px = short_side * touch_pan_slop_percent / 100.0f;
+    tuning.zoom_gate_px = short_side * touch_zoom_gate_percent / 100.0f;
+    tuning.rotate_gate_rad = touch_rotate_gate_rad;
+    tuning.catch_up_ms = TOUCH_CATCH_UP_MS;
+    tuning.step_twist_rad = TOUCH_FRONT_VIEW_STEP_RAD;
+    tuning.flick_min_speed = short_side * TOUCH_FLICK_MIN_SPEED_SHARE;
+    tuning.flick_decay = touch_flick_decay;
+    return tuning;
 }
 
 static void touch_release_buttons(void)
@@ -377,9 +371,21 @@ static void touch_reset_state(void)
     touch_finger_count = 0;
     touch_gesture = TGest_None;
     touch_max_fingers_this_contact = 0;
+    touch_contact_moved = false;
     touch_reset_gesture_axes();
+    touch_camera_release(NULL, false);
+    touch_camera_catch();
     touch_tapped_back = false;
     touch_back_key_frames = 0;
+}
+
+void touch_focus_lost(void)
+{
+    // Nothing says what the fingers do from here on. A cancel usually arrives first,
+    // but when it does not, a finger counted as down would make every later touch
+    // look like one more finger, for as long as the game runs.
+    if (touch_finger_count > 0)
+        touch_reset_state();
 }
 
 void init_touch_input(void)
@@ -509,6 +515,7 @@ static void touch_begin_camera_gesture(void)
     touch_total_twist = 0.0f;
     touch_pinch_accum = touch_twist_accum = 0.0f;
     touch_gesture = TGest_Camera;
+    touch_camera_regrip();
 }
 
 static float touch_clamp01(float value)
@@ -553,20 +560,15 @@ static void touch_update_camera_gesture(void)
     const float net_pan_y = (float)(cy - touch_start_cy);
     touch_total_twist += angle_delta;
     if (!touch_t2f_pan
-     && (sqrtf(net_pan_x * net_pan_x + net_pan_y * net_pan_y) >= touch_commit_pan_px))
+     && (sqrtf(net_pan_x * net_pan_x + net_pan_y * net_pan_y) >= TOUCH_COMMIT_PAN_PX))
     {
         touch_t2f_pan = true;
-        // The travel spent reaching the threshold would otherwise be
-        // swallowed - a dead first centimetre on every pan. Handing it over
-        // now lets the map catch up to where the fingers already are.
-        touch_pan_drain_x += net_pan_x;
-        touch_pan_drain_y += net_pan_y;
     }
-    if (!touch_t2f_zoom && (fabsf(dist - touch_start_dist) >= touch_commit_pinch_px))
+    if (!touch_t2f_zoom && (fabsf(dist - touch_start_dist) >= TOUCH_COMMIT_PINCH_PX))
     {
         touch_t2f_zoom = true;
     }
-    if (!touch_t2f_rotate && (fabsf(touch_total_twist) >= touch_commit_twist_rad))
+    if (!touch_t2f_rotate && (fabsf(touch_total_twist) >= TOUCH_COMMIT_TWIST_RAD))
     {
         touch_t2f_rotate = true;
     }
@@ -577,17 +579,9 @@ static void touch_update_camera_gesture(void)
         // per game frame, each a couple of pixels, so turning one event into
         // an axis value would describe the sampling rate rather than how fast
         // the finger is actually moving. update_touch_inputs() converts the
-        // sum once a frame. The world follows the fingers, so the camera
-        // travels the other way; the drain feeds the camera directly and only
-        // empties when the camera reads it, so nothing is lost between the
-        // frame rate and the game's slower turn rate. The frame sum drives
-        // the flick velocity.
+        // sum once a frame.
         touch_pan_accum_x += pan_dx;
         touch_pan_accum_y += pan_dy;
-        touch_pan_drain_x += pan_dx;
-        touch_pan_drain_y += pan_dy;
-        touch_pan_frame_x += pan_dx;
-        touch_pan_frame_y += pan_dy;
     }
     if (touch_t2f_zoom)
     {
@@ -596,12 +590,10 @@ static void touch_update_camera_gesture(void)
         // it never reports in a single event, so a deliberate pinch cleared
         // the threshold and then produced nothing at all.
         touch_pinch_accum += dist_delta;
-        touch_pinch_drain += dist_delta;
     }
     if (touch_t2f_rotate)
     {
         touch_twist_accum += angle_delta;
-        touch_twist_drain += angle_delta;
     }
 
     touch_camera_prev_dist = dist;
@@ -649,6 +641,25 @@ static void touch_normalized_to_game(float nx, float ny, long *x, long *y)
 }
 
 /**
+ * A first finger that has moved far enough holds the left button down, so that dig
+ * areas and rooms can be painted the same way as with a mouse - once a second finger
+ * had its chance to arrive and make this a camera gesture instead.
+ */
+static void touch_start_drag_when_due(const struct TouchFinger *finger)
+{
+    if (!finger->moved || (touch_gesture != TGest_Point)
+     || ((SDL_GetTicks() - finger->down_ticks) < TOUCH_SECOND_FINGER_GRACE_MS))
+        return;
+    touch_gesture = TGest_Drag;
+    // Dragging with the toggle on undesignates an area, which is
+    // what the right button does when held on the desktop.
+    if (touch_sticky_rmb)
+        touch_press_right();
+    else
+        touch_press_left();
+}
+
+/**
  * Handles one SDL touch event. Declared in bflib_inputctrl.cpp the same way
  * JEvent() is, to keep SDL types out of the shared headers.
  */
@@ -666,7 +677,7 @@ void TEvent(const SDL_Event *ev)
     case SDL_EVENT_FINGER_DOWN:
     {
         // Touching the screen catches a rolling map, as it does everywhere.
-        touch_flick_vx = touch_flick_vy = 0.0f;
+        touch_camera_catch();
         struct TouchFinger *finger = touch_alloc(ev->tfinger.fingerID);
         if (finger == NULL)
             break;
@@ -689,6 +700,8 @@ void TEvent(const SDL_Event *ev)
             // cursor sprite and any hover highlight track the finger.
             touch_move_pointer(finger->x, finger->y);
             touch_gesture = TGest_Point;
+            touch_contact_start_ticks = finger->down_ticks;
+            touch_contact_moved = false;
         }
         else if (touch_finger_count == 2)
         {
@@ -700,6 +713,7 @@ void TEvent(const SDL_Event *ev)
         {
             touch_release_buttons();
             touch_reset_gesture_axes();
+            touch_camera_release(NULL, false);
             touch_gesture = TGest_Blocked;
         }
         break;
@@ -717,7 +731,10 @@ void TEvent(const SDL_Event *ev)
         if (threshold < (long)touch_drag_threshold_min_px)
             threshold = (long)touch_drag_threshold_min_px;
         if ((labs(travel_x) >= threshold) || (labs(travel_y) >= threshold))
+        {
             finger->moved = true;
+            touch_contact_moved = true;
+        }
 
         if (touch_gesture == TGest_Camera)
         {
@@ -726,18 +743,7 @@ void TEvent(const SDL_Event *ev)
         else if ((touch_finger_count == 1) && (touch_gesture != TGest_Blocked))
         {
             touch_move_pointer(finger->x, finger->y);
-            if (finger->moved && (touch_gesture == TGest_Point))
-            {
-                // A moving finger is a drag: hold the left button so that
-                // dig areas and rooms can be painted the same way as with a mouse.
-                touch_gesture = TGest_Drag;
-                // Dragging with the toggle on undesignates an area, which is
-                // what the right button does when held on the desktop.
-                if (touch_sticky_rmb)
-                    touch_press_right();
-                else
-                    touch_press_left();
-            }
+            touch_start_drag_when_due(finger);
         }
         break;
     }
@@ -751,7 +757,10 @@ void TEvent(const SDL_Event *ev)
         const Uint64 held_ms = SDL_GetTicks() - finger->down_ticks;
         // A contact the system took away ends the gesture like a lifted finger
         // does, but nobody meant it as a tap, so it counts as a drag.
-        const TbBool was_moved = finger->moved || (ev->type == SDL_EVENT_FINGER_CANCELED);
+        const TbBool canceled = (ev->type == SDL_EVENT_FINGER_CANCELED);
+        if (canceled)
+            touch_contact_moved = true;
+        const TbBool moved = finger->moved;
         const long up_x = finger->x;
         const long up_y = finger->y;
         finger->active = false;
@@ -763,7 +772,9 @@ void TEvent(const SDL_Event *ev)
             switch (touch_gesture)
             {
             case TGest_Point:
-                if (!was_moved && (held_ms <= TOUCH_TAP_MAX_MS))
+                // Moved and still a point: a stroke over before the second finger's grace
+                // was. Without the grace that would have been a press, so it still is.
+                if (!canceled && (moved || (held_ms <= TOUCH_TAP_MAX_MS)))
                 {
                     touch_move_pointer(up_x, up_y);
                     if (touch_sticky_rmb)
@@ -778,9 +789,12 @@ void TEvent(const SDL_Event *ev)
                 break;
             case TGest_Camera:
             case TGest_Blocked:
-                touch_end_pan_flick();
+                {
+                    const struct TgTuning tuning = touch_current_tuning();
+                    touch_camera_release(&tuning, touch_contact_moved);
+                }
                 // Multi finger taps that never turned into a drag act as shortcuts.
-                if (!was_moved && (held_ms <= TOUCH_TAP_MAX_MS))
+                if (!touch_contact_moved && ((SDL_GetTicks() - touch_contact_start_ticks) <= TOUCH_TAP_MAX_MS))
                 {
                     // Two fingers is the shortest gesture there is, and right
                     // click is the verb Dungeon Keeper uses most after left:
@@ -805,7 +819,8 @@ void TEvent(const SDL_Event *ev)
         {
             // Dropped back to a single finger; stop the camera gesture but do
             // not start a new click with the finger that is still down.
-            touch_end_pan_flick();
+            const struct TgTuning tuning = touch_current_tuning();
+            touch_camera_release(&tuning, touch_contact_moved);
             touch_reset_gesture_axes();
             touch_gesture = TGest_Blocked;
         }
@@ -825,6 +840,38 @@ void TEvent(const SDL_Event *ev)
 
 static void touch_apply_pan_accumulator(void);
 static void touch_apply_camera_accumulators(void);
+
+/**
+ * Runs for every frame the game draws, before the cameras are interpolated.
+ *
+ * The rest of the input is only looked at once per game turn, so finger events get
+ * their own pump here: at 20 turns a second a finger would otherwise reach the map
+ * in steps of 50 ms, whatever the frame rate.
+ */
+void touch_frame_update(void)
+{
+    if (touch_control_mode == TCMode_PointerKeys)
+        return;
+    LbPollTouchEvents();
+    if (!touch_controls_active())
+        return;
+    struct TouchFinger *a = NULL;
+    struct TouchFinger *b = NULL;
+    const struct TgTuning tuning = touch_current_tuning();
+    if ((touch_gesture == TGest_Camera) && (touch_two_fingers(&a, &b) >= 2))
+    {
+        struct TgFingers fingers;
+        fingers.ax = (float)a->x;
+        fingers.ay = (float)a->y;
+        fingers.bx = (float)b->x;
+        fingers.by = (float)b->y;
+        touch_camera_frame(&fingers, &tuning);
+    }
+    else
+    {
+        touch_camera_frame(NULL, &tuning);
+    }
+}
 
 void update_touch_inputs(void)
 {
@@ -866,7 +913,11 @@ void update_touch_inputs(void)
         for (int i = 0; i < TOUCH_MAX_FINGERS; i++)
         {
             struct TouchFinger *finger = &touch_fingers[i];
-            if (!finger->active || finger->moved)
+            if (!finger->active)
+                continue;
+            // A finger that stopped within the grace sends no more motion to start its drag.
+            touch_start_drag_when_due(finger);
+            if (finger->moved)
                 continue;
             if ((SDL_GetTicks() - finger->down_ticks) >= touch_longpress_ms)
             {
@@ -897,54 +948,6 @@ void update_touch_inputs(void)
         lbKeyOn[KC_ESCAPE] = 1;
         lbInkey = KC_ESCAPE;
         touch_back_key_frames = 2;
-    }
-
-    // The drains only make sense while something consumes them every few
-    // frames. When nothing does - possession, the parchment map, a menu -
-    // whatever a still-running gesture or a flick feeds in would pile up and
-    // unload into the camera in one jolt the moment the isometric view is
-    // back. The camera reads every third frame, so a short grace covers its
-    // cadence and anything older is thrown away.
-    {
-        static int frames_unconsumed = 0;
-        if (touch_pan_drained || touch_zoom_rotate_drained)
-        {
-            frames_unconsumed = 0;
-        }
-        else if (++frames_unconsumed >= 10)
-        {
-            touch_pan_drain_x = touch_pan_drain_y = 0.0f;
-            touch_pinch_drain = touch_twist_drain = 0.0f;
-            touch_flick_vx = touch_flick_vy = 0.0f;
-        }
-    }
-    // Consumed and set anew each frame; the isometric camera raises them
-    // again for as long as it drains the gestures directly.
-    touch_pan_drained = false;
-    touch_zoom_rotate_drained = false;
-
-    // The flick velocity averages the travel of the last few frames, but only
-    // while the pan is actually live - during the roll-out the frame sum is
-    // zero and averaging it in would decay the flick twice.
-    if ((touch_gesture == TGest_Camera) && touch_t2f_pan)
-    {
-        touch_flick_vx = 0.6f * touch_flick_vx + 0.4f * touch_pan_frame_x;
-        touch_flick_vy = 0.6f * touch_flick_vy + 0.4f * touch_pan_frame_y;
-    }
-    touch_pan_frame_x = touch_pan_frame_y = 0.0f;
-    if (touch_finger_count == 0)
-    {
-        if ((fabsf(touch_flick_vx) > 0.5f) || (fabsf(touch_flick_vy) > 0.5f))
-        {
-            touch_pan_drain_x += touch_flick_vx;
-            touch_pan_drain_y += touch_flick_vy;
-            touch_flick_vx *= touch_flick_decay;
-            touch_flick_vy *= touch_flick_decay;
-        }
-        else if ((touch_flick_vx != 0.0f) || (touch_flick_vy != 0.0f))
-        {
-            touch_flick_vx = touch_flick_vy = 0.0f;
-        }
     }
 
     // All four camera axes are summed over the frame now, so none of them needs
@@ -997,8 +1000,8 @@ static void touch_apply_pan_accumulator(void)
 
     if (touch_gesture == TGest_Camera)
     {
-        const float dx = touch_pan_accum_x / touch_pan_full_speed_px;
-        const float dy = touch_pan_accum_y / touch_pan_full_speed_px;
+        const float dx = touch_pan_accum_x / TOUCH_PAN_FULL_SPEED_PX;
+        const float dy = touch_pan_accum_y / TOUCH_PAN_FULL_SPEED_PX;
         if (dx > 0.0f)
             touch_axis_pan_left = sqrtf(touch_clamp01(dx));
         else if (dx < 0.0f)
@@ -1015,73 +1018,38 @@ static void touch_apply_pan_accumulator(void)
 
 float touch_game_key_axis_value(long key_id)
 {
-    if (!touch_controls_active())
+    if (!touch_controls_active() || touch_camera_owns_view())
         return 0.0f;
     switch (key_id)
     {
-    // While the camera drains a gesture directly, the same motion must not
-    // also arrive through the axes, or it would be applied twice.
-    // Possession never drains, so a creature still walks on these.
-    case Gkey_MoveLeft:  return touch_pan_drained ? 0.0f : touch_axis_pan_left;
-    case Gkey_MoveRight: return touch_pan_drained ? 0.0f : touch_axis_pan_right;
-    case Gkey_MoveUp:    return touch_pan_drained ? 0.0f : touch_axis_pan_up;
-    case Gkey_MoveDown:  return touch_pan_drained ? 0.0f : touch_axis_pan_down;
-    case Gkey_ZoomIn:    return touch_zoom_rotate_drained ? 0.0f : touch_axis_zoom_in;
-    case Gkey_ZoomOut:   return touch_zoom_rotate_drained ? 0.0f : touch_axis_zoom_out;
-    case Gkey_RotateCW:  return touch_zoom_rotate_drained ? 0.0f : touch_axis_rotate_cw;
-    case Gkey_RotateCCW: return touch_zoom_rotate_drained ? 0.0f : touch_axis_rotate_ccw;
+    case Gkey_MoveLeft:  return touch_axis_pan_left;
+    case Gkey_MoveRight: return touch_axis_pan_right;
+    case Gkey_MoveUp:    return touch_axis_pan_up;
+    case Gkey_MoveDown:  return touch_axis_pan_down;
+    case Gkey_ZoomIn:    return touch_axis_zoom_in;
+    case Gkey_ZoomOut:   return touch_axis_zoom_out;
+    case Gkey_RotateCW:  return touch_axis_rotate_cw;
+    case Gkey_RotateCCW: return touch_axis_rotate_ccw;
     default:             return 0.0f;
     }
 }
 
-TbBool touch_drain_zoom_twist(float *zoom, float *twist)
+TbBool touch_gesture_committed(void)
 {
-    *zoom = 0.0f;
-    *twist = 0.0f;
-    if (!touch_controls_active())
-        return false;
-    const TbBool active = (touch_gesture == TGest_Camera)
-                       && (touch_t2f_zoom || touch_t2f_rotate);
-    if (!active && (touch_pinch_drain == 0.0f) && (touch_twist_drain == 0.0f))
-        return false;
-    touch_zoom_rotate_drained = true;
-    // Normalised like the pan: full-speed pixels of pinch, or radians of
-    // twist, per game turn come out as one unit.
-    *zoom = touch_pinch_drain / (TOUCH_PINCH_FULL_SPEED_PX * TOUCH_FRAMES_PER_TURN);
-    *twist = touch_twist_drain / (TOUCH_TWIST_FULL_SPEED_RAD * TOUCH_FRAMES_PER_TURN);
-    // The zoom is stepwise on the consumer side: a drained amount too small
-    // for a step must keep accumulating, or a very careful pinch would be
-    // thrown away one sliver per turn and never zoom at all. The twist is
-    // continuous, so it is always taken whole.
-    if (fabsf(*zoom) >= 0.05f) {
-        touch_pinch_drain = 0.0f;
-    } else {
-        *zoom = 0.0f;
-    }
-    touch_twist_drain = 0.0f;
-    return true;
+    return touch_controls_active() && (touch_gesture == TGest_Camera)
+        && (touch_t2f_pan || touch_t2f_zoom || touch_t2f_rotate);
 }
 
-TbBool touch_drain_pan_movement(float *dx, float *dy)
+TbBool touch_allows_edge_scroll(void)
 {
-    *dx = 0.0f;
-    *dy = 0.0f;
-    if (!touch_controls_active())
-        return false;
-    const TbBool panning = (touch_gesture == TGest_Camera) && touch_t2f_pan;
-    const TbBool flicking = (touch_flick_vx != 0.0f) || (touch_flick_vy != 0.0f);
-    if (!panning && !flicking
-     && (touch_pan_drain_x == 0.0f) && (touch_pan_drain_y == 0.0f))
-        return false;
-    touch_pan_drained = true;
-    // Normalised so that touch_pan_full_speed_px of travel per frame equals
-    // the camera speed of a held movement key. The key is read once per game
-    // turn while the fingers deliver every frame, so without the turn factor
-    // the same drag came out three times faster than the key it is calibrated
-    // against - the map raced away from the finger.
-    *dx = touch_pan_drain_x / (touch_pan_full_speed_px * TOUCH_FRAMES_PER_TURN);
-    *dy = touch_pan_drain_y / (touch_pan_full_speed_px * TOUCH_FRAMES_PER_TURN);
-    touch_pan_drain_x = touch_pan_drain_y = 0.0f;
+    // A pointer on a touch screen stays where the last finger left it, or at the corner
+    // it started in, and an edge scroll from there would run for ever. Only a finger
+    // dragging a paint to the edge means it.
+    if (touch_controls_active())
+        return (touch_gesture == TGest_Drag);
+    // Automatic mode before the first touch: only a real mouse says it is at the edge.
+    if (touch_control_mode == TCMode_Auto)
+        return (last_used_input_device == ID_Keyboard_Mouse);
     return true;
 }
 

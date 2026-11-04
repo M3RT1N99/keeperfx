@@ -303,6 +303,14 @@ static TbKeyCode mousebutton_to_keycode(const Uint8 *button)
     return (KC_MOUSE1 + 1 - *button);
 }
 
+#ifdef __ANDROID__
+/* A back press from a system gesture can go down and up between two looks at the
+   keyboard, and the game would never know it happened. Its release then waits for
+   the next poll, which gives the game exactly one look at the key being down. */
+static TbBool back_pressed_this_poll = false;
+static TbBool back_release_waiting = false;
+#endif
+
 static void process_event(const SDL_Event *ev)
 {
     struct TbPoint mouseDelta;
@@ -326,6 +334,9 @@ static void process_event(const SDL_Event *ev)
             touch_set_sticky_right_click(!touch_sticky_right_click());
             return;
         }
+        if (ev->key.key == SDLK_AC_BACK) {
+            back_pressed_this_poll = true;
+        }
 #endif
         x = keyboard_keys_mapping(&ev->key);
         if (x != KC_UNASSIGNED)
@@ -338,6 +349,10 @@ static void process_event(const SDL_Event *ev)
     case SDL_EVENT_KEY_UP:
 #ifdef __ANDROID__
         if (ev->key.key == SDLK_MENU) {
+            return;
+        }
+        if ((ev->key.key == SDLK_AC_BACK) && back_pressed_this_poll) {
+            back_release_waiting = true;
             return;
         }
 #endif
@@ -505,6 +520,7 @@ static void process_event(const SDL_Event *ev)
     case SDL_EVENT_WINDOW_FOCUS_LOST:
     {
         GetSDLWindowSystem()->OnFocusLost();
+        touch_focus_lost();
         isMouseActive = false;
         isMouseActivated = false;
         LbGrabMouseCheck(MG_OnFocusLost);
@@ -590,6 +606,11 @@ TbBool LbPollInputs(void)
 #ifdef __ANDROID__
     if (!android_event_pump_due())
         return (lbUserQuit < 1);
+    if (back_release_waiting) {
+        keyboardControl(KActn_KEYUP, KC_ESCAPE, KMod_NONE, SDLK_AC_BACK);
+        back_release_waiting = false;
+    }
+    back_pressed_this_poll = false;
 #endif
     SDL_Event ev;
     //process events until event queue is empty
@@ -598,6 +619,19 @@ TbBool LbPollInputs(void)
     }
 
     return (lbUserQuit < 1);
+}
+
+void LbPollTouchEvents(void)
+{
+#ifdef __ANDROID__
+    if (android_running_in_background())
+        return;
+#endif
+    SDL_PumpEvents();
+    SDL_Event ev;
+    while (SDL_PeepEvents(&ev, 1, SDL_GETEVENT, SDL_EVENT_FINGER_DOWN, SDL_EVENT_FINGER_CANCELED) > 0) {
+        process_event(&ev);
+    }
 }
 
 TbBool LbIsActive(void)

@@ -25,6 +25,7 @@
 #include "bflib_planar.h"
 #include "bflib_joyst.h"
 #include "bflib_touch.h"
+#include "touch_camera.h"
 #include "bflib_video.h"
 #include "bflib_keybrd.h"
 #include "bflib_mouse.h"
@@ -669,7 +670,7 @@ static TbBool cursor_entered_panning_edge(void)
 {
     static TbBool cursor_was_at_edge = false;
     TbBool cursor_at_edge = false;
-    if (get_local_view_type() == PVT_DungeonTop && IsMouseInsideWindow() && !is_feature_on(Ft_DisableCursorCameraPanning)) {
+    if (get_local_view_type() == PVT_DungeonTop && IsMouseInsideWindow() && !is_feature_on(Ft_DisableCursorCameraPanning) && touch_allows_edge_scroll()) {
         const int32_t edge_scrolling_border = max(4, scale_fixed_DK_value(4));
         const int32_t mouse_x = GetMouseX();
         const int32_t mouse_y = GetMouseY();
@@ -691,6 +692,9 @@ static TbBool observer_camera_input_pressed(void)
     }
     if ((get_game_key_axis_value(Gkey_MoveLeft, true) != 0.0f) || (get_game_key_axis_value(Gkey_MoveRight, true) != 0.0f)
      || (get_game_key_axis_value(Gkey_MoveUp, true) != 0.0f) || (get_game_key_axis_value(Gkey_MoveDown, true) != 0.0f)) {
+        return true;
+    }
+    if (touch_gesture_committed()) {
         return true;
     }
     const int32_t camera_keys[] = {
@@ -2296,7 +2300,7 @@ static void get_isometric_or_front_view_mouse_inputs(struct Packet *pckt,int rot
     {
         return; // don't pan the camera if the mouse has left the window
     }
-    if (is_feature_on(Ft_DisableCursorCameraPanning) == false) {
+    if ((is_feature_on(Ft_DisableCursorCameraPanning) == false) && touch_allows_edge_scroll()) {
         int32_t mx = my_mouse_x;
         int32_t my = my_mouse_y;
         int32_t edge_scrolling_border = max(4, scale_fixed_DK_value(4));
@@ -2367,30 +2371,6 @@ static void get_isometric_view_nonaction_inputs(struct Packet* packet)
                 set_packet_control(packet, PCtr_ViewZoomOut);
         } else
         {
-            // The pinch and the twist arrive as drained totals, the same
-            // lossless hand-over the pan uses: their per-frame axes lost two
-            // thirds of the motion between the frame rate and the turn rate,
-            // and a careful pinch never even cleared the per-frame deadzone.
-            // The twist drives the rotation directly, with the speed the
-            // fingers actually turned; the zoom is stepwise in the engine, so
-            // the drained total decides whether this turn steps. Draining
-            // silences the zoom and rotate axes, so the key checks below
-            // still serve keyboards and pads without applying anything twice.
-            float touch_zoom = 0.0f;
-            float touch_twist = 0.0f;
-            if (touch_controls_active()
-             && touch_drain_zoom_twist(&touch_zoom, &touch_twist))
-            {
-                if (touch_twist != 0.0f)
-                {
-                    local_state.camera_rotation = -touch_twist;
-                    rotating = true;
-                }
-                if (touch_zoom > 0.05f)
-                    set_packet_control(packet, PCtr_ViewZoomIn);
-                else if (touch_zoom < -0.05f)
-                    set_packet_control(packet, PCtr_ViewZoomOut);
-            }
             if (is_game_key_pressed(Gkey_RotateCW, false, false))
             {
                 if (rotate_around_mouse_option == RotateAroundMouse_RotationKeys)
@@ -2416,27 +2396,11 @@ static void get_isometric_view_nonaction_inputs(struct Packet* packet)
             if (is_game_key_pressed(Gkey_TiltReset, false, false))
                 set_packet_control(packet, PCtr_ViewTiltReset);
 
-            // Drained before get_movement_inputs() so the same travel stops
-            // reporting through the movement axes, and applied after it so
-            // the clamp in there never touches the finger's value.
-            float touch_pan_dx = 0.0f;
-            float touch_pan_dy = 0.0f;
-            TbBool touch_pan = touch_controls_active()
-                && touch_drain_pan_movement(&touch_pan_dx, &touch_pan_dy);
             get_movement_inputs(&local_state.camera_movement_x, &local_state.camera_movement_y, no_mods);
-            if (touch_pan)
-            {
-                // Added, not assigned: the camera empties these when it takes
-                // them, once per game turn, and several frames land in
-                // between - assigning would throw those frames' travel away,
-                // which is exactly what made panning feel detached before.
-                // The world follows the fingers, so the camera runs opposite.
-                local_state.camera_movement_x += -touch_pan_dx;
-                local_state.camera_movement_y += -touch_pan_dy;
-            }
         }
         if (! set_rotate_pos)
             local_state.camera_rotate_around_cursor = false;
+        touch_camera_packet_zoom(packet);
     }
 }
 
@@ -2531,6 +2495,7 @@ static void get_front_view_nonaction_inputs(struct Packet* pckt)
             set_packet_control(pckt, PCtr_ViewZoomIn);
         if (is_game_key_pressed(Gkey_ZoomOut, false, false))
             set_packet_control(pckt, PCtr_ViewZoomOut);
+        touch_camera_packet_zoom(pckt);
     }
 }
 

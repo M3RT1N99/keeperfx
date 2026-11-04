@@ -56,8 +56,7 @@ TbBool touch_parse_control_mode(const char *text, unsigned char *mode);
 /**
  * Adjusts one gesture constant at run time, by name.
  *
- * Names: panspeed, longpress, dragslop, commitpan, commitpinch, committwist,
- * flickdecay.
+ * Names: longpress, dragslop, panslop, zoomgate, rotategate, flickdecay.
  * @return true when the name was recognised.
  */
 TbBool touch_tune(const char *name, float value);
@@ -78,8 +77,20 @@ void init_touch_input(void);
 /** True when the native touch scheme should currently drive the game. */
 TbBool touch_controls_active(void);
 
-/** Per frame update - long press detection and gesture decay. Called from poll_inputs(). */
+/** Per poll update - long press detection and the game key lane. Called from poll_inputs(). */
 void update_touch_inputs(void);
+
+/** Per drawn frame update - takes in the fingers and moves the camera with them. */
+void touch_frame_update(void);
+
+/** The window lost the focus: whatever the fingers are doing, this game no longer hears of it. */
+void touch_focus_lost(void);
+
+/** True when a two finger gesture has become more than a tap: it wants the camera. */
+TbBool touch_gesture_committed(void);
+
+/** False when the pointer being at the edge of the screen does not mean to scroll. */
+TbBool touch_allows_edge_scroll(void);
 
 /**
  * Touch equivalent of the controller term in is_game_key_pressed().
@@ -91,29 +102,6 @@ int touch_game_key_pressed(long key_id, TbBool clear_pressed);
  * Touch equivalent of cbtn_axis_value(); returns 0.0 when the gesture is inactive.
  */
 float touch_game_key_axis_value(long key_id);
-
-/**
- * Hands over the finger travel collected since the last call, normalised so
- * that one unit equals the camera speed of a fully pressed movement key, and
- * including the roll-out of a flick. The isometric camera consumes this
- * directly, so the world follows the finger at the speed it actually moved;
- * while it does, the pan gesture stops reporting through the game key axes so
- * the movement is not applied twice.
- *
- * @return true while a pan gesture or its flick is live, even in a frame the
- * fingers did not move.
- */
-TbBool touch_drain_pan_movement(float *dx, float *dy);
-
-/**
- * Same hand-over for the zoom and rotate channels: net pinch and twist since
- * the last call, in key-speed units. Positive zoom means the fingers moved
- * apart, positive twist means clockwise. While a caller consumes these, the
- * zoom and rotate game key axes report zero so nothing arrives twice.
- *
- * @return true while a camera gesture has either channel unlocked.
- */
-TbBool touch_drain_zoom_twist(float *zoom, float *twist);
 
 /******************************************************************************/
 #ifdef __cplusplus

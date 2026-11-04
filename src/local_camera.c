@@ -41,6 +41,7 @@
 #include "local_possession.h"
 #include "creature_control.h"
 #include "bflib_datetm.h"
+#include "touch_camera.h"
 
 #include <math.h>
 #include "post_inc.h"
@@ -293,7 +294,6 @@ struct LocalCameraRotation {
     TbBool cw;
     TbBool ccw;
     TbBool around_cursor;
-    float speed;
 };
 
 static struct LocalCameraRotation take_local_camera_rotation(void)
@@ -302,11 +302,9 @@ static struct LocalCameraRotation take_local_camera_rotation(void)
     rotation.cw = local_state.camera_rotate_cw;
     rotation.ccw = local_state.camera_rotate_ccw;
     rotation.around_cursor = local_state.camera_rotate_around_cursor;
-    rotation.speed = local_state.camera_rotation;
     local_state.camera_rotate_cw = false;
     local_state.camera_rotate_ccw = false;
     local_state.camera_rotate_around_cursor = false;
-    local_state.camera_rotation = 0.0f;
     return rotation;
 }
 
@@ -343,14 +341,6 @@ static void process_local_camera_rotation(struct Camera *cam, TbBool has_pivot, 
             cam->rotation_angle_x = (cam->rotation_angle_x - DEGREES_90) & ANGLE_MASK;
         else
             view_set_camera_rotation_velocity_around(cam, -16, -64, rot_x, rot_y);
-    }
-    // A twist turns around the pointer whatever the rotate-around-mouse option
-    // says: that option is about keys, and the pointer sits under the first finger.
-    const int32_t speed_delta = (int32_t)(rotation->speed * 16.0f);
-    if (speed_delta != 0)
-    {
-        view_set_camera_rotation_velocity_around(cam, speed_delta, (int32_t)(rotation->speed * 64.0f),
-            has_pivot ? pivot_x : -1, has_pivot ? pivot_y : -1);
     }
 }
 
@@ -451,6 +441,7 @@ void update_local_cameras(void)
     const TbBool following_player = observer_is_active() && !is_observer_camera_active();
     const TbBool move_camera = camera_step_due || following_player;
     const struct LocalCameraRotation rotation = take_local_camera_rotation();
+    const uint32_t touch_zoom_flags = touch_camera_take_zoom_flags();
     local_state.camera.previous_deviation_x = local_state.camera.destination_deviation_x;
     local_state.camera.previous_deviation_y = local_state.camera.destination_deviation_y;
     local_state.camera.destination_deviation_x = 0;
@@ -533,7 +524,9 @@ void update_local_cameras(void)
                 process_local_camera_movement(cam);
                 process_local_camera_rotation(cam, local_state.camera.has_rotation_pivot,
                     local_state.camera.rotation_pivot_x, local_state.camera.rotation_pivot_y, &rotation);
-                process_camera_view_controls(cam, pckt, get_local_user_state());
+                struct Packet controls = *pckt;
+                controls.control_flags &= ~touch_zoom_flags;
+                process_camera_view_controls(cam, &controls, get_local_user_state());
             } else {
                 process_local_camera_controls(cam, pckt);
             }

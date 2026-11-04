@@ -15,6 +15,7 @@
 #include "keeperfx.hpp"
 
 #include "bflib_math.h"
+#include "bflib_touch.h"
 #include "bflib_keybrd.h"
 #include "bflib_sound.h"
 #include "thing_list.h"
@@ -498,6 +499,7 @@ void gameplay_loop_draw()
         do_draw = false;
     }
     if ( do_draw ) {
+        touch_frame_update();
         // Frame rate limiter
         if (fps_limit_current > 0) {
             process_frame_time = min(1.L, process_frame_time - 1.L);

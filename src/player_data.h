@@ -329,12 +329,6 @@ extern struct LocalState {
     // FIXME: use fixed-point precision instead
     float camera_movement_x;
     float camera_movement_y;
-    /* How hard the view is being rotated this turn, where 1.0 is a held key.
-       The rotate flags below are on or off, which is right for a key, but a
-       twisted pair of fingers has a speed, and a fixed step is what makes the
-       camera feel like it is stepping rather than following. Stays zero
-       without touch. */
-    float camera_rotation;
     TbBool camera_speedup_pressed;
     TbBool camera_rotate_cw;
     TbBool camera_rotate_ccw;

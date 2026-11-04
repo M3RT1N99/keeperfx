@@ -52,6 +52,8 @@ extern unsigned char last_used_input_device;
 
 /******************************************************************************/
 TbBool LbPollInputs(void);
+/** Takes in finger events only, for the frames between two polls of everything else. */
+void LbPollTouchEvents(void);
 TbBool LbIsActive(void);
 TbBool LbIsMouseActive(void);
 TbBool LbIsTextInputActive(void);

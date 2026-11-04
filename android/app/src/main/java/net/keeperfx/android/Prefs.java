@@ -192,13 +192,12 @@ public final class Prefs {
      * defaults and ranges must match, or the engine warns and ignores a value.
      */
     public static final TouchTunable[] TOUCH_TUNABLES = {
-        new TouchTunable("panspeed",      7.0f,   1.0f,   60.0f,  1.0f),
         new TouchTunable("longpress",   420.0f, 120.0f, 2000.0f, 10.0f),
         new TouchTunable("dragslop",     12.0f,   2.0f,   80.0f,  1.0f),
-        new TouchTunable("commitpan",    20.0f,   4.0f,  200.0f,  1.0f),
-        new TouchTunable("commitpinch",  34.0f,   4.0f,  200.0f,  1.0f),
-        new TouchTunable("committwist",  0.30f,  0.02f,   2.0f, 0.01f),
-        new TouchTunable("flickdecay",   0.90f,   0.0f,  0.99f, 0.01f),
+        new TouchTunable("panslop",       1.4f,   0.2f,   10.0f,  0.1f),
+        new TouchTunable("zoomgate",      2.0f,   0.2f,   20.0f,  0.1f),
+        new TouchTunable("rotategate",   0.10f,  0.02f,    1.0f, 0.01f),
+        new TouchTunable("flickdecay",   0.93f,   0.0f,  0.99f, 0.01f),
     };
 
     public float getTouchTune(TouchTunable tunable) {

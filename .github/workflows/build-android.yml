@@ -67,6 +67,11 @@ jobs:
       working-directory: android
       run: gradle --no-daemon testReleaseUnitTest
 
+    - name: Run the touch gesture tests
+      run: |
+        bash tests/touch/build.sh /tmp/kfx_touch_tests
+        /tmp/kfx_touch_tests
+
     - name: Build APK
       working-directory: android
       run: |
