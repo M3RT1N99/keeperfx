@@ -75,6 +75,12 @@ public final class UpdateManager {
         return false;
     }
 
+    static List<Item> without(List<Item> items, Kind kind) {
+        final List<Item> rest = new ArrayList<>(items);
+        rest.removeIf(item -> item.kind == kind);
+        return rest;
+    }
+
     /**
      * The list as a dialog shows it.
      *

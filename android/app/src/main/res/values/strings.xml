@@ -86,6 +86,7 @@
     <string name="updates_permission">To install its own update, KeeperFX needs permission to install apps. Grant it once in the settings screen that follows, then start the update again.</string>
     <string name="updates_permission_open">Open settings</string>
 
+    <string name="updates_permission_rest_running">The other downloads are running. The app update was left out: to install its own update, KeeperFX needs permission to install apps. Grant it once in the settings screen that follows, then start the update again.</string>
     <string name="button_update_app">Update app · %1$s</string>
     <string name="app_update_title">App update</string>
     <string name="app_update_available">Version %1$s is available.

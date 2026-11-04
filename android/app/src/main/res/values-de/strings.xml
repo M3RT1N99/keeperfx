@@ -51,6 +51,12 @@
     <string name="updates_use_wifi">Am besten im WLAN. Der Download läuft weiter, wenn du die App verlässt.</string>
     <string name="notification_install_update">Update geladen. Zum Installieren tippen.</string>
     <string name="updates_running">Es läuft bereits ein Download.</string>
+
+    <string name="updates_permission_title">Berechtigung nötig</string>
+    <string name="updates_permission">Um sich selbst zu aktualisieren, braucht KeeperFX die Berechtigung, Apps zu installieren. Erteile sie einmal in den folgenden Einstellungen und starte das Update dann noch einmal.</string>
+    <string name="updates_permission_rest_running">Die anderen Downloads laufen. Das App-Update wurde ausgelassen: Um sich selbst zu aktualisieren, braucht KeeperFX die Berechtigung, Apps zu installieren. Erteile sie einmal in den folgenden Einstellungen und starte das Update dann noch einmal.</string>
+    <string name="updates_permission_open">Einstellungen öffnen</string>
+
     <string name="notification_channel_network_game">Netzwerkspiel</string>
     <string name="notification_network_game">Netzwerkspiel läuft. Tippen, um zurückzukehren, die anderen warten.</string>
 

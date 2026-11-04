@@ -428,26 +428,35 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     }
 
     /**
-     * Hands the whole list to the foreground service. It keeps running when the
-     * launcher is closed, which a 360 MB transfer needs, and reports back
-     * through onDownloadState().
+     * Hands the list to the foreground service. It keeps running when the launcher
+     * is closed, which a 360 MB transfer needs, and reports back through
+     * onDownloadState().
+     *
+     * An app update the system would not install stays behind, and only that: the
+     * game data must not depend on a player granting a permission for something else.
+     * The next tap on the app update asks again.
      */
     private void runUpdates(List<UpdateManager.Item> items) {
-        if (UpdateManager.contains(items, UpdateManager.Kind.APP)
-                && !AppUpdater.canInstallPackages(this)) {
+        final boolean appLeftOut = UpdateManager.contains(items, UpdateManager.Kind.APP)
+            && !AppUpdater.canInstallPackages(this);
+        final List<UpdateManager.Item> runnable =
+            appLeftOut ? UpdateManager.without(items, UpdateManager.Kind.APP) : items;
+        if (!runnable.isEmpty()) {
+            requestNotificationPermission();
+            setBusy(true);
+            DownloadService.start(this, runnable);
+        }
+        if (appLeftOut) {
             new AlertDialog.Builder(this)
                 .setTitle(R.string.updates_permission_title)
-                .setMessage(R.string.updates_permission)
+                .setMessage(runnable.isEmpty()
+                    ? R.string.updates_permission : R.string.updates_permission_rest_running)
                 .setPositiveButton(R.string.updates_permission_open, (d, w) -> startActivity(
                     new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                         Uri.parse("package:" + getPackageName()))))
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
-            return;
         }
-        requestNotificationPermission();
-        setBusy(true);
-        DownloadService.start(this, items);
     }
 
     /**

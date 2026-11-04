@@ -437,4 +437,18 @@ public class UpdatePlanTest {
         assertEquals(UpdateManager.Kind.APP, items.get(0).kind);
         assertEquals(release, items.get(0).appUpdate);
     }
+
+    /** No permission to install the app: what is left runs, in the order it was planned. */
+    @Test
+    public void leavingTheAppOutKeepsTheRestInOrder() {
+        facts.alphaVersion = "";
+        facts.hasMusic = false;
+        facts.appUpdate = new AppRelease("1.60", "https://example.test/app.apk", 1,
+            Collections.<String>emptyList());
+        final List<UpdateManager.Item> rest =
+            UpdateManager.without(UpdateManager.plan(facts), UpdateManager.Kind.APP);
+        assertEquals(2, rest.size());
+        assertEquals(UpdateManager.Kind.GAME_ALPHA, rest.get(0).kind);
+        assertEquals(UpdateManager.Kind.MUSIC, rest.get(1).kind);
+    }
 }
