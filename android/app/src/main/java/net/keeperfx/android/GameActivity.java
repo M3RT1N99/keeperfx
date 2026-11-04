@@ -57,12 +57,19 @@ public class GameActivity extends SDLActivity {
     /** Present but not competing with the game for attention. */
     private static final float IDLE_ALPHA = 0.55f;
 
+    /** Whether the engine may be alive, paused behind the launcher, with its files open. */
+    private static volatile boolean open = false;
+
     private String[] arguments = new String[0];
     private boolean rightClickActive = false;
     private WifiManager.MulticastLock multicastLock;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Android can bring this back from the recent apps without the launcher ever
+        // starting, and that must not play on a swap a dead process left half done.
+        PhoneTransfer.finishInterruptedImport(this);
+        open = true;
         String[] extra = null;
         if (getIntent() != null) {
             extra = getIntent().getStringArrayExtra(EXTRA_ARGUMENTS);
@@ -88,6 +95,16 @@ public class GameActivity extends SDLActivity {
             addBackButton();
             addRightClickToggle();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        open = false;
+        super.onDestroy();
+    }
+
+    static boolean isOpen() {
+        return open;
     }
 
     /**

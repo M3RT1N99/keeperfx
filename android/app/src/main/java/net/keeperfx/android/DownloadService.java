@@ -35,6 +35,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.graphics.drawable.Icon;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -42,6 +43,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 
+import java.io.File;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -68,25 +70,36 @@ public class DownloadService extends Service {
         public final String detail;
         /** Set when a job failed, until an observer has shown it; null otherwise. */
         public final String error;
+        /** What a dialog about the failure is called. */
+        public final int errorTitle;
 
-        State(boolean running, String stage, int percent, String detail, String error) {
+        State(boolean running, String stage, int percent, String detail, String error,
+                int errorTitle) {
             this.running = running;
             this.stage = stage;
             this.percent = percent;
             this.detail = detail;
             this.error = error;
+            this.errorTitle = errorTitle;
         }
     }
 
     public interface Observer {
         void onDownloadState(State state);
+
+        /** A packed file is ready, and whoever hears this is on screen to open the share sheet. */
+        void onExportReady(File file);
     }
 
     private static final CopyOnWriteArrayList<Observer> observers = new CopyOnWriteArrayList<>();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private static final State IDLE = new State(false, "", -1, "", null);
+    private static final State IDLE = new State(false, "", -1, "", null, R.string.install_failed);
     private static volatile State currentState = IDLE;
     private static volatile boolean cancelRequested = false;
+    /** Counts the imports that replaced the settings under the launcher's views. */
+    private static volatile int settingsGeneration = 0;
+    /** The file the last import read, until the launcher has offered to delete it. */
+    private static volatile PhoneTransfer.ReceivedFile receivedFile = null;
 
     public static void addObserver(Observer observer) {
         observers.add(observer);
@@ -99,6 +112,26 @@ public class DownloadService extends Service {
 
     public static boolean isRunning() {
         return currentState.running;
+    }
+
+    static int settingsGeneration() {
+        return settingsGeneration;
+    }
+
+    static PhoneTransfer.ReceivedFile takeReceivedFile() {
+        final PhoneTransfer.ReceivedFile file = receivedFile;
+        receivedFile = null;
+        return file;
+    }
+
+    /** For the launcher's own cancel button; the notification may not be allowed to show. */
+    static void requestCancel() {
+        cancelRequested = true;
+    }
+
+    /** What is left of a finished job, when it points at something that is about to go. */
+    static void cancelFinishedNotification(Context context) {
+        context.getSystemService(NotificationManager.class).cancel(NOTIFICATION_ID);
     }
 
     /**
@@ -136,19 +169,39 @@ public class DownloadService extends Service {
         start(context, new int[] {UpdateManager.Kind.ALPHA_REVERT.ordinal()});
     }
 
+    static void startBundleExport(Context context) {
+        start(context, new int[] {UpdateManager.Kind.BUNDLE_EXPORT.ordinal()});
+    }
+
+    /**
+     * @param file the picked file. The read grant goes along with the intent, because
+     *        the one the launcher holds ends with the activity and this job may not.
+     */
+    static void startBundleImport(Context context, Uri file) {
+        start(context, new int[] {UpdateManager.Kind.BUNDLE_IMPORT.ordinal()},
+            new Intent().setData(file).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
+    }
+
     private static void start(Context context, int[] kinds) {
+        start(context, kinds, new Intent());
+    }
+
+    private static void start(Context context, int[] kinds, Intent intent) {
         // Running from this moment on, not from the first progress report: until
         // then the launcher would still let the player press Play, or start the
         // same thing again.
-        publish(new State(true, context.getString(R.string.notification_preparing), -1, "", null));
+        publish(new State(true, context.getString(R.string.notification_preparing), -1, "", null,
+            R.string.install_failed));
         try {
-            context.startForegroundService(new Intent(context, DownloadService.class)
+            context.startForegroundService(intent
+                .setClass(context, DownloadService.class)
                 .setAction(ACTION_START)
                 .putExtra(EXTRA_KINDS, kinds));
         } catch (IllegalStateException e) {
             // Android refuses when the app is not on screen any more.
             Log.w(TAG, "Cannot start the download service", e);
-            publish(new State(false, "", -1, "", "Cannot start: " + e.getMessage()));
+            publish(new State(false, "", -1, "", "Cannot start: " + e.getMessage(),
+                R.string.install_failed));
         }
     }
 
@@ -157,6 +210,9 @@ public class DownloadService extends Service {
     private Thread worker;
     /** Only touched by the worker, and by the main thread once the worker is done. */
     private volatile Intent installIntent;
+    /** The same goes for these two. */
+    private volatile File exportedFile;
+    private volatile int doneMessage;
     private long lastNotified;
     private String lastStage = "";
 
@@ -195,30 +251,49 @@ public class DownloadService extends Service {
         // startForegroundService() and did not get here.
         startForegroundWith(getString(R.string.notification_preparing), -1);
         final int[] kinds = intent.getIntArrayExtra(EXTRA_KINDS);
+        final Uri file = intent.getData();
         cancelRequested = false;
         installIntent = null;
+        exportedFile = null;
+        doneMessage = R.string.notification_done;
 
-        worker = new Thread(() -> runJobs(kinds), "kfx-download-service");
+        worker = new Thread(() -> runJobs(kinds, file), "kfx-download-service");
         worker.start();
         return START_NOT_STICKY;
     }
 
-    private void runJobs(int[] kinds) {
+    private void runJobs(int[] kinds, Uri file) {
         String failure = null;
+        int failureTitle = R.string.install_failed;
         for (int ordinal : kinds) {
             if (cancelRequested) {
                 failure = getString(R.string.notification_cancelled);
                 break;
             }
-            failure = runJob(UpdateManager.Kind.values()[ordinal]);
+            final UpdateManager.Kind kind = UpdateManager.Kind.values()[ordinal];
+            if (kind == UpdateManager.Kind.BUNDLE_EXPORT) {
+                failureTitle = R.string.send_title;
+            } else if (kind == UpdateManager.Kind.BUNDLE_IMPORT) {
+                failureTitle = R.string.receive_title;
+            }
+            failure = runJob(kind, file);
             if (failure != null) {
                 break;
             }
         }
 
         final String finalFailure = failure;
-        publish(new State(false, "", -1, "", finalFailure));
+        final File exported = (failure == null) ? exportedFile : null;
+        publish(new State(false, "", -1, "", finalFailure, failureTitle));
         mainHandler.post(() -> {
+            if (exported != null) {
+                // Only for whoever is on screen now. Anyone coming back later has the
+                // launcher's panel and the notification, and no use for a share sheet
+                // that opens out of nowhere.
+                for (Observer observer : observers) {
+                    observer.onExportReady(exported);
+                }
+            }
             showFinishedNotification(finalFailure);
             worker = null;
             stopForeground(STOP_FOREGROUND_DETACH);
@@ -227,7 +302,7 @@ public class DownloadService extends Service {
     }
 
     /** @return null on success, otherwise the failure message. */
-    private String runJob(UpdateManager.Kind kind) {
+    private String runJob(UpdateManager.Kind kind, Uri file) {
         final String[] failure = new String[1];
 
         switch (kind) {
@@ -287,12 +362,62 @@ public class DownloadService extends Service {
                 }
                 break;
             }
+            case BUNDLE_EXPORT:
+                return runBundleExport();
+            case BUNDLE_IMPORT:
+                return runBundleImport(file);
         }
         return failure[0];
     }
 
+    private String runBundleExport() {
+        try {
+            exportedFile = PhoneTransfer.runExport(this, transferProgress("Packing"));
+            return null;
+        } catch (TransferBundle.CancelledException e) {
+            return "Packing cancelled.";
+        } catch (TransferBundle.RefusedException | FileUtil.NoRoomException e) {
+            return e.getMessage();
+        } catch (Exception e) {
+            Log.e(TAG, "Could not pack the installation", e);
+            return "Packing failed: " + e.getMessage();
+        }
+    }
+
+    private String runBundleImport(Uri file) {
+        try {
+            PhoneTransfer.runImport(this, file, transferProgress("Unpacking the received file"));
+            receivedFile = PhoneTransfer.describeReceived(this, file);
+            settingsGeneration++;
+            doneMessage = R.string.receive_done_notification;
+            return null;
+        } catch (TransferBundle.CancelledException e) {
+            return "Import cancelled. Nothing was changed.";
+        } catch (TransferBundle.RefusedException | FileUtil.NoRoomException e) {
+            return e.getMessage();
+        } catch (Exception e) {
+            Log.e(TAG, "Could not import the received file", e);
+            return "Import failed: " + e.getMessage();
+        }
+    }
+
+    private TransferBundle.Progress transferProgress(String stage) {
+        return new TransferBundle.Progress() {
+            @Override
+            public void onBytes(long done, long total) {
+                report(stage, (total > 0) ? (int) (done * 100 / total) : -1,
+                    GameData.describeBytes(done) + " of " + GameData.describeBytes(total));
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return cancelRequested;
+            }
+        };
+    }
+
     private void report(String stage, int percent, String detail) {
-        publish(new State(true, stage, percent, detail, null));
+        publish(new State(true, stage, percent, detail, null, R.string.install_failed));
         // A notification per 256 KB, or per percent on a fast line, is more than
         // Android accepts: it starts dropping them, and then also the last one that
         // says how it all ended. Seen leaving "Downloading the music" up for good.
@@ -374,8 +499,24 @@ public class DownloadService extends Service {
                 .build());
             return;
         }
+        final File exported = (failure == null) ? exportedFile : null;
+        if (exported != null) {
+            // The same goes for a share sheet, and the packing can easily outlast the
+            // player's patience with looking at the launcher.
+            manager.notify(NOTIFICATION_ID, new Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText(getString(R.string.send_ready_notification))
+                .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+                .setContentIntent(PendingIntent.getActivity(this, 2,
+                    PhoneTransfer.shareSheet(this, exported)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT))
+                .setAutoCancel(true)
+                .build());
+            return;
+        }
         final String text = (failure == null)
-            ? getString(R.string.notification_done)
+            ? getString(doneMessage)
             : failure;
         manager.notify(NOTIFICATION_ID, buildNotification(text, -1, false));
     }

@@ -23,8 +23,11 @@ import android.content.SharedPreferences;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 
 public final class Prefs {
 
@@ -49,7 +52,11 @@ public final class Prefs {
     private final SharedPreferences prefs;
 
     public Prefs(Context context) {
-        this.prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE);
+        this(context.getSharedPreferences(FILE, Context.MODE_PRIVATE));
+    }
+
+    Prefs(SharedPreferences prefs) {
+        this.prefs = prefs;
     }
 
     public int getInputMode() {
@@ -250,6 +257,127 @@ public final class Prefs {
 
     public void setExtraArguments(String value) {
         prefs.edit().putString(KEY_EXTRA_ARGS, value == null ? "" : value.trim()).apply();
+    }
+
+    // ------------------------------------------- moving to another phone
+
+    /**
+     * What may come along from another phone. A received file may not be from the
+     * player's own, so this keeps what it knows, in the form it knows it in, and
+     * drops the rest. The extra arguments stay out above all: they would hand
+     * someone else's file the engine's command line.
+     */
+    static Map<String, String> acceptTransferred(Map<String, String> offered) {
+        final Map<String, String> accepted = new TreeMap<>();
+        for (Map.Entry<String, String> entry : offered.entrySet()) {
+            if (isAcceptable(entry.getKey(), entry.getValue())) {
+                accepted.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return accepted;
+    }
+
+    private static boolean isAcceptable(String key, String value) {
+        switch (key) {
+            case KEY_INPUT_MODE:
+                return isIntBetween(value, INPUT_AUTO, INPUT_POINTER);
+            case KEY_DRAW_FPS:
+                return isIntBetween(value, 0, 1000);
+            case KEY_BACK_BUTTON:
+            case KEY_NO_INTRO:
+            case KEY_NO_SOUND:
+            case KEY_USE_ALPHA:
+                return "true".equals(value) || "false".equals(value);
+            case KEY_LANGUAGE:
+                return GameLanguage.codeAt(GameLanguage.indexOf(value)).equals(value);
+            default:
+                final TouchTunable tunable = tunableOf(key);
+                return tunable != null && isFloatBetween(value, tunable.min, tunable.max);
+        }
+    }
+
+    private static TouchTunable tunableOf(String key) {
+        for (TouchTunable tunable : TOUCH_TUNABLES) {
+            if (key.equals("tune_" + tunable.key)) {
+                return tunable;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isIntBetween(String value, int min, int max) {
+        try {
+            final int parsed = Integer.parseInt(value);
+            return parsed >= min && parsed <= max;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private static boolean isFloatBetween(String value, float min, float max) {
+        try {
+            final float parsed = Float.parseFloat(value);
+            return parsed >= min && parsed <= max;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /** The player's settings as they go into a file for another phone. */
+    Map<String, String> transferableSettings() {
+        final Map<String, String> all = new TreeMap<>();
+        for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+            all.put(entry.getKey(), String.valueOf(entry.getValue()));
+        }
+        return acceptTransferred(all);
+    }
+
+    /**
+     * Replaces the settings that travel and the versions the swap just put in place.
+     * In one write that is on disk when this returns, since the next process has to
+     * find the versions matching the files. What the other phone left at its default
+     * goes back to the default here too. Whatever does not travel stays this phone's.
+     *
+     * @param accepted what acceptTransferred() let through
+     * @return false when it could not be written
+     */
+    boolean replaceWithTransferred(Map<String, String> accepted, String release, String alpha) {
+        final SharedPreferences.Editor editor = prefs.edit();
+        for (String key : prefs.getAll().keySet()) {
+            if (isTransferKey(key)) {
+                editor.remove(key);
+            }
+        }
+        for (Map.Entry<String, String> entry : accepted.entrySet()) {
+            final String key = entry.getKey();
+            final String value = entry.getValue();
+            switch (key) {
+                case KEY_INPUT_MODE:
+                case KEY_DRAW_FPS:
+                    editor.putInt(key, Integer.parseInt(value));
+                    break;
+                case KEY_BACK_BUTTON:
+                case KEY_NO_INTRO:
+                case KEY_NO_SOUND:
+                case KEY_USE_ALPHA:
+                    editor.putBoolean(key, Boolean.parseBoolean(value));
+                    break;
+                case KEY_LANGUAGE:
+                    editor.putString(key, value);
+                    break;
+                default:
+                    editor.putFloat(key, Float.parseFloat(value));
+                    break;
+            }
+        }
+        editor.putString(KEY_INSTALLED_VERSION, release);
+        editor.putString(KEY_INSTALLED_ALPHA, alpha);
+        return editor.commit();
+    }
+
+    private static boolean isTransferKey(String key) {
+        return Arrays.asList(KEY_INPUT_MODE, KEY_DRAW_FPS, KEY_BACK_BUTTON, KEY_NO_INTRO,
+            KEY_NO_SOUND, KEY_USE_ALPHA, KEY_LANGUAGE).contains(key) || tunableOf(key) != null;
     }
 
     private static String inputModeArgument(int mode) {

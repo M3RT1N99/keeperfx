@@ -112,6 +112,17 @@
                     android:layout_marginTop="8dp"
                     android:max="100"
                     android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/cancelJob"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/btn_slate"
+                    android:text="@android:string/cancel"
+                    android:textColor="@color/btn_text"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <!-- Getting the data in place -->
@@ -142,6 +153,86 @@
                 android:text="@string/button_import_original"
                 android:textColor="@color/btn_text"
                 android:textSize="15sp" />
+
+            <!-- Moving the whole installation between two phones -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/sendToPhone"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_slate"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="@string/button_send_phone"
+                    android:textColor="@color/btn_text"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/receiveFromPhone"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/btn_slate"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:text="@string/button_receive_phone"
+                    android:textColor="@color/btn_text"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- A packed file takes up a lot of room, so it does not get to hide. -->
+            <LinearLayout
+                android:id="@+id/exportPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/panel"
+                android:orientation="vertical"
+                android:padding="10dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/exportStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/kfx_text"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/exportShare"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/btn_slate"
+                        android:text="@string/button_share_again"
+                        android:textColor="@color/btn_text"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/exportDelete"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/btn_danger"
+                        android:text="@string/button_delete_export"
+                        android:textColor="@color/btn_danger_text"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
 
             <!-- Settings -->
             <TextView

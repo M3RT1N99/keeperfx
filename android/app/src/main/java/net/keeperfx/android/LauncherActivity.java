@@ -29,6 +29,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -44,6 +45,7 @@ import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,6 +54,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private static final int REQUEST_PICK_KEEPERFX = 1001;
     private static final int REQUEST_PICK_ORIGINAL_DK = 1002;
     private static final int REQUEST_PICK_ORIGINAL_DK_ZIP = 1003;
+    private static final int REQUEST_PICK_BUNDLE = 1004;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -67,6 +70,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private Button playButton;
     private Button removeDataButton;
     private Button updateAppButton;
+    private Button sendButton;
+    private Button receiveButton;
+    private Button cancelJobButton;
+    private View exportPanel;
+    private TextView exportStatus;
+    private Button exportShareButton;
+    private Button exportDeleteButton;
     private RadioGroup inputModeGroup;
     private CheckBox useAlphaBox;
     private Spinner languageSpinner;
@@ -79,11 +89,16 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private DataImporter runningImport;
     private boolean busy = false;
     private boolean downloadWasRunning = false;
+    private int loadedSettingsGeneration;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_launcher);
+
+        // Before anything below looks at the installation or reads a setting.
+        PhoneTransfer.cleanUpAtStart(this);
+        loadedSettingsGeneration = DownloadService.settingsGeneration();
 
         prefs = new Prefs(this);
 
@@ -99,6 +114,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         updateAppButton = findViewById(R.id.updateApp);
         updateAppButton.setText(getString(R.string.button_update_app,
             AppUpdater.installedVersionName(this)));
+        sendButton = findViewById(R.id.sendToPhone);
+        receiveButton = findViewById(R.id.receiveFromPhone);
+        cancelJobButton = findViewById(R.id.cancelJob);
+        exportPanel = findViewById(R.id.exportPanel);
+        exportStatus = findViewById(R.id.exportStatus);
+        exportShareButton = findViewById(R.id.exportShare);
+        exportDeleteButton = findViewById(R.id.exportDelete);
         inputModeGroup = findViewById(R.id.inputMode);
         useAlphaBox = findViewById(R.id.useAlpha);
         languageSpinner = findViewById(R.id.language);
@@ -183,6 +205,20 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         importKeeperfxButton.setOnClickListener(v -> pickFolder(REQUEST_PICK_KEEPERFX,
             R.string.import_keeperfx_title, R.string.import_keeperfx_explanation));
         importOriginalButton.setOnClickListener(v -> askOriginalDkSource());
+        sendButton.setOnClickListener(v -> confirmSend());
+        receiveButton.setOnClickListener(v -> askForReceivedFile());
+        cancelJobButton.setOnClickListener(v -> DownloadService.requestCancel());
+        exportShareButton.setOnClickListener(v -> {
+            final File export = TransferBundle.finishedExport(PhoneTransfer.exportDirectory(this));
+            if (export != null) {
+                startActivity(PhoneTransfer.shareSheet(this, export));
+            }
+            refreshExportPanel();
+        });
+        exportDeleteButton.setOnClickListener(v -> {
+            PhoneTransfer.deleteExport(this);
+            refreshExportPanel();
+        });
         playButton.setOnClickListener(v -> startGame());
         removeDataButton.setOnClickListener(v -> confirmRemoveData());
         updateAppButton.setOnClickListener(v -> checkAppUpdate());
@@ -190,6 +226,16 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             v -> startActivity(new Intent(this, LogActivity.class)));
         findViewById(R.id.touchTuning).setOnClickListener(
             v -> startActivity(new Intent(this, TouchTuningActivity.class)));
+    }
+
+    /**
+     * Every view here is loaded from the settings in onCreate(). Their saved state can
+     * only be older than that, and restoring it fires their listeners, which would
+     * write it back over what an import just put in place, as far as taking the alpha
+     * patch off again.
+     */
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
     }
 
     @Override
@@ -273,8 +319,22 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         }
         detailView.setText(sb.toString().trim());
         refreshLanguageNote();
+        refreshExportPanel();
 
         setBusy(busy);
+    }
+
+    /**
+     * Many hundreds of megabytes of the player's storage are in that file, and it has
+     * to stay until the other side has read it, which nothing here can see happen.
+     */
+    private void refreshExportPanel() {
+        final File export = TransferBundle.finishedExport(PhoneTransfer.exportDirectory(this));
+        exportPanel.setVisibility(export != null ? View.VISIBLE : View.GONE);
+        if (export != null) {
+            exportStatus.setText(getString(R.string.send_waiting, export.getName(),
+                GameData.describeBytes(export.length())));
+        }
     }
 
     private void refreshLanguageNote() {
@@ -387,12 +447,20 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     @Override
     public void onDownloadState(DownloadService.State state) {
+        if (!state.running && loadedSettingsGeneration != DownloadService.settingsGeneration()) {
+            // An import just replaced the settings every view below was loaded from.
+            recreate();
+            return;
+        }
         // The service's idle state must not unlock the buttons while a folder
         // import is still copying - the observer fires with the current state
         // the moment it attaches, which is also every onResume().
         setBusy(state.running || runningImport != null);
+        cancelJobButton.setVisibility(state.running ? View.VISIBLE : View.GONE);
         if (state.running) {
             downloadWasRunning = true;
+            // The file it describes may be the one on its way out right now.
+            exportPanel.setVisibility(View.GONE);
             keeperfxStatus.setText(state.stage);
             detailView.setText(state.detail);
             if (state.percent >= 0) {
@@ -406,7 +474,11 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         refreshStatus();
         if (state.error != null) {
             DownloadService.errorShown();
-            showMessage(R.string.install_failed, state.error);
+            showMessage(state.errorTitle, state.error);
+        }
+        final PhoneTransfer.ReceivedFile received = DownloadService.takeReceivedFile();
+        if (received != null) {
+            offerToDeleteReceivedFile(received);
         }
         // One finished download can open the way to the next: the alpha patch and
         // the music are only offered once the release is in place, and on a fresh
@@ -415,6 +487,138 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             downloadWasRunning = false;
             checkForUpdateInBackground();
         }
+    }
+
+    @Override
+    public void onExportReady(File file) {
+        startActivity(PhoneTransfer.shareSheet(this, file));
+    }
+
+    // ------------------------------------------------------ to another phone
+
+    private void confirmSend() {
+        if (DownloadService.isRunning()) {
+            Toast.makeText(this, R.string.updates_running, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        setBusy(true);
+        progressBar.setIndeterminate(true);
+        new Thread(() -> {
+            final PhoneTransfer.SendOffer offer = PhoneTransfer.checkExport(this);
+            postIfAlive(() -> {
+                setBusy(false);
+                refreshStatus();
+                showSendDialog(offer);
+            });
+        }, "kfx-send-check").start();
+    }
+
+    private void showSendDialog(PhoneTransfer.SendOffer offer) {
+        if (offer.refusal != null) {
+            showMessage(R.string.send_title, offer.refusal);
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.send_title)
+            .setMessage(getString(R.string.send_offer,
+                offer.version,
+                offer.music ? getString(R.string.send_offer_music) : "",
+                offer.saves,
+                GameData.describeBytes(offer.bytes),
+                offer.files,
+                GameData.describeBytes(offer.needed),
+                GameData.describeBytes(offer.free)))
+            .setPositiveButton(R.string.send_confirm, (dialog, which) -> {
+                requestNotificationPermission();
+                setBusy(true);
+                DownloadService.startBundleExport(this);
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+
+    // ---------------------------------------------------- from another phone
+
+    private void askForReceivedFile() {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.receive_title)
+            .setMessage(R.string.receive_explanation)
+            .setPositiveButton(R.string.receive_choose, (dialog, which) -> {
+                final Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                // As with the original game's zip: the reader decides, not the label.
+                intent.setType("*/*");
+                intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, PhoneTransfer.downloadsUri());
+                startActivityForResult(intent, REQUEST_PICK_BUNDLE);
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+
+    private void inspectReceivedFile(Uri file) {
+        setBusy(true);
+        progressBar.setIndeterminate(true);
+        new Thread(() -> {
+            final PhoneTransfer.ReceiveOffer offer = PhoneTransfer.inspect(this, file);
+            postIfAlive(() -> {
+                setBusy(false);
+                refreshStatus();
+                showReceiveDialog(file, offer);
+            });
+        }, "kfx-receive-check").start();
+    }
+
+    private void showReceiveDialog(Uri file, PhoneTransfer.ReceiveOffer offer) {
+        if (offer.refusal != null) {
+            showMessage(R.string.receive_title, offer.refusal);
+            return;
+        }
+        final TransferBundle.Marker marker = offer.marker;
+        final StringBuilder body = new StringBuilder(getString(R.string.receive_offer,
+            GameData.describeVersion(marker.release, marker.alpha),
+            marker.saves,
+            GameData.describeBytes(marker.bytes)));
+        final int savesHere = offer.savesHere;
+        body.append("\n\n").append(!offer.installedHere
+            ? getString(R.string.receive_nothing_here)
+            : savesHere > 0
+                ? getString(R.string.receive_replaces, savesHere)
+                : getString(R.string.receive_replaces_no_saves));
+        body.append("\n\n").append(getString(R.string.receive_room,
+            GameData.describeBytes(marker.bytes), GameData.describeBytes(offer.free)));
+        body.append("\n\n").append(getString(R.string.receive_trust));
+        final String thisApp = AppUpdater.installedVersionName(this);
+        if (!marker.app.equals(thisApp) || marker.engine != BuildConfig.ENGINE_BUILD) {
+            body.append("\n\n").append(getString(R.string.receive_other_build,
+                marker.app, marker.engine, thisApp, BuildConfig.ENGINE_BUILD));
+        }
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.receive_title)
+            .setMessage(body.toString())
+            .setPositiveButton(R.string.receive_confirm, (dialog, which) -> {
+                requestNotificationPermission();
+                setBusy(true);
+                DownloadService.startBundleImport(this, file);
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+
+    private void offerToDeleteReceivedFile(PhoneTransfer.ReceivedFile file) {
+        new AlertDialog.Builder(this)
+            .setTitle(R.string.receive_done_title)
+            .setMessage(getString(R.string.receive_done, file.where))
+            .setPositiveButton(R.string.receive_delete, (dialog, which) -> new Thread(() -> {
+                final boolean deleted = PhoneTransfer.deleteReceived(this, file.uri);
+                postIfAlive(() -> {
+                    if (!deleted) {
+                        showMessage(R.string.receive_done_title,
+                            getString(R.string.receive_not_deleted, file.where));
+                    }
+                });
+            }, "kfx-receive-delete").start())
+            .setNegativeButton(R.string.receive_keep, null)
+            .show();
     }
 
     // ------------------------------------------------------------- app update
@@ -531,6 +735,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         if (resultCode != RESULT_OK || data == null) {
             return;
         }
+        if (requestCode == REQUEST_PICK_BUNDLE) {
+            if (data.getData() != null) {
+                inspectReceivedFile(data.getData());
+            }
+            return;
+        }
         if (requestCode != REQUEST_PICK_KEEPERFX && requestCode != REQUEST_PICK_ORIGINAL_DK
          && requestCode != REQUEST_PICK_ORIGINAL_DK_ZIP) {
             return;
@@ -596,7 +806,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         removeDataButton.setEnabled(!value);
         importKeeperfxButton.setEnabled(!value);
         importOriginalButton.setEnabled(!value);
-        playButton.setEnabled(!value && GameData.isComplete(this));
+        final boolean complete = GameData.isComplete(this);
+        playButton.setEnabled(!value && complete);
+        sendButton.setEnabled(!value && complete);
+        // Not tied to anything being installed: on a new phone this is the way in.
+        receiveButton.setEnabled(!value);
+        exportShareButton.setEnabled(!value);
+        exportDeleteButton.setEnabled(!value);
     }
 
     /**

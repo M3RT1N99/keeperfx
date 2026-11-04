@@ -249,6 +249,9 @@ public final class ReleaseDownloader {
         // Hundreds of megabytes of partial release, and what "Reset" is often for.
         FileUtil.deleteTree(new File(context.getFilesDir(), "downloads"));
         FileUtil.deleteTree(new File(context.getFilesDir(), "updates"));
+        // A copy of everything being forgotten, the player's saves among them.
+        FileUtil.deleteTree(PhoneTransfer.exportDirectory(context));
+        DownloadService.cancelFinishedNotification(context);
         //noinspection ResultOfMethodCallIgnored
         GameData.stableManifest(context).delete();
         //noinspection ResultOfMethodCallIgnored

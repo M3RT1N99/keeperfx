@@ -40,6 +40,9 @@ public final class UpdateManager {
         APP,
         /** Never offered; the launcher's switch for the patch runs it. */
         ALPHA_REVERT,
+        /** Never offered either; these two have buttons of their own. */
+        BUNDLE_EXPORT,
+        BUNDLE_IMPORT,
     }
 
     public static final class Item {

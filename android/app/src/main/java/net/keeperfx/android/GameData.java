@@ -141,7 +141,7 @@ public final class GameData {
      * check can tell from an installation, and that the player would then play.
      */
     static File installInProgress(Context context) {
-        return new File(new File(context.getFilesDir(), "manifests"), "install-in-progress");
+        return new File(manifestDirectory(context), "install-in-progress");
     }
 
     static void markInstallInProgress(Context context) throws IOException {
@@ -193,7 +193,10 @@ public final class GameData {
 
     /** Files from the original game that are still missing, as relative paths. */
     public static List<String> findMissingOriginalDkFiles(Context context) {
-        final File root = gameDirectory(context);
+        return findMissingOriginalDkFiles(gameDirectory(context));
+    }
+
+    static List<String> findMissingOriginalDkFiles(File root) {
         final List<String> missing = new ArrayList<>();
         for (String name : ORIGINAL_DK_DATA_FILES) {
             if (!resolveIgnoringCase(root, "data/" + name).isFile()) {
@@ -263,11 +266,15 @@ public final class GameData {
      * for the alpha patch laid over it; each line is "<size>\t<relative path>".
      */
     public static File stableManifest(Context context) {
-        return new File(new File(context.getFilesDir(), "manifests"), "stable.txt");
+        return new File(manifestDirectory(context), TransferBundle.STABLE_MANIFEST);
     }
 
     public static File alphaManifest(Context context) {
-        return new File(new File(context.getFilesDir(), "manifests"), "alpha.txt");
+        return new File(manifestDirectory(context), TransferBundle.ALPHA_MANIFEST);
+    }
+
+    static File manifestDirectory(Context context) {
+        return new File(context.getFilesDir(), "manifests");
     }
 
     public static boolean hasManifest(Context context) {
@@ -345,8 +352,10 @@ public final class GameData {
      */
     public static String describeInstalledVersion(Context context) {
         final Prefs prefs = new Prefs(context);
-        final String release = prefs.getInstalledVersion();
-        final String alpha = prefs.getInstalledAlphaVersion();
+        return describeVersion(prefs.getInstalledVersion(), prefs.getInstalledAlphaVersion());
+    }
+
+    static String describeVersion(String release, String alpha) {
         final String base = release.isEmpty() ? "imported folder" : release;
         return alpha.isEmpty() ? base : base + " + alpha " + alpha;
     }

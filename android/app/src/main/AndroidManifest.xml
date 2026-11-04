@@ -83,7 +83,7 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- Hands out the shared log copy and the downloaded APK, nothing else. -->
+        <!-- Hands out the shared log copy, the downloaded APK and a packed installation, nothing else. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

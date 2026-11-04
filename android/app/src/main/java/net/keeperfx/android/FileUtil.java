@@ -37,7 +37,13 @@ final class FileUtil {
 
     /** Says so up front, rather than after running into a full disk half way. */
     static void requireRoom(File directory, long bytes, String what) throws NoRoomException {
-        final long usable = directory.getUsableSpace();
+        requireRoom(directory, bytes, 0, what);
+    }
+
+    /** @param reclaimable what the job will free before it needs the room, which counts as free */
+    static void requireRoom(File directory, long bytes, long reclaimable, String what)
+            throws NoRoomException {
+        final long usable = directory.getUsableSpace() + reclaimable;
         if (bytes > usable) {
             throw new NoRoomException("Not enough free storage: " + what + " needs "
                 + GameData.describeBytes(bytes) + " and " + GameData.describeBytes(usable)
@@ -100,6 +106,16 @@ final class FileUtil {
         }
         //noinspection ResultOfMethodCallIgnored
         root.delete();
+    }
+
+    /** Best effort, the same way: empties the folder and leaves it standing. */
+    static void deleteContents(File directory) {
+        final File[] entries = directory.listFiles();
+        if (entries != null) {
+            for (File entry : entries) {
+                deleteTree(entry);
+            }
+        }
     }
 
     /**
