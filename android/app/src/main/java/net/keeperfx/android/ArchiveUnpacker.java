@@ -84,8 +84,20 @@ final class ArchiveUnpacker {
         final List<String> written = new ArrayList<>();
         try (SevenZFile sevenZ = SevenZFile.builder().setFile(archive).get()) {
             requireRoom(sevenZ, destination);
+            // A process dying during a patch leaves the game playable, on the release
+            // with some files replaced, as long as each of them is whole.
+            final InputStream currentEntry = new InputStream() {
+                @Override
+                public int read() throws IOException {
+                    return sevenZ.read();
+                }
+
+                @Override
+                public int read(byte[] buffer, int offset, int length) throws IOException {
+                    return sevenZ.read(buffer, offset, length);
+                }
+            };
             SevenZArchiveEntry entry;
-            final byte[] buffer = new byte[256 * 1024];
             while ((entry = sevenZ.getNextEntry()) != null) {
                 if (progress.isCancelled()) {
                     return written;
@@ -107,13 +119,7 @@ final class ArchiveUnpacker {
                 if (isSkipped(name)) {
                     continue;
                 }
-                FileUtil.ensureDirectory(out.getParentFile());
-                try (OutputStream os = new FileOutputStream(out)) {
-                    int read;
-                    while ((read = sevenZ.read(buffer)) > 0) {
-                        os.write(buffer, 0, read);
-                    }
-                }
+                FileUtil.writeAtomically(out, currentEntry);
                 written.add(ArchivePaths.relativePath(name));
                 if ((written.size() % 100) == 0) {
                     progress.onFiles(written.size());

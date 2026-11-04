@@ -95,7 +95,7 @@ public final class ReleaseDownloader {
             listener.onStage("Unpacking the music", -1, "");
             final File musicDir = new File(GameData.gameDirectory(context), "music");
             final int files = ArchiveUnpacker.unzipInstead(archive, musicDir,
-                new File(context.getFilesDir(), "music-unpacking"), unpackProgress);
+                new File(downloadDirectory(), "music-unpacking"), unpackProgress);
             if (isCancelled()) {
                 finish(false, "Cancelled while unpacking");
                 return;
@@ -201,7 +201,7 @@ public final class ReleaseDownloader {
     /**
      * Puts the installation back to the plain release without downloading it.
      *
-     * Runs synchronously and is quick: the backup is a few megabytes of
+     * Runs synchronously and is quick: the backup is some tens of megabytes of
      * configuration and data files, not the 374 MB release.
      */
     public void revertAlpha() {

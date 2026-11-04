@@ -26,9 +26,7 @@ import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
 import org.apache.commons.compress.archivers.sevenz.SevenZFile;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.LinkedHashSet;
@@ -102,9 +100,8 @@ final class AlphaBackup {
         for (String name : added) {
             lines.append(name).append('\n');
         }
-        try (OutputStream out = new FileOutputStream(new File(directory, ADDED_LIST))) {
-            out.write(lines.toString().getBytes(StandardCharsets.UTF_8));
-        }
+        FileUtil.writeAtomically(new File(directory, ADDED_LIST),
+            lines.toString().getBytes(StandardCharsets.UTF_8));
         Log.i(TAG, "Saved " + saved + " files before applying the alpha patch");
     }
 

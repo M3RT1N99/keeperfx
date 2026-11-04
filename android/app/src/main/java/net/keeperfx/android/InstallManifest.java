@@ -23,10 +23,8 @@ package net.keeperfx.android;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -57,13 +55,12 @@ final class InstallManifest {
      * Sizes are taken from the disk after the configuration overlay and the
      * retirement list have run, not from the archive, so verification later
      * compares like with like; a file the retirement list deleted again simply
-     * falls out. Written to a temporary name first: a manifest that lies is
-     * worse than none.
+     * falls out. Written whole or not at all: a manifest that lies is worse than
+     * none.
      *
      * @return how many files it lists.
      */
     static int write(File manifest, File root, Collection<String> names) throws IOException {
-        FileUtil.ensureDirectory(manifest.getParentFile());
         final StringBuilder lines = new StringBuilder();
         int listed = 0;
         for (String name : names) {
@@ -73,17 +70,7 @@ final class InstallManifest {
                 listed++;
             }
         }
-        final File tmp = new File(manifest.getAbsolutePath() + ".tmp");
-        try (OutputStream out = new FileOutputStream(tmp)) {
-            out.write(lines.toString().getBytes(StandardCharsets.UTF_8));
-        }
-        if (!tmp.renameTo(manifest)) {
-            //noinspection ResultOfMethodCallIgnored
-            manifest.delete();
-            if (!tmp.renameTo(manifest)) {
-                throw new IOException("Cannot write " + manifest.getAbsolutePath());
-            }
-        }
+        FileUtil.writeAtomically(manifest, lines.toString().getBytes(StandardCharsets.UTF_8));
         return listed;
     }
 
