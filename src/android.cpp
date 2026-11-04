@@ -29,6 +29,7 @@
 
 #include "pre_inc.h"
 #include "android.h"
+#include "android_lan_rules.h"
 #include "platform.h"
 #include "bflib_basics.h"
 #include "game_legacy.h"
@@ -39,7 +40,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <sys/socket.h>
 #include <android/log.h>
+#include <android/multinetwork.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include "post_inc.h"
@@ -222,6 +229,110 @@ extern "C" size_t android_codepage_to_utf8(const char *charset, const char *src,
     }
     env->PopLocalFrame(nullptr);
     return written;
+}
+
+extern "C" int android_lan_broadcast_targets(char targets[ANDROID_LAN_TARGETS_MAX][ANDROID_LAN_ADDRESS_LEN])
+{
+    static std::string last_logged;
+    std::string found;
+    int count = 0;
+    // Read anew for every send, so that a hotspot or Wi-Fi coming up while somebody is
+    // looking at the list is picked up. It costs one netlink dump a second, only there.
+    struct ifaddrs *interfaces = nullptr;
+    if (getifaddrs(&interfaces) != 0)
+    {
+        found = std::string("unknown, getifaddrs failed: ") + strerror(errno);
+        interfaces = nullptr;
+    }
+    for (const struct ifaddrs *i = interfaces; i != nullptr && count < ANDROID_LAN_TARGETS_MAX; i = i->ifa_next)
+    {
+        if (i->ifa_addr == nullptr || i->ifa_netmask == nullptr || i->ifa_addr->sa_family != AF_INET)
+            continue;
+        if ((i->ifa_flags & (IFF_UP | IFF_LOOPBACK | IFF_BROADCAST)) != (IFF_UP | IFF_BROADCAST))
+            continue;
+        const auto v4 = [](const struct sockaddr *a) {
+            return ntohl(reinterpret_cast<const struct sockaddr_in *>(a)->sin_addr.s_addr);
+        };
+        const bool reported = i->ifa_broadaddr != nullptr && i->ifa_broadaddr->sa_family == AF_INET;
+        const uint32_t broadcast = lan_subnet_broadcast(v4(i->ifa_addr), v4(i->ifa_netmask),
+            reported ? v4(i->ifa_broadaddr) : 0);
+        if (broadcast == 0)
+            continue;
+        const struct in_addr wire = {htonl(broadcast)};
+        char text[ANDROID_LAN_ADDRESS_LEN];
+        if (inet_ntop(AF_INET, &wire, text, sizeof(text)) == nullptr)
+            continue;
+        found += (found.empty() ? "" : ", ") + std::string(text) + " (" + i->ifa_name + ")";
+        // Two interfaces on one subnet is an emulator's habit, not a phone's. One send
+        // is all the routing table can tell apart anyway.
+        bool known = false;
+        for (int k = 0; k < count; k++)
+            known = known || strcmp(targets[k], text) == 0;
+        if (!known)
+            snprintf(targets[count++], ANDROID_LAN_ADDRESS_LEN, "%s", text);
+    }
+    if (interfaces != nullptr)
+        freeifaddrs(interfaces);
+    if (found.empty())
+        found = "none";
+    if (found != last_logged)
+    {
+        last_logged = found;
+        LbNetLog("LAN: subnet broadcast targets: %s\n", found.c_str());
+    }
+    return count;
+}
+
+// What GameActivity.lanNetworkHandle() answers when it names no network.
+#define LAN_NO_WIFI_NETWORK 0
+#define LAN_WIFI_IS_DEFAULT (-1)
+#define LAN_NETWORKS_UNKNOWN (-2)
+
+static jlong lan_network_handle(void)
+{
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    if (env == nullptr || env->PushLocalFrame(4) != JNI_OK)
+        return LAN_NETWORKS_UNKNOWN;
+    jlong handle = LAN_NETWORKS_UNKNOWN;
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (activity != nullptr)
+    {
+        jmethodID method = env->GetMethodID(env->GetObjectClass(activity), "lanNetworkHandle", "()J");
+        if (method != nullptr)
+            handle = env->CallLongMethod(activity, method);
+    }
+    if (env->ExceptionCheck())
+    {
+        env->ExceptionClear();
+        handle = LAN_NETWORKS_UNKNOWN;
+    }
+    env->PopLocalFrame(nullptr);
+    return handle;
+}
+
+extern "C" void android_lan_bind_socket(int socket, const char *what)
+{
+    const jlong handle = lan_network_handle();
+    switch (handle)
+    {
+    case LAN_NO_WIFI_NETWORK:
+        LbNetLog("LAN: %s socket left unbound, no Wi-Fi network: this phone owns the hotspot or has none\n", what);
+        return;
+    case LAN_WIFI_IS_DEFAULT:
+        LbNetLog("LAN: %s socket left unbound, Wi-Fi is the default network\n", what);
+        return;
+    case LAN_NETWORKS_UNKNOWN:
+        LbNetLog("LAN: %s socket left unbound, could not ask for the networks\n", what);
+        return;
+    }
+    if (android_setsocknetwork(static_cast<net_handle_t>(handle), socket) != 0)
+    {
+        LbNetLog("LAN: %s socket left unbound, binding to Wi-Fi network %lld failed: %s\n",
+            what, static_cast<long long>(handle), strerror(errno));
+        return;
+    }
+    LbNetLog("LAN: %s socket bound to Wi-Fi network %lld, which is not the default network\n",
+        what, static_cast<long long>(handle));
 }
 
 /**

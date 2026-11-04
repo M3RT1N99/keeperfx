@@ -20,6 +20,9 @@
 package net.keeperfx.android;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -246,6 +249,37 @@ public class GameActivity extends SDLActivity {
             Log.w(TAG, "Cannot hold a multicast lock: " + e);
             multicastLock = null;
         }
+    }
+
+    /**
+     * Which network a local game's socket belongs on, asked by the engine when it
+     * makes one (android_lan_bind_socket).
+     *
+     * A hotspot without internet leaves the Wi-Fi unvalidated with cellular as the
+     * default network, and a socket that is not told otherwise then sends its
+     * traffic for the hotspot out over cellular, where it is lost. With Wi-Fi as the
+     * default, or with no Wi-Fi network at all, which is what the hotspot's owner
+     * sees of its own hotspot, the routing is right as it stands.
+     *
+     * @return the network's handle, 0 when there is no Wi-Fi network, -1 when Wi-Fi
+     *     is the default network.
+     */
+    @SuppressWarnings({"unused", "deprecation"}) // Called from native code. A callback
+    // could replace getAllNetworks, but only by keeping up with networks all the time.
+    private long lanNetworkHandle() {
+        final ConnectivityManager connectivity = getSystemService(ConnectivityManager.class);
+        final NetworkCapabilities active =
+            connectivity.getNetworkCapabilities(connectivity.getActiveNetwork());
+        if (active != null && active.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+            return -1;
+        }
+        for (Network network : connectivity.getAllNetworks()) {
+            final NetworkCapabilities capabilities = connectivity.getNetworkCapabilities(network);
+            if (capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                return network.getNetworkHandle();
+            }
+        }
+        return 0;
     }
 
     private void releaseMulticastLock() {

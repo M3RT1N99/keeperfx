@@ -581,6 +581,7 @@ static void test_the_chase_respects_the_limits(void)
 }
 
 int touch_steer_tests(int *total_checks);
+int android_lan_rules_tests(int *total_checks);
 
 int main(void)
 {
@@ -605,6 +606,7 @@ int main(void)
     test_the_chase_does_not_tremble();
     test_the_chase_respects_the_limits();
     failures += touch_steer_tests(&checks);
+    failures += android_lan_rules_tests(&checks);
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
 }

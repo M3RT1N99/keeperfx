@@ -32,6 +32,10 @@
 #include <cstddef>
 #include <climits>
 
+#ifdef __ANDROID__
+#include "android.h"
+#endif
+
 #include "post_inc.h"
 
 #define NUM_CHANNELS 2
@@ -294,6 +298,12 @@ namespace
             LbNetLog("ENet: host created (IPv4) on port %d\n", (int)address.port);
         }
         enet_host_compress_with_range_coder(host);
+#ifdef __ANDROID__
+        if (frontnet_service_selected(FrontendNetSvc_LAN))
+            android_lan_bind_socket(host->socket, "host game");
+        else
+            LbNetLog("LAN: host game socket left unbound, an online game follows the default network\n");
+#endif
         port_forward_set_mapping(address.port);
         external_ipv4_port = holepunch_stun_query(host, external_ipv4_address, sizeof(external_ipv4_address));
         enet_host_set_intercept_callback(host, intercept_punch);
@@ -701,6 +711,9 @@ namespace
             connect_address.port = (enet_uint16)lan_game_port;
             if (create_join_host(ENET_ADDRESS_TYPE_IPV4) != Lb_OK)
                 return Lb_FAIL;
+#ifdef __ANDROID__
+            android_lan_bind_socket(host->socket, "joiner game");
+#endif
         } else if (join_lobby_id[0] != '\0') {
             return join_via_holepunch();
         } else {

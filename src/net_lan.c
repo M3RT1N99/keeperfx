@@ -11,6 +11,10 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
+#ifdef __ANDROID__
+#include "android.h"
+#endif
+
 #include "post_inc.h"
 
 #define LAN_DISCOVERY_PORT               5557
@@ -80,6 +84,9 @@ void lan_host_start(uint16_t port)
     }
     enet_socket_set_option(host_socket, ENET_SOCKOPT_REUSEADDR, 1);
     enet_socket_set_option(host_socket, ENET_SOCKOPT_NONBLOCK, 1);
+#ifdef __ANDROID__
+    android_lan_bind_socket(host_socket, "host discovery");
+#endif
     ENetAddress bind_address;
     enet_address_build_any(&bind_address, ENET_ADDRESS_TYPE_IPV4);
     bind_address.port = LAN_DISCOVERY_PORT;
@@ -152,6 +159,18 @@ void lan_service(void)
         char message[] = LAN_DISCOVER_MSG;
         ENetBuffer send_buffer = {.data = message, .dataLength = sizeof(message) - 1};
         enet_socket_send(joiner_socket, &broadcast_address, &send_buffer, 1);
+#ifdef __ANDROID__
+        // The send above follows the default network, so from a phone that owns the hotspot
+        // or whose default is cellular it never reaches the Wi-Fi. A subnet's own broadcast
+        // address leaves on that subnet's interface whatever the default network is.
+        char targets[ANDROID_LAN_TARGETS_MAX][ANDROID_LAN_ADDRESS_LEN];
+        const int target_count = android_lan_broadcast_targets(targets);
+        for (int i = 0; i < target_count; i++) {
+            enet_address_set_host_ip(&broadcast_address, targets[i]);
+            broadcast_address.port = LAN_DISCOVERY_PORT;
+            enet_socket_send(joiner_socket, &broadcast_address, &send_buffer, 1);
+        }
+#endif
         last_broadcast_milliseconds = now;
     }
     char buffer[LAN_MSG_MAX];

@@ -46,6 +46,24 @@ int android_running_in_background(void);
 /** Whether event polling should ask SDL for events right now. */
 int android_event_pump_due(void);
 
+#define ANDROID_LAN_TARGETS_MAX 8
+#define ANDROID_LAN_ADDRESS_LEN 16 // INET_ADDRSTRLEN
+
+/**
+ * The broadcast address of every IPv4 subnet this device is on right now, in dotted
+ * form. Logs when the set changes.
+ * @return how many there are.
+ */
+int android_lan_broadcast_targets(char targets[ANDROID_LAN_TARGETS_MAX][ANDROID_LAN_ADDRESS_LEN]);
+
+/**
+ * Puts a local game's socket on the Wi-Fi network if Wi-Fi is there but is not the
+ * default network, and leaves it alone otherwise. Logs which it was and why. A socket
+ * that cannot be bound stays usable as it was.
+ * @param what What the socket is for, for the log.
+ */
+void android_lan_bind_socket(int socket, const char *what);
+
 /** Implemented in bflib_sndlib.cpp, called when the activity goes away and comes back. */
 void android_audio_enter_background(int engine_keeps_running);
 void android_audio_enter_foreground(int engine_kept_running);
