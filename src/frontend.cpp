@@ -1138,6 +1138,16 @@ void gui_quit_game(struct GuiButton *gbtn)
         return;
     }
     struct PlayerInfo *player = get_my_player();
+#ifdef __ANDROID__
+    // A touch screen has no Space and no tap finishes a won level, so this is the way on, whatever
+    // the input mode says. A plain quit would throw the win away: get_startup_menu_state() goes
+    // straight to the land view and the campaign stays where it was.
+    if (player->victory_state == VicS_WonLevel)
+    {
+        set_players_packet_action(player, PckA_FinishGame, player->victory_state, 0, 0, 0);
+        return;
+    }
+#endif
     set_players_packet_action(player, PckA_QuitToMainMenu, 0, 0, 0, 0);
 }
 

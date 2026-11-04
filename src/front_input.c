@@ -924,32 +924,29 @@ static TbBool get_paused_message_inputs(void)
     return true;
 }
 
-#ifdef __ANDROID__
-/** When this phone last saw the game paused, for finish_level_requested(). */
-static TbClockMSec last_seen_paused = 0;
-/** Longer than a double tap's second tap can take to come down. */
-#define FINISH_LEVEL_AFTER_PAUSE_MSEC 500
-
-#endif
 /**
  * Whether the player asked to leave a level that has already been decided.
  *
  * The key bound to this is Space, and a touch screen has no way of producing
- * one - which left a won or lost level with no way out at all. Once the level
- * is decided there is nothing else to do in the play area, so a tap there
- * counts as well; the statistics screen that follows already takes a click the
- * same way in front_continue_pressed().
+ * one. On a lost level a tap on the play area counts as well: there is nothing
+ * else to do there and nothing to lose, and the statistics screen that follows
+ * takes a click the same way in front_continue_pressed(). A won level on Android
+ * takes no tap, because the game goes on behind the victory line and a stray tap
+ * must not end it; the menu's Quit finishes it there, see gui_quit_game().
  *
  * Three things are deliberately not treated as that tap: anything over the
- * panel, which get_gui_inputs() has consumed by the time this runs and which
- * game_is_busy_doing_gui() still reports; the minimap, which is inside the
- * panel without being a button; and the parchment map, where a click means
- * "zoom there" and losing a level should not stop the player looking around.
+ * panel; the minimap, which is inside the panel without being a button; and the
+ * parchment map, where a click means "zoom there" and losing a level should not
+ * stop the player looking around.
  */
 static TbBool finish_level_requested(void)
 {
     if (is_game_key_pressed(Gkey_FinishLevel, true, false))
         return true;
+#ifdef __ANDROID__
+    if (get_my_player()->victory_state == VicS_WonLevel)
+        return false;
+#endif
     if (!touch_controls_active() || !left_button_clicked)
         return false;
     if (get_local_view_type() != PVT_DungeonTop)
@@ -957,22 +954,17 @@ static TbBool finish_level_requested(void)
     if (mouse_is_over_panel_map(local_state.minimap_pos_x, local_state.minimap_pos_y))
         return false;
 #ifdef __ANDROID__
-    // A tap between a menu's buttons is still meant for the menu, and get_gui_inputs()
-    // leaves a click on no button standing, where it does run. So is one beside a menu
-    // window, which is the part of the screen the player cannot do anything else with.
+    // A tap between a menu's buttons is still meant for the menu, and a lost level only reads
+    // the buttons after this test. So is one beside a menu window, which is the part of the
+    // screen the player cannot do anything else with.
     if (a_menu_window_is_active() || (point_is_over_gui_menu(GetMouseX(), GetMouseY()) >= 0))
-        return false;
-    // The box a paused game shows is gone the moment the game goes on, so the second tap of
-    // a double tap on it comes down on the play area, and that tap belongs to the unpausing.
-    if ((LbTimerClock() - last_seen_paused) < FINISH_LEVEL_AFTER_PAUSE_MSEC)
         return false;
 #endif
     // The panel is tested by its own rectangle rather than by asking
-    // game_is_busy_doing_gui(). That flag is set by get_gui_inputs(), which
-    // does not run at all on the lost level path - get_inputs() returns
-    // straight after get_level_lost_inputs() - so it would answer with
-    // whatever the last ordinary frame left behind, and a tap on the panel
-    // could end the level.
+    // game_is_busy_doing_gui(). That flag is set by get_gui_inputs(), which on
+    // the lost level path runs after this test, further down in
+    // get_level_lost_inputs(), so it would answer with whatever the turn before
+    // left behind, and a tap on the panel could end the level.
     const int mnu_num = menu_id_to_number(GMnu_MAIN);
     if (mnu_num >= 0)
     {
@@ -988,10 +980,6 @@ static TbBool finish_level_requested(void)
 
 static short get_global_inputs(void)
 {
-#ifdef __ANDROID__
-  if (flag_is_set(game.operation_flags, GOF_Paused))
-      last_seen_paused = LbTimerClock();
-#endif
   if (game_is_busy_doing_gui_string_input())
     return false;
   struct PlayerInfo* player = get_my_player();
@@ -1007,7 +995,11 @@ static short get_global_inputs(void)
       {
           if (menu_is_active(GMnu_QUIT))
           {
+#ifdef __ANDROID__
+              gui_quit_game(NULL);
+#else
               set_players_packet_action(player, PckA_QuitToMainMenu, 0, 0, 0, 0);
+#endif
               clear_key_pressed(KC_RETURN);
               return true;
           }
