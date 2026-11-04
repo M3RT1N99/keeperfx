@@ -2,15 +2,26 @@ package net.keeperfx.android;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -247,6 +258,159 @@ public class UpdatePlanTest {
         facts.alphaForEngine = null;
         facts.hasMusic = false;
         assertEquals(Arrays.asList(UpdateManager.Kind.MUSIC), plannedKinds());
+    }
+
+    /** The servers of a device that is current: nothing newer anywhere. */
+    private static class ServersWithNothingNew implements UpdateManager.Servers {
+        @Override
+        public ReleaseApi.ReleaseInfo latestStable() throws IOException, JSONException {
+            return STABLE;
+        }
+
+        @Override
+        public ReleaseApi.ReleaseInfo alphaForEngine(int engineBuild)
+                throws IOException, JSONException {
+            return ALPHA;
+        }
+
+        @Override
+        public AppRelease appUpdate() throws IOException, JSONException {
+            return null;
+        }
+    }
+
+    private static final class NoServerAnswers extends ServersWithNothingNew {
+        @Override
+        public ReleaseApi.ReleaseInfo latestStable() throws IOException {
+            throw new IOException("offline");
+        }
+
+        @Override
+        public ReleaseApi.ReleaseInfo alphaForEngine(int engineBuild) throws IOException {
+            throw new IOException("offline");
+        }
+
+        @Override
+        public AppRelease appUpdate() throws IOException {
+            throw new IOException("offline");
+        }
+    }
+
+    /** What the servers say is not known yet at this point on a real device. */
+    private UpdateManager.Result ask(UpdateManager.Servers servers) {
+        facts.latestStable = null;
+        facts.alphaForEngine = null;
+        return UpdateManager.ask(facts, servers);
+    }
+
+    @Test
+    public void whenEveryServerAnswersAnEmptyListMeansCurrent() {
+        final UpdateManager.Result result = ask(new ServersWithNothingNew());
+        assertEquals(Collections.emptyList(), result.items);
+        assertFalse(result.unanswered);
+    }
+
+    /**
+     * Airplane mode, nothing installed. The empty list used to bring up "Everything is
+     * up to date" over a status line saying KeeperFX is not installed.
+     */
+    @Test
+    public void nothingOfferedBecauseNoServerAnsweredIsNotCurrent() {
+        facts.dataInstalled = false;
+        facts.stableVersion = "";
+        final UpdateManager.Result result = ask(new NoServerAnswers());
+        assertEquals(Collections.emptyList(), result.items);
+        assertTrue(result.unanswered);
+    }
+
+    @Test
+    public void whatNeedsNoServerIsStillOfferedWhenNoneAnswers() {
+        facts.hasMusic = false;
+        final UpdateManager.Result result = ask(new NoServerAnswers());
+        assertEquals(UpdateManager.Kind.MUSIC, result.items.get(0).kind);
+        assertTrue(result.unanswered);
+    }
+
+    @Test
+    public void theAlphaIsNotAskedForWhenItIsNotWanted() {
+        facts.alphaEnabled = false;
+        facts.alphaVersion = "";
+        final UpdateManager.Result result = ask(new ServersWithNothingNew() {
+            @Override
+            public ReleaseApi.ReleaseInfo alphaForEngine(int engineBuild) throws IOException {
+                throw new IOException("nothing should have asked");
+            }
+        });
+        assertFalse(result.unanswered);
+    }
+
+    /**
+     * Sixty requests an hour without an account, and the check runs on every return to
+     * the launcher, so a shared address gets there. The answer is an error, in real
+     * HTTP, and the app has to be told that apart from being current.
+     */
+    @Test
+    public void aRateLimitOnTheAppQuestionIsNoAnswer() throws Exception {
+        for (String status : new String[] {"403 rate limit exceeded", "429 Too Many Requests"}) {
+            final String limited = serveOnce("HTTP/1.1 " + status + "\r\n"
+                + "Content-Type: application/json\r\nConnection: close\r\n\r\n"
+                + "{\"message\":\"API rate limit exceeded\"}");
+            final UpdateManager.Result result = ask(
+                new ServersWithNothingNew() {
+                    @Override
+                    public AppRelease appUpdate() throws IOException, JSONException {
+                        try {
+                            return AppUpdater.newerThan("1.57", Http.getJson(limited));
+                        } catch (IOException e) {
+                            // That it was the status, and not this server falling over.
+                            assertTrue(e.getMessage(),
+                                e.getMessage().contains("HTTP " + status.substring(0, 3)));
+                            throw e;
+                        }
+                    }
+                });
+            assertEquals(Collections.emptyList(), result.items);
+            assertTrue(status, result.unanswered);
+        }
+    }
+
+    /** @return where to ask for the one answer it has. */
+    private static String serveOnce(final String response) throws IOException {
+        final ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
+        final Thread thread = new Thread(() -> {
+            try (ServerSocket closing = server; Socket socket = closing.accept()) {
+                final BufferedReader in = new BufferedReader(new InputStreamReader(
+                    socket.getInputStream(), StandardCharsets.ISO_8859_1));
+                String line;
+                while ((line = in.readLine()) != null && !line.isEmpty()) {
+                    // Only the end of the request matters.
+                }
+                socket.getOutputStream().write(response.getBytes(StandardCharsets.ISO_8859_1));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+        thread.setDaemon(true);
+        thread.start();
+        return "http://127.0.0.1:" + server.getLocalPort() + "/latest";
+    }
+
+    @Test
+    public void aReleaseWithNoApkDoesNotCountAsCurrent() throws Exception {
+        try {
+            AppUpdater.newerThan("1.57", new JSONObject("{\"tag_name\":\"android-v1.60\"}"));
+            fail("null here would read as being on the newest build");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage(), expected.getMessage().contains("no APK"));
+        }
+    }
+
+    @Test
+    public void theAppIsCurrentOrItIsNot() throws Exception {
+        final JSONObject latest = new JSONObject("{\"tag_name\":\"android-v1.60\",\"assets\":"
+            + "[{\"name\":\"keeperfx-android-arm64.apk\",\"browser_download_url\":\"https://x/a\"}]}");
+        assertEquals("1.60", AppUpdater.newerThan("1.57", latest).versionName);
+        assertNull(AppUpdater.newerThan("1.60", latest));
     }
 
     @Test

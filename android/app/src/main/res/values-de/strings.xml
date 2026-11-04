@@ -42,6 +42,9 @@
     <string name="status_downloading_app">App wird geladen…</string>
 
     <string name="updates_none_title">Alles aktuell</string>
+    <string name="updates_unanswered_title">Suche nach Downloads fehlgeschlagen</string>
+    <string name="updates_unanswered">Ein Server hat nicht geantwortet, es kann also etwas bereitstehen, das diese Suche nicht sieht. Prüfe die Internetverbindung und versuche es noch einmal. Ist die Verbindung in Ordnung, versuche es in einer Stunde wieder: GitHub begrenzt, wie oft es nach der neuesten App gefragt werden darf.</string>
+    <string name="updates_unanswered_more">Ein Server hat nicht geantwortet, es kann also noch mehr geben.</string>
     <string name="updates_available_title">%1$d Download(s) verfügbar</string>
     <string name="updates_download_all">Alle laden</string>
     <string name="updates_replaces_data">Die Spieldaten werden dabei ersetzt. Spielstände, importierte Originaldateien, Musik und eigene Karten bleiben erhalten.</string>
@@ -56,7 +59,7 @@
     <string name="app_update_none">%1$s ist die neueste Version.</string>
     <string name="app_update_changes">Änderungen:</string>
     <string name="app_update_check">Suchen</string>
-    <string name="app_update_offline">Die Update-Prüfung ist fehlgeschlagen. Besteht eine Internetverbindung?</string>
+    <string name="app_update_offline">Der Update-Server hat nicht geantwortet. Prüfe die Internetverbindung und versuche es noch einmal. Ist die Verbindung in Ordnung, versuche es in einer Stunde wieder: GitHub begrenzt, wie oft es gefragt werden darf.</string>
     <string name="app_update_install">Installieren</string>
 
     <string name="install_failed">Installation fehlgeschlagen: %1$s</string>

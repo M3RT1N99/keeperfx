@@ -74,6 +74,9 @@
 
     <string name="updates_none_title">Everything is up to date</string>
     <string name="updates_none">The app, the game data and the music are all current.\n\nFiles from an original Dungeon Keeper cannot be downloaded — use "Import original Dungeon Keeper" for those.</string>
+    <string name="updates_unanswered_title">Could not check for downloads</string>
+    <string name="updates_unanswered">A server did not answer, so something may be waiting that this cannot see. Check the internet connection and try again. If the connection is fine, try again in an hour: GitHub limits how often it can be asked for the newest app.</string>
+    <string name="updates_unanswered_more">A server did not answer, so there may be more than this.</string>
     <string name="updates_available_title">%1$d download(s) available</string>
     <string name="updates_download_all">Download all</string>
     <string name="updates_replaces_data">The game data is unpacked over the current installation. Save games, the files from the original game, music, and anything you added are kept.</string>
@@ -93,7 +96,7 @@ The update installs over this one; game data and settings are kept.</string>
     <string name="app_update_none">You are on the newest build (%1$s).</string>
     <string name="app_update_changes">What changed:</string>
     <string name="app_update_check">Checking…</string>
-    <string name="app_update_offline">Could not reach the update server.</string>
+    <string name="app_update_offline">The update server did not answer. Check the internet connection and try again. If the connection is fine, try again in an hour: GitHub limits how often it can be asked.</string>
     <string name="app_update_install">Download and install</string>
 
     <string name="notification_channel_downloads">Downloads</string>

@@ -81,12 +81,21 @@ public final class AppUpdater {
 
     /** Blocking; call from a background thread. Returns null when up to date. */
     static AppRelease checkForUpdate(Context context) throws IOException, org.json.JSONException {
-        final AppRelease release = AppRelease.fromGithub(Http.getJson(LATEST_RELEASE_URL));
+        return newerThan(installedVersionName(context), Http.getJson(LATEST_RELEASE_URL));
+    }
+
+    /**
+     * @param latest the newest release as the API lists it
+     * @return that release when it is newer, null when the app is current
+     * @throws IOException when the release cannot tell, since null would call that current
+     */
+    static AppRelease newerThan(String installed, org.json.JSONObject latest)
+            throws IOException, org.json.JSONException {
+        final AppRelease release = AppRelease.fromGithub(latest);
         if (release == null) {
-            Log.w(TAG, "The newest release carries no version or no APK");
-            return null;
+            throw new IOException("The newest release carries no version or no APK");
         }
-        if (!AppVersion.isNewer(release.versionName, installedVersionName(context))) {
+        if (!AppVersion.isNewer(release.versionName, installed)) {
             return null;
         }
         Log.i(TAG, "Update available: " + release.versionName);

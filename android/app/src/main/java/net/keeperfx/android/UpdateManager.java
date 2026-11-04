@@ -26,6 +26,9 @@ package net.keeperfx.android;
 import android.content.Context;
 import android.util.Log;
 
+import org.json.JSONException;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -96,6 +99,21 @@ public final class UpdateManager {
         return body.toString();
     }
 
+    /** What a check found. */
+    public static final class Result {
+        public final List<Item> items;
+        /**
+         * A server did not answer, so an empty list does not mean nothing is waiting: an
+         * app update nobody could ask about looks just like there being none.
+         */
+        public final boolean unanswered;
+
+        Result(List<Item> items, boolean unanswered) {
+            this.items = items;
+            this.unanswered = unanswered;
+        }
+    }
+
     /**
      * Everything the list of downloads depends on. The fields that come from the
      * network are null when the question could not be answered: being offline
@@ -119,8 +137,18 @@ public final class UpdateManager {
         AppRelease appUpdate;
     }
 
+    /** The questions that go over the network, apart so that a test can have them fail. */
+    interface Servers {
+        ReleaseApi.ReleaseInfo latestStable() throws IOException, JSONException;
+
+        ReleaseApi.ReleaseInfo alphaForEngine(int engineBuild) throws IOException, JSONException;
+
+        /** Null when the app is current; not being able to tell has to throw. */
+        AppRelease appUpdate() throws IOException, JSONException;
+    }
+
     /** Blocking; call from a background thread. */
-    public static List<Item> check(Context context) {
+    public static Result check(Context context) {
         final Prefs prefs = new Prefs(context);
         final Facts facts = new Facts();
         facts.missingEntries = GameData.findMissingKeeperfxEntries(context);
@@ -136,25 +164,56 @@ public final class UpdateManager {
         facts.hasMusic = GameData.hasMusic(context);
         facts.appVersionName = AppUpdater.installedVersionName(context);
 
+        return ask(facts, new Servers() {
+            @Override
+            public ReleaseApi.ReleaseInfo latestStable() throws IOException, JSONException {
+                return ReleaseApi.latestStable();
+            }
+
+            @Override
+            public ReleaseApi.ReleaseInfo alphaForEngine(int engineBuild)
+                    throws IOException, JSONException {
+                final ReleaseApi.ReleaseInfo alpha = ReleaseApi.alphaForEngine(engineBuild);
+                facts.alphaCached = ReleaseDownloader.isAlphaCached(context, alpha);
+                return alpha;
+            }
+
+            @Override
+            public AppRelease appUpdate() throws IOException, JSONException {
+                return AppUpdater.checkForUpdate(context);
+            }
+        });
+    }
+
+    /**
+     * Fills in what the servers say and plans from that. No connection, a server error
+     * and GitHub's limit on anonymous requests all end up here the same way: what
+     * depends on that answer stays off the list, and the result says the list is not
+     * the whole story.
+     */
+    static Result ask(Facts facts, Servers servers) {
+        boolean unanswered = false;
         try {
-            facts.latestStable = ReleaseApi.latestStable();
+            facts.latestStable = servers.latestStable();
         } catch (Exception e) {
             Log.w(TAG, "Could not check the KeeperFX release", e);
+            unanswered = true;
         }
         if (facts.dataInstalled && facts.alphaEnabled) {
             try {
-                facts.alphaForEngine = ReleaseApi.alphaForEngine(facts.engineBuild);
-                facts.alphaCached = ReleaseDownloader.isAlphaCached(context, facts.alphaForEngine);
+                facts.alphaForEngine = servers.alphaForEngine(facts.engineBuild);
             } catch (Exception e) {
                 Log.w(TAG, "Could not check the KeeperFX alpha", e);
+                unanswered = true;
             }
         }
         try {
-            facts.appUpdate = AppUpdater.checkForUpdate(context);
+            facts.appUpdate = servers.appUpdate();
         } catch (Exception e) {
             Log.w(TAG, "Could not check for an app update", e);
+            unanswered = true;
         }
-        return plan(facts);
+        return new Result(plan(facts), unanswered);
     }
 
     /** Decides what to offer. No Android and no network, so a test can pin it. */

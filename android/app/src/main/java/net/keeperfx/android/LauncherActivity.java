@@ -366,7 +366,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
      */
     private void checkForUpdateInBackground() {
         new Thread(() -> {
-            final List<UpdateManager.Item> items = UpdateManager.check(this);
+            final List<UpdateManager.Item> items = UpdateManager.check(this).items;
             postIfAlive(() -> {
                 if (!items.isEmpty() && !busy) {
                     installButton.setText(getString(R.string.button_updates_waiting, items.size()));
@@ -391,23 +391,30 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         keeperfxStatus.setText(R.string.status_checking_updates);
 
         new Thread(() -> {
-            final List<UpdateManager.Item> items = UpdateManager.check(this);
+            final UpdateManager.Result found = UpdateManager.check(this);
             postIfAlive(() -> {
                 setBusy(false);
                 refreshStatus();
-                if (items.isEmpty()) {
+                if (!found.items.isEmpty()) {
+                    showUpdateDialog(found);
+                } else if (found.unanswered) {
+                    showMessage(R.string.updates_unanswered_title,
+                        getString(R.string.updates_unanswered));
+                } else {
                     showMessage(R.string.updates_none_title, getString(R.string.updates_none));
-                    return;
                 }
-                showUpdateDialog(items);
             });
         }, "kfx-update-scan").start();
     }
 
-    private void showUpdateDialog(List<UpdateManager.Item> items) {
+    private void showUpdateDialog(UpdateManager.Result found) {
+        final List<UpdateManager.Item> items = found.items;
         final StringBuilder body = new StringBuilder(UpdateManager.describe(items)).append('\n');
         if (UpdateManager.contains(items, UpdateManager.Kind.GAME_DATA)) {
             body.append('\n').append(getString(R.string.updates_replaces_data));
+        }
+        if (found.unanswered) {
+            body.append('\n').append(getString(R.string.updates_unanswered_more));
         }
         body.append('\n').append(getString(R.string.updates_use_wifi));
 
