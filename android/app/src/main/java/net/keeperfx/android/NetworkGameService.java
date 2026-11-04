@@ -83,6 +83,11 @@ public class NetworkGameService extends Service {
     }
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(GameLanguage.localized(base));
+    }
+
+    @Override
     public IBinder onBind(Intent intent) {
         return null;
     }

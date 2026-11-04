@@ -217,21 +217,24 @@ public class DownloadService extends Service {
     private String lastStage = "";
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(GameLanguage.localized(base));
+    }
+
+    @Override
     public IBinder onBind(Intent intent) {
         return null;
     }
 
+    /** Every time: for a channel that exists this changes the name, to the language chosen since. */
     @Override
     public void onCreate() {
         super.onCreate();
-        final NotificationManager manager = getSystemService(NotificationManager.class);
-        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
-            final NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
-                getString(R.string.notification_channel_downloads),
-                NotificationManager.IMPORTANCE_LOW);
-            channel.setShowBadge(false);
-            manager.createNotificationChannel(channel);
-        }
+        final NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
+            getString(R.string.notification_channel_downloads),
+            NotificationManager.IMPORTANCE_LOW);
+        channel.setShowBadge(false);
+        getSystemService(NotificationManager.class).createNotificationChannel(channel);
     }
 
     @Override

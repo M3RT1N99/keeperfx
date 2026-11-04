@@ -23,6 +23,7 @@ package net.keeperfx.android;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -56,6 +57,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private static final int REQUEST_PICK_ORIGINAL_DK = 1002;
     private static final int REQUEST_PICK_ORIGINAL_DK_ZIP = 1003;
     private static final int REQUEST_PICK_BUNDLE = 1004;
+    private static final String STATE_SCROLL = "scrollY";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -93,9 +95,21 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private int loadedSettingsGeneration;
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(GameLanguage.localized(base));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_launcher);
+        if (savedInstanceState != null) {
+            // A change of language lands here: the box is half way down, and the player
+            // should still be looking at it.
+            final int scrollY = savedInstanceState.getInt(STATE_SCROLL);
+            final View scroll = findViewById(R.id.scroll);
+            scroll.post(() -> scroll.scrollTo(0, scrollY));
+        }
 
         // Before anything below looks at the installation or reads a setting.
         PhoneTransfer.cleanUpAtStart(this);
@@ -167,9 +181,16 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 final String code = GameLanguage.codeAt(position);
+                // This also fires by itself when the box is first laid out.
+                final boolean changed = !code.equals(prefs.getLanguage());
                 prefs.setLanguage(code);
                 GameLanguage.applyToConfig(LauncherActivity.this, code);
-                refreshLanguageNote();
+                if (changed) {
+                    // Views read their texts once, and this screen speaks it too.
+                    recreate();
+                } else {
+                    refreshLanguageNote();
+                }
             }
 
             @Override public void onNothingSelected(AdapterView<?> parent) { }
@@ -249,6 +270,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
      */
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(STATE_SCROLL, findViewById(R.id.scroll).getScrollY());
     }
 
     @Override
@@ -869,6 +896,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         progressBar.setVisibility(value ? View.VISIBLE : View.GONE);
         installButton.setEnabled(!value);
         useAlphaBox.setEnabled(!value);
+        // Changing it recreates the screen, which would cancel a folder import, and it
+        // writes to the configuration that an install is unpacking.
+        languageSpinner.setEnabled(!value);
         // Deleting the installation under a running install leaves a mess that the
         // install then records as complete.
         removeDataButton.setEnabled(!value);

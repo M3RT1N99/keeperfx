@@ -176,12 +176,14 @@ public class GameActivity extends SDLActivity {
         button.setImageResource(R.drawable.ic_game_back);
         button.setBackgroundResource(R.drawable.overlay_round);
         button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        button.setContentDescription(getString(R.string.game_back));
+        button.setContentDescription(GameLanguage.localized(this).getString(R.string.game_back));
         // Present but not competing with the game for attention.
         button.setAlpha(IDLE_ALPHA);
         button.setOnClickListener(view -> sendEscape(view));
+        // RIGHT, not END: the game's picture does not mirror on a phone set to Arabic, and
+        // the other side holds the status panel.
         final FrameLayout.LayoutParams params =
-            new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.END);
+            new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.RIGHT);
         params.topMargin = margin;
         params.rightMargin = margin;
         // addContentView() stacks onto the window's own frame, so SDL's view
@@ -209,7 +211,7 @@ public class GameActivity extends SDLActivity {
         button.setImageResource(R.drawable.ic_right_click);
         button.setBackgroundResource(R.drawable.overlay_round);
         button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        button.setContentDescription(getString(R.string.game_right_click));
+        button.setContentDescription(GameLanguage.localized(this).getString(R.string.game_right_click));
         button.setAlpha(IDLE_ALPHA);
         button.setOnClickListener(view -> {
             rightClickActive = !rightClickActive;
@@ -218,7 +220,7 @@ public class GameActivity extends SDLActivity {
             sendKey(view, KEYCODE_STICKY_RIGHT_CLICK);
         });
         final FrameLayout.LayoutParams params =
-            new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.END);
+            new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.RIGHT);
         // Directly under the back arrow: same column, one button lower.
         params.topMargin = margin + size + margin;
         params.rightMargin = margin;

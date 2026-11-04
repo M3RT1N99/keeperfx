@@ -268,7 +268,7 @@
     <string name="option_use_alpha_hint">The engine in this app is built from the current source, and the stable release does not carry everything it expects, the fonts for Japanese, Chinese and Korean among them. The alpha patch adds those, a small download on top of the release. Turn this off to stay strictly on 1.4.0. The patch comes back off without downloading anything.</string>
 
     <string name="settings_language">Language</string>
-    <string name="settings_language_hint">Sets the language the game runs in. Starts on the one the device uses; speech and text only appear in it when the installation carries that language.</string>
+    <string name="settings_language_hint">Sets the language of this launcher and of the game. It starts on the one the device uses. In the game, speech and text only appear in it when the installation carries that language.</string>
 
     <string name="language_not_installed">This installation has no texts in %1$s, so the game runs in English.</string>
 

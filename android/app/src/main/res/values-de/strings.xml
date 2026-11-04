@@ -103,7 +103,7 @@
 
     <string name="settings_language">Sprache</string>
     <string name="language_not_installed">Diese Installation enthält keine Texte auf %1$s, das Spiel läuft deshalb auf Englisch.</string>
-    <string name="settings_language_hint">Legt fest, in welcher Sprache das Spiel läuft. Beginnt mit der des Geräts. Sprachausgabe und Texte erscheinen nur dann darin, wenn die Installation diese Sprache mitbringt.</string>
+    <string name="settings_language_hint">Legt die Sprache dieses Launchers und des Spiels fest. Beginnt mit der des Geräts. Im Spiel erscheinen Sprachausgabe und Texte nur dann darin, wenn die Installation diese Sprache mitbringt.</string>
 
     <string name="settings_startup">Start</string>
     <string name="option_no_intro">Intro überspringen</string>

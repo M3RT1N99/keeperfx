@@ -39,6 +39,38 @@ public class GameLanguageTest {
     }
 
     @Test
+    public void everyLanguageInTheBoxHasItsLocale() {
+        final String[][] expected = {
+            {"ENG", "en"}, {"GER", "de"}, {"FRE", "fr"}, {"ITA", "it"}, {"SPA", "es"}, {"DUT", "nl"},
+            {"POL", "pl"}, {"SWE", "sv"}, {"CZE", "cs"}, {"RUS", "ru"}, {"UKR", "uk"}, {"HUN", "hu"},
+            {"DAN", "da"}, {"NOR", "nb"}, {"POR", "pt"}, {"KOR", "ko"}, {"JPN", "ja"},
+            {"CHI", "zh-CN"}, {"CHT", "zh-TW"}, {"ARA", "ar"}, {"LAT", "la"},
+        };
+        assertEquals(expected.length, GameLanguage.all().size());
+        for (String[] row : expected) {
+            assertEquals(row[0], row[1], GameLanguage.localeOf(row[0]).toLanguageTag());
+        }
+    }
+
+    /** A phone set to a language gets the same box entry the launcher would then speak it from. */
+    @Test
+    public void aLocaleFindsItsWayBackToItsLanguage() {
+        for (GameLanguage.Entry entry : GameLanguage.all()) {
+            assertEquals(entry.code, GameLanguage.forLocale(GameLanguage.localeOf(entry.code)));
+        }
+    }
+
+    @Test
+    public void norwegianIsAlsoFoundUnderTheOldTag() {
+        assertEquals("NOR", GameLanguage.forLocale(new Locale("no", "NO")));
+    }
+
+    @Test
+    public void anUnknownCodeSpeaksEnglish() {
+        assertEquals("en", GameLanguage.localeOf("XXX").toLanguageTag());
+    }
+
+    @Test
     public void anUnknownLanguageIsEnglish() {
         assertEquals("ENG", GameLanguage.forLocale(new Locale("sw", "KE")));
     }

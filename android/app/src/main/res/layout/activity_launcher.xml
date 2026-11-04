@@ -23,6 +23,7 @@
         android:background="@color/kfx_scrim" />
 
     <ScrollView
+        android:id="@+id/scroll"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
@@ -116,7 +117,8 @@
                 <Button
                     android:id="@+id/cancelJob"
                     android:layout_width="match_parent"
-                    android:layout_height="40dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="40dp"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/btn_slate"
                     android:text="@android:string/cancel"
@@ -129,7 +131,8 @@
             <Button
                 android:id="@+id/installKeeperfx"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
+                android:minHeight="56dp"
                 android:layout_marginTop="14dp"
                 android:background="@drawable/btn_orange"
                 android:drawableStart="@drawable/ic_update"
@@ -143,7 +146,8 @@
             <Button
                 android:id="@+id/importOriginalDk"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
+                android:minHeight="56dp"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/btn_orange"
                 android:drawableStart="@drawable/ic_folder"
@@ -159,12 +163,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:baselineAligned="false"
                 android:orientation="horizontal">
 
                 <Button
                     android:id="@+id/exportInstallation"
                     android:layout_width="0dp"
-                    android:layout_height="56dp"
+                    android:layout_height="match_parent"
+                    android:minHeight="56dp"
                     android:layout_weight="1"
                     android:background="@drawable/btn_slate"
                     android:paddingStart="10dp"
@@ -176,7 +182,8 @@
                 <Button
                     android:id="@+id/importInstallation"
                     android:layout_width="0dp"
-                    android:layout_height="56dp"
+                    android:layout_height="match_parent"
+                    android:minHeight="56dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:background="@drawable/btn_slate"
@@ -209,12 +216,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
+                    android:baselineAligned="false"
                     android:orientation="horizontal">
 
                     <Button
                         android:id="@+id/exportShare"
                         android:layout_width="0dp"
-                        android:layout_height="44dp"
+                        android:layout_height="match_parent"
+                        android:minHeight="44dp"
                         android:layout_weight="1"
                         android:background="@drawable/btn_slate"
                         android:text="@string/button_share_again"
@@ -224,7 +233,8 @@
                     <Button
                         android:id="@+id/exportDelete"
                         android:layout_width="0dp"
-                        android:layout_height="44dp"
+                        android:layout_height="match_parent"
+                        android:minHeight="44dp"
                         android:layout_marginStart="8dp"
                         android:layout_weight="1"
                         android:background="@drawable/btn_danger"
@@ -261,21 +271,24 @@
                     <RadioButton
                         android:id="@+id/inputAuto"
                         android:layout_width="match_parent"
-                        android:layout_height="46dp"
+                        android:layout_height="wrap_content"
+                        android:minHeight="46dp"
                         android:text="@string/input_auto"
                         android:textColor="@color/kfx_text" />
 
                     <RadioButton
                         android:id="@+id/inputTouch"
                         android:layout_width="match_parent"
-                        android:layout_height="46dp"
+                        android:layout_height="wrap_content"
+                        android:minHeight="46dp"
                         android:text="@string/input_touch"
                         android:textColor="@color/kfx_text" />
 
                     <RadioButton
                         android:id="@+id/inputPointer"
                         android:layout_width="match_parent"
-                        android:layout_height="46dp"
+                        android:layout_height="wrap_content"
+                        android:minHeight="46dp"
                         android:text="@string/input_pointer"
                         android:textColor="@color/kfx_text" />
                 </RadioGroup>
@@ -283,7 +296,8 @@
                 <CheckBox
                     android:id="@+id/backButton"
                     android:layout_width="match_parent"
-                    android:layout_height="46dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="46dp"
                     android:text="@string/option_back_button"
                     android:textColor="@color/kfx_text" />
 
@@ -298,7 +312,8 @@
                 <Button
                     android:id="@+id/touchTuning"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/btn_slate"
                     android:text="@string/button_touch_tuning"
@@ -327,7 +342,8 @@
                 <CheckBox
                     android:id="@+id/useAlpha"
                     android:layout_width="match_parent"
-                    android:layout_height="46dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="46dp"
                     android:text="@string/option_use_alpha"
                     android:textColor="@color/kfx_text" />
 
@@ -400,14 +416,16 @@
                 <CheckBox
                     android:id="@+id/noIntro"
                     android:layout_width="match_parent"
-                    android:layout_height="46dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="46dp"
                     android:text="@string/option_no_intro"
                     android:textColor="@color/kfx_text" />
 
                 <CheckBox
                     android:id="@+id/noSound"
                     android:layout_width="match_parent"
-                    android:layout_height="46dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="46dp"
                     android:text="@string/option_no_sound"
                     android:textColor="@color/kfx_text" />
 
@@ -428,7 +446,8 @@
             <Button
                 android:id="@+id/play"
                 android:layout_width="match_parent"
-                android:layout_height="76dp"
+                android:layout_height="wrap_content"
+                android:minHeight="76dp"
                 android:layout_marginTop="26dp"
                 android:background="@drawable/btn_orange"
                 android:text="@string/button_play"
@@ -445,12 +464,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                android:baselineAligned="false"
                 android:orientation="horizontal">
 
                 <Button
                     android:id="@+id/showLog"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
+                    android:layout_height="match_parent"
+                    android:minHeight="48dp"
                     android:layout_weight="1"
                     android:background="@drawable/btn_slate"
                     android:drawableStart="@drawable/ic_logfile"
@@ -464,7 +485,8 @@
                 <Button
                     android:id="@+id/importKeeperfx"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
+                    android:layout_height="match_parent"
+                    android:minHeight="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:background="@drawable/btn_slate"
@@ -479,7 +501,8 @@
                 <Button
                     android:id="@+id/removeData"
                     android:layout_width="0dp"
-                    android:layout_height="48dp"
+                    android:layout_height="match_parent"
+                    android:minHeight="48dp"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:background="@drawable/btn_danger"
@@ -496,7 +519,8 @@
             <Button
                 android:id="@+id/updateApp"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
+                android:layout_height="wrap_content"
+                android:minHeight="50dp"
                 android:layout_marginTop="8dp"
                 android:layout_marginBottom="14dp"
                 android:background="@drawable/btn_slate"

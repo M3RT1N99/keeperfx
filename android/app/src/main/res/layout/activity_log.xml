@@ -26,12 +26,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
+        android:baselineAligned="false"
         android:orientation="horizontal">
 
         <Button
             android:id="@+id/logShare"
             android:layout_width="0dp"
-            android:layout_height="50dp"
+            android:layout_height="match_parent"
+            android:minHeight="50dp"
             android:layout_weight="1"
             android:background="@drawable/btn_orange"
             android:text="@string/log_share"
@@ -41,7 +43,8 @@
         <Button
             android:id="@+id/logCopy"
             android:layout_width="0dp"
-            android:layout_height="50dp"
+            android:layout_height="match_parent"
+            android:minHeight="50dp"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:background="@drawable/btn_slate"
@@ -52,7 +55,8 @@
         <Button
             android:id="@+id/logRefresh"
             android:layout_width="0dp"
-            android:layout_height="50dp"
+            android:layout_height="match_parent"
+            android:minHeight="50dp"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:background="@drawable/btn_slate"
@@ -69,9 +73,11 @@
         android:background="@drawable/panel"
         android:padding="8dp">
 
+        <!-- The log is English whatever the launcher speaks, and this keeps its lines readable. -->
         <HorizontalScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:layoutDirection="ltr">
 
             <TextView
                 android:id="@+id/logText"
@@ -79,6 +85,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="monospace"
                 android:textColor="@color/kfx_text"
+                android:textDirection="ltr"
                 android:textIsSelectable="true"
                 android:textSize="10sp" />
         </HorizontalScrollView>

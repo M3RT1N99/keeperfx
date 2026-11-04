@@ -62,6 +62,11 @@ public class LogActivity extends Activity {
     private String currentLog = "";
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(GameLanguage.localized(base));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_log);

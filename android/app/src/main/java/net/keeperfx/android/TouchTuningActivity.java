@@ -27,6 +27,7 @@
 package net.keeperfx.android;
 
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -45,6 +46,11 @@ public class TouchTuningActivity extends Activity {
     private static final int[] FPS_CHOICES = {30, 40, 60, 90, 120, 0};
 
     private Prefs prefs;
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(GameLanguage.localized(base));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,8 +98,9 @@ public class TouchTuningActivity extends Activity {
             // Rebuilds every row from the freshly cleared values.
             recreate();
         });
+        reset.setMinHeight(Math.round(48 * density));
         final LinearLayout.LayoutParams resetParams = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, Math.round(48 * density));
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         resetParams.topMargin = Math.round(18 * density);
         list.addView(reset, resetParams);
 

@@ -3,16 +3,16 @@
 /******************************************************************************/
 /**
  * @file GameLanguage.java
- *     Language of the game, and the mapping from the device's own.
+ *     The one language the player chooses: the game's and the launcher's.
  * @par Purpose:
  *     The engine takes its language from LANGUAGE= in keeperfx.cfg, which has
- *     no command line equivalent, so the launcher writes it there. The default
- *     follows the language the phone is set to, which is almost always the one
+ *     no command line equivalent, so the launcher writes it there. The launcher's own
+ *     screens and notifications read the same choice, which makes every language in
+ *     the box readable on every phone, Latin included, which no phone offers. The
+ *     default follows the language the phone is set to, which is almost always the one
  *     the player wants and saves them finding the setting at all.
  * @par Comment:
- *     Codes are the ones config_keeperfx.c accepts. Only those with a matching
- *     Android language tag are offered for automatic selection; the rest are
- *     still selectable by hand.
+ *     Codes are the ones config_keeperfx.c accepts.
  *
  *     The engine refuses to start without the text file of its language, and the
  *     official data has none for several languages the engine knows: Hungarian,
@@ -30,6 +30,7 @@
 package net.keeperfx.android;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.util.Log;
 
 import java.io.File;
@@ -60,11 +61,7 @@ public final class GameLanguage {
         }
     }
 
-    /**
-     * Every code config_keeperfx.c's lang_type[] accepts, with the ISO 639-1
-     * tag Android reports for it. An empty tag means the language has no plain
-     * equivalent to match a device against; it can still be picked by hand.
-     */
+    /** Every code config_keeperfx.c's lang_type[] accepts, with the language tag of its locale. */
     private static final String[][] LANGUAGES = {
         {"ENG", "en", "English"},
         {"GER", "de", "Deutsch"},
@@ -79,14 +76,14 @@ public final class GameLanguage {
         {"UKR", "uk", "Українська"},
         {"HUN", "hu", "Magyar"},
         {"DAN", "da", "Dansk"},
-        {"NOR", "no", "Norsk"},
+        {"NOR", "nb", "Norsk"},
         {"POR", "pt", "Português"},
         {"KOR", "ko", "한국어"},
         {"JPN", "ja", "日本語"},
-        {"CHI", "zh", "简体中文"},
-        {"CHT", "", "繁體中文"},
+        {"CHI", "zh-CN", "简体中文"},
+        {"CHT", "zh-TW", "繁體中文"},
         {"ARA", "ar", "العربية"},
-        {"LAT", "", "Latina"},
+        {"LAT", "la", "Latina"},
     };
 
     private GameLanguage() {
@@ -129,7 +126,7 @@ public final class GameLanguage {
     static String forLocale(Locale locale) {
         final String language = locale.getLanguage();
         // Android reports Norwegian as one of its two written forms.
-        if ("nb".equals(language) || "nn".equals(language)) {
+        if ("nb".equals(language) || "nn".equals(language) || "no".equals(language)) {
             return "NOR";
         }
         if ("zh".equals(language)) {
@@ -140,11 +137,27 @@ public final class GameLanguage {
             return "CHI";
         }
         for (String[] row : LANGUAGES) {
-            if (!row[1].isEmpty() && row[1].equals(language)) {
+            if (row[1].equals(language)) {
                 return row[0];
             }
         }
         return "ENG";
+    }
+
+    static Locale localeOf(String code) {
+        return Locale.forLanguageTag(LANGUAGES[indexOf(code)][1]);
+    }
+
+    /**
+     * The context for whatever the launcher's side of the app shows: its screens and its
+     * notifications speak the language in the box, whatever the phone is set to. Only the
+     * locale is overridden, and with it the direction of the layout, so a rotation still
+     * reaches the resources. Locale.setDefault() is left alone: forDevice() asks it.
+     */
+    static Context localized(Context base) {
+        final Configuration override = new Configuration();
+        override.setLocale(localeOf(new Prefs(base).getLanguage()));
+        return base.createConfigurationContext(override);
     }
 
     /** What the engine can run in: the language asked for, or English without its texts. */
