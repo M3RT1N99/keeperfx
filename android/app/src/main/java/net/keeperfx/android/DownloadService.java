@@ -336,7 +336,7 @@ public class DownloadService extends Service {
     private Message runAppUpdate() {
         final Message stage = new Message(R.string.status_downloading_app);
         try {
-            final AppRelease available = AppUpdater.checkForUpdate(this);
+            final AppRelease available = AppUpdater.checkForUpdate();
             if (available == null) {
                 return null; // someone else already installed it
             }

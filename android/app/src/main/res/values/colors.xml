@@ -14,7 +14,6 @@
     <color name="kfx_accent">#FFFF9A3C</color>
     <color name="kfx_ok">#FF7BC96F</color>
     <color name="kfx_warn">#FFFF6A45</color>
-    <color name="kfx_divider">#FF35302A</color>
     <color name="kfx_danger_border">#80FF6A45</color>
 
     <!-- Play button gradient -->

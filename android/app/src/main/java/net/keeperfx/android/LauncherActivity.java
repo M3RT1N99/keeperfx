@@ -128,7 +128,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         removeDataButton = findViewById(R.id.removeData);
         updateAppButton = findViewById(R.id.updateApp);
         updateAppButton.setText(getString(R.string.button_update_app,
-            AppUpdater.installedVersionName(this)));
+            BuildConfig.VERSION_NAME));
         exportButton = findViewById(R.id.exportInstallation);
         importButton = findViewById(R.id.importInstallation);
         cancelJobButton = findViewById(R.id.cancelJob);
@@ -678,7 +678,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         body.append("\n\n").append(getString(R.string.import_bundle_room,
             GameData.describeBytes(marker.bytes).in(this), GameData.describeBytes(offer.free).in(this)));
         body.append("\n\n").append(getString(R.string.import_bundle_trust));
-        final String thisApp = AppUpdater.installedVersionName(this);
+        final String thisApp = BuildConfig.VERSION_NAME;
         if (!marker.app.equals(thisApp) || marker.engine != BuildConfig.ENGINE_BUILD) {
             body.append("\n\n").append(getString(R.string.import_bundle_other_build,
                 marker.app, marker.engine, thisApp, BuildConfig.ENGINE_BUILD));
@@ -731,7 +731,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             AppRelease available = null;
             boolean reachable = true;
             try {
-                available = AppUpdater.checkForUpdate(this);
+                available = AppUpdater.checkForUpdate();
             } catch (Exception e) {
                 reachable = false;
             }
@@ -740,7 +740,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             postIfAlive(() -> {
                 updateAppButton.setEnabled(true);
                 updateAppButton.setText(getString(R.string.button_update_app,
-                    AppUpdater.installedVersionName(this)));
+                    BuildConfig.VERSION_NAME));
                 if (!online) {
                     showMessage(R.string.app_update_title,
                         getString(R.string.app_update_offline));
@@ -748,12 +748,12 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
                 }
                 if (found == null) {
                     showMessage(R.string.app_update_title, getString(R.string.app_update_none,
-                        AppUpdater.installedVersionName(this)));
+                        BuildConfig.VERSION_NAME));
                     return;
                 }
                 final StringBuilder text = new StringBuilder(
                     getString(R.string.app_update_available, found.versionName,
-                        AppUpdater.installedVersionName(this)));
+                        BuildConfig.VERSION_NAME));
                 final String changelog = found.changelog();
                 if (!changelog.isEmpty()) {
                     text.append("\n\n")

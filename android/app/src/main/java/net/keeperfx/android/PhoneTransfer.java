@@ -132,7 +132,7 @@ final class PhoneTransfer {
         final String release = TransferBundle.plainVersion(prefs.getInstalledVersion());
         final String alpha = TransferBundle.plainVersion(prefs.getInstalledAlphaVersion());
         final TransferBundle.Marker marker = new TransferBundle.Marker(
-            TransferBundle.plainVersion(AppUpdater.installedVersionName(context)),
+            BuildConfig.VERSION_NAME,
             BuildConfig.ENGINE_BUILD, release, alpha, plan.entries(), plan.bytes(), plan.saves);
         return TransferBundle.writeExport(exportDirectory(context),
             TransferBundle.fileName(release, alpha), plan, marker, progress);
@@ -232,7 +232,7 @@ final class PhoneTransfer {
                 throw new Message.Failure(R.string.import_bundle_cannot_read);
             }
             swap(context).install(in, BundledConfig.relativePaths(context),
-                AppUpdater.installedVersionName(context), progress);
+                BuildConfig.VERSION_NAME, progress);
         }
     }
 

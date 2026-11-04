@@ -54,18 +54,9 @@ public final class AppUpdater {
 
     // ------------------------------------------------------------ version check
 
-    public static String installedVersionName(Context context) {
-        try {
-            return context.getPackageManager()
-                .getPackageInfo(context.getPackageName(), 0).versionName;
-        } catch (Exception e) {
-            return "unknown";
-        }
-    }
-
     /** Blocking; call from a background thread. Returns null when up to date. */
-    static AppRelease checkForUpdate(Context context) throws IOException, org.json.JSONException {
-        return newerThan(installedVersionName(context), Http.getJson(LATEST_RELEASE_URL));
+    static AppRelease checkForUpdate() throws IOException, org.json.JSONException {
+        return newerThan(BuildConfig.VERSION_NAME, Http.getJson(LATEST_RELEASE_URL));
     }
 
     /**

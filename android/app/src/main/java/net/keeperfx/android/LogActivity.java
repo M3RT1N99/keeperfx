@@ -150,7 +150,7 @@ public class LogActivity extends Activity {
         // The engine's own header with its suffixed version is the first thing a long
         // log loses, and this preamble is what is left to tell it from an official build.
         sb.append("KeeperFX for Android (unofficial)\n");
-        sb.append("app version    : ").append(AppUpdater.installedVersionName(this)).append('\n');
+        sb.append("app version    : ").append(BuildConfig.VERSION_NAME).append('\n');
         final String release = prefs.getInstalledVersion();
         final String alpha = prefs.getInstalledAlphaVersion();
         sb.append("KeeperFX data  : ")

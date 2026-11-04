@@ -176,7 +176,7 @@ public final class UpdateManager {
         facts.alphaVersion = prefs.getInstalledAlphaVersion();
         facts.engineBuild = BuildConfig.ENGINE_BUILD;
         facts.hasMusic = GameData.hasMusic(context);
-        facts.appVersionName = AppUpdater.installedVersionName(context);
+        facts.appVersionName = BuildConfig.VERSION_NAME;
 
         return ask(facts, new Servers() {
             @Override
@@ -194,7 +194,7 @@ public final class UpdateManager {
 
             @Override
             public AppRelease appUpdate() throws IOException, JSONException {
-                return AppUpdater.checkForUpdate(context);
+                return AppUpdater.checkForUpdate();
             }
         });
     }
