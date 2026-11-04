@@ -341,19 +341,7 @@ public class DownloadService extends Service {
                 return null; // someone else already installed it
             }
             report(stage, -1, null);
-            final Intent install = AppUpdater.download(this, available, new ResumableDownload.Progress() {
-                @Override
-                public void onBytes(long done, long total) {
-                    report(stage, (total > 0) ? (int) (done * 100 / total) : -1,
-                        new Message(R.string.progress_bytes,
-                            GameData.describeBytes(done), GameData.describeBytes(total)));
-                }
-
-                @Override
-                public boolean isCancelled() {
-                    return cancelRequested;
-                }
-            });
+            final Intent install = AppUpdater.download(this, available, new JobProgress(stage));
             if (install == null) {
                 return new Message(R.string.job_download_cancelled);
             }
@@ -368,7 +356,7 @@ public class DownloadService extends Service {
 
     private Message runBundleExport() {
         try {
-            exportedFile = PhoneTransfer.runExport(this, transferProgress(R.string.stage_packing));
+            exportedFile = PhoneTransfer.runExport(this, new JobProgress(new Message(R.string.stage_packing)));
             return null;
         } catch (TransferBundle.CancelledException e) {
             return new Message(R.string.job_packing_cancelled);
@@ -382,7 +370,8 @@ public class DownloadService extends Service {
 
     private Message runBundleImport(Uri file) {
         try {
-            PhoneTransfer.runImport(this, file, transferProgress(R.string.stage_unpacking_import));
+            PhoneTransfer.runImport(this, file,
+                new JobProgress(new Message(R.string.stage_unpacking_import)));
             importedFile = PhoneTransfer.describeImported(this, file);
             settingsGeneration++;
             doneMessage = R.string.import_bundle_done_notification;
@@ -397,21 +386,25 @@ public class DownloadService extends Service {
         }
     }
 
-    private TransferBundle.Progress transferProgress(int stage) {
-        final Message stageMessage = new Message(stage);
-        return new TransferBundle.Progress() {
-            @Override
-            public void onBytes(long done, long total) {
-                report(stageMessage, (total > 0) ? (int) (done * 100 / total) : -1,
-                    new Message(R.string.progress_bytes,
-                        GameData.describeBytes(done), GameData.describeBytes(total)));
-            }
+    /** What a transfer of known length tells the launcher and the notification. */
+    private final class JobProgress implements ResumableDownload.Progress, TransferBundle.Progress {
+        private final Message stage;
 
-            @Override
-            public boolean isCancelled() {
-                return cancelRequested;
-            }
-        };
+        JobProgress(Message stage) {
+            this.stage = stage;
+        }
+
+        @Override
+        public void onBytes(long done, long total) {
+            report(stage, (total > 0) ? (int) (done * 100 / total) : -1,
+                new Message(R.string.progress_bytes,
+                    GameData.describeBytes(done), GameData.describeBytes(total)));
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return cancelRequested;
+        }
     }
 
     /** @param detail null when there is nothing to add. */
@@ -484,42 +477,37 @@ public class DownloadService extends Service {
         manager.notify(NOTIFICATION_ID, buildNotification(text, percent, true));
     }
 
+    /**
+     * Neither the system's installer nor a share sheet can open by itself when the launcher
+     * is not on screen, and Android drops that without a word, so what is left to do goes
+     * in a notification. The packing in particular can easily outlast the player's patience
+     * with looking at the launcher.
+     */
     private void showFinishedNotification(String failure) {
         final NotificationManager manager = getSystemService(NotificationManager.class);
-        final Intent install = (failure == null) ? installIntent : null;
-        if (install != null) {
-            // The installer cannot open itself when the launcher is not on screen,
-            // and Android drops that without a word. The notification still can.
-            manager.notify(NOTIFICATION_ID, new Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle(getString(R.string.app_name))
-                .setContentText(getString(R.string.notification_install_update))
-                .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setContentIntent(PendingIntent.getActivity(this, 1, install,
-                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT))
-                .setAutoCancel(true)
-                .build());
-            return;
+        if (failure != null) {
+            manager.notify(NOTIFICATION_ID, buildNotification(failure, -1, false));
+        } else if (installIntent != null) {
+            manager.notify(NOTIFICATION_ID, tapToContinue(R.string.notification_install_update,
+                android.R.drawable.stat_sys_download_done, 1, installIntent));
+        } else if (exportedFile != null) {
+            manager.notify(NOTIFICATION_ID, tapToContinue(R.string.export_ready_notification,
+                android.R.drawable.stat_sys_upload_done, 2,
+                PhoneTransfer.shareSheet(this, exportedFile).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        } else {
+            manager.notify(NOTIFICATION_ID, buildNotification(getString(doneMessage), -1, false));
         }
-        final File exported = (failure == null) ? exportedFile : null;
-        if (exported != null) {
-            // The same goes for a share sheet, and the packing can easily outlast the
-            // player's patience with looking at the launcher.
-            manager.notify(NOTIFICATION_ID, new Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle(getString(R.string.app_name))
-                .setContentText(getString(R.string.export_ready_notification))
-                .setSmallIcon(android.R.drawable.stat_sys_upload_done)
-                .setContentIntent(PendingIntent.getActivity(this, 2,
-                    PhoneTransfer.shareSheet(this, exported)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT))
-                .setAutoCancel(true)
-                .build());
-            return;
-        }
-        final String text = (failure == null)
-            ? getString(doneMessage)
-            : failure;
-        manager.notify(NOTIFICATION_ID, buildNotification(text, -1, false));
+    }
+
+    private Notification tapToContinue(int text, int icon, int requestCode, Intent next) {
+        return new Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getString(text))
+            .setSmallIcon(icon)
+            .setContentIntent(PendingIntent.getActivity(this, requestCode, next,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT))
+            .setAutoCancel(true)
+            .build();
     }
 
     /** Polled by the downloaders so a cancel takes effect mid transfer. */
