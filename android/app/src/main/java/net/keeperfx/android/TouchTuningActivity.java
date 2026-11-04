@@ -216,6 +216,8 @@ public class TouchTuningActivity extends Activity {
             case "panslop":     return R.string.tuning_panslop;
             case "zoomgate":    return R.string.tuning_zoomgate;
             case "rotategate":  return R.string.tuning_rotategate;
+            case "looksens":    return R.string.tuning_looksens;
+            case "stickradius": return R.string.tuning_stickradius;
             default:            return R.string.tuning_flickdecay;
         }
     }
@@ -227,6 +229,8 @@ public class TouchTuningActivity extends Activity {
             case "panslop":     return R.string.tuning_panslop_hint;
             case "zoomgate":    return R.string.tuning_zoomgate_hint;
             case "rotategate":  return R.string.tuning_rotategate_hint;
+            case "looksens":    return R.string.tuning_looksens_hint;
+            case "stickradius": return R.string.tuning_stickradius_hint;
             default:            return R.string.tuning_flickdecay_hint;
         }
     }

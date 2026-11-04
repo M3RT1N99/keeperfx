@@ -167,4 +167,8 @@ The system back button and the back gesture also leave a menu. On screen: a back
     <string name="tuning_rotategate_hint">How far the fingers twist before the map starts to turn. Raise this if panning keeps turning into rotating.</string>
     <string name="tuning_flickdecay">Flick roll-out</string>
     <string name="tuning_flickdecay_hint">How much speed a released swipe keeps per sixtieth of a second. 0 stops the map dead the moment the fingers lift.</string>
+    <string name="tuning_looksens">Possession look speed (degrees per pixel at 720 high)</string>
+    <string name="tuning_looksens_hint">How far the view of a possessed creature turns for the travel of a finger.</string>
+    <string name="tuning_stickradius">Possession stick size (% of the screen height)</string>
+    <string name="tuning_stickradius_hint">Radius of the ring that appears under the thumb. A larger one takes a longer push to start walking.</string>
 </resources>

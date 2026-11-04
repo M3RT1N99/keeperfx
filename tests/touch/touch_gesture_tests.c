@@ -580,6 +580,8 @@ static void test_the_chase_respects_the_limits(void)
     CHECK(tg_zoom_chase(0, 3000, step_in(3000), step_out(3000)) == 0, "chased a zoom of nothing");
 }
 
+int touch_steer_tests(int *total_checks);
+
 int main(void)
 {
     test_projection_round_trip();
@@ -602,6 +604,7 @@ int main(void)
     test_the_chase_stays_within_half_a_step();
     test_the_chase_does_not_tremble();
     test_the_chase_respects_the_limits();
+    failures += touch_steer_tests(&checks);
     printf("%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;
 }

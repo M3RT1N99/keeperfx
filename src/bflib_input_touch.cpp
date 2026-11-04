@@ -7,9 +7,10 @@
  * @par Purpose:
  *     Turns SDL multi touch events into game actions without going through
  *     the operating system mouse. Finger positions drive the in-game pointer
- *     directly. Two fingers hold the map, see touch_camera.c; where there is no
- *     map to hold, gestures are fed into the same device independent game key
- *     layer that the keyboard and the controller use.
+ *     directly. Two fingers hold the map, see touch_camera.c; a possessed creature
+ *     has rules of its own, see touch_possess.c; what has neither gets its gestures
+ *     fed into the same device independent game key layer that the keyboard and the
+ *     controller use.
  * @par Comment:
  *     This module deliberately does not use SDL's touch-to-mouse translation
  *     (SDL_HINT_TOUCH_MOUSE_EVENTS); that emulation collapses multi touch into
@@ -40,10 +41,13 @@
 #include "bflib_planar.h"
 #include "bflib_video.h"
 #include "front_input.h"
+#include "kjm_input.h"
 #include "kfx/platform/WindowSystemSDL.h"
 #include "kfx/renderer/RendererManager.h"
 #include "touch_camera.h"
 #include "touch_gesture.h"
+#include "touch_possess.h"
+#include "touch_steer.h"
 #include <SDL3/SDL.h>
 #include "post_inc.h"
 
@@ -103,8 +107,8 @@ static float touch_rotate_gate_rad = 0.10f;
 static float touch_flick_decay = 0.93f;
 
 /*
- * The rest of this block is the game key lane, for what has no map to hold: walking a
- * possessed creature and scrolling the land view.
+ * The rest of this block is the game key lane, for what has no map to hold and no
+ * creature to steer: scrolling the land view and the parchment map.
  */
 
 /**
@@ -226,6 +230,16 @@ static int touch_max_fingers_this_contact = 0;
 static Uint64 touch_contact_start_ticks = 0;
 static TbBool touch_contact_moved = false;
 
+/* Steering a possessed creature. */
+static TbBool touch_was_steering = false;
+/** Tapped and not clicked yet: a tap can come faster than the game takes in a click. */
+static int touch_attacks_owed = 0;
+/** A click the panel is waiting for, once the one under way is done. */
+static TbBool touch_panel_click_wanted = false;
+static long touch_panel_click_x, touch_panel_click_y;
+/** The click under way is the panel's. It holds the pointer until the game has seen it end. */
+static TbBool touch_panel_click = false;
+
 /******************************************************************************/
 
 void touch_set_sticky_right_click(TbBool on)
@@ -259,6 +273,8 @@ TbBool touch_tune(const char *name, float value)
         { "zoomgate",    &touch_zoom_gate_percent,      0.2f,  20.0f },
         { "rotategate",  &touch_rotate_gate_rad,       0.02f,   1.0f },
         { "flickdecay",  &touch_flick_decay,            0.0f,   0.99f },
+        { "looksens",    &touch_look_sensitivity,      0.05f,   0.60f },
+        { "stickradius", &touch_stick_radius_percent,   8.0f,  25.0f },
     };
     for (size_t i = 0; i < sizeof(tunables) / sizeof(tunables[0]); i++)
     {
@@ -377,6 +393,10 @@ static void touch_reset_state(void)
     touch_camera_catch();
     touch_tapped_back = false;
     touch_back_key_frames = 0;
+    touch_possess_reset();
+    touch_attacks_owed = 0;
+    touch_panel_click_wanted = false;
+    touch_panel_click = false;
 }
 
 void touch_focus_lost(void)
@@ -386,6 +406,7 @@ void touch_focus_lost(void)
     // look like one more finger, for as long as the game runs.
     if (touch_finger_count > 0)
         touch_reset_state();
+    touch_possess_reset();
 }
 
 void init_touch_input(void)
@@ -673,6 +694,48 @@ static Uint64 touch_event_ms(const SDL_Event *ev)
 }
 
 /**
+ * Fingers belong to what they landed on. When a creature starts or stops being steered,
+ * by a possession ending by itself or a menu opening over it, the ones still down drop
+ * out of the game until they have been lifted, and nothing they did stays held.
+ */
+static void touch_sync_steering(void)
+{
+    const TbBool steering = touch_possess_steering();
+    if (steering == touch_was_steering)
+        return;
+    touch_was_steering = steering;
+    touch_reset_state();
+}
+
+static void touch_steering_event(const SDL_Event *ev)
+{
+    const unsigned long long id = ev->tfinger.fingerID;
+    const long long ms = (long long)touch_event_ms(ev);
+    long x;
+    long y;
+    touch_normalized_to_game(ev->tfinger.x, ev->tfinger.y, &x, &y);
+    switch (ev->type)
+    {
+    case SDL_EVENT_FINGER_DOWN:
+        touch_possess_finger_down(id, x, y, ms);
+        break;
+    case SDL_EVENT_FINGER_MOTION:
+        touch_possess_finger_move(id, x, y, ms);
+        break;
+    case SDL_EVENT_FINGER_UP:
+        touch_possess_finger_up(id, ms, false);
+        break;
+    case SDL_EVENT_FINGER_CANCELED:
+        touch_possess_finger_up(id, ms, true);
+        break;
+    default:
+        break;
+    }
+    if (touch_possess_pointer_at(&x, &y))
+        touch_move_pointer(x, y);
+}
+
+/**
  * Handles one SDL touch event. Declared in bflib_inputctrl.cpp the same way
  * JEvent() is, to keep SDL types out of the shared headers.
  */
@@ -684,6 +747,12 @@ void TEvent(const SDL_Event *ev)
     touch_seen_device = true;
     if (!touch_controls_active())
         return;
+    touch_sync_steering();
+    if (touch_possess_steering())
+    {
+        touch_steering_event(ev);
+        return;
+    }
 
     switch (ev->type)
     {
@@ -854,6 +923,61 @@ void TEvent(const SDL_Event *ev)
 static void touch_apply_pan_accumulator(void);
 static void touch_apply_camera_accumulators(void);
 
+static void touch_click_as_tapped(void)
+{
+    if (touch_sticky_rmb)
+        touch_queue_right_click();
+    else
+        touch_queue_click();
+}
+
+/** Turns what the fingers asked for into clicks, one at a time. */
+static void touch_serve_steering(void)
+{
+    struct TsActions actions;
+    touch_possess_poll((long long)SDL_GetTicks(), &actions);
+    touch_attacks_owed += actions.attacks;
+    if (actions.right_click)
+        touch_tapped_right_click = true;
+    if (actions.escape)
+        touch_tapped_back = true;
+    if (actions.pointer_click)
+    {
+        touch_panel_click_wanted = true;
+        touch_panel_click_x = (long)actions.click_x;
+        touch_panel_click_y = (long)actions.click_y;
+    }
+    long pointer_x;
+    long pointer_y;
+    const TbBool panel_has_pointer = touch_possess_pointer_at(&pointer_x, &pointer_y);
+    // A tap beside a finger resting on the panel has no pointer to click with, and
+    // saving it up would fire it long after, the moment that finger lifts.
+    if (panel_has_pointer)
+        touch_attacks_owed = 0;
+    // The game reads a press and a release in two separate turns. Another press before
+    // it has read the release would merge the two clicks into one.
+    if (touch_click_pending || touch_right_click_pending || left_button_held || right_button_held)
+        return;
+    touch_panel_click = false;
+    if (touch_panel_click_wanted)
+    {
+        touch_panel_click_wanted = false;
+        touch_panel_click = true;
+        touch_move_pointer(touch_panel_click_x, touch_panel_click_y);
+        touch_click_as_tapped();
+        return;
+    }
+    if (panel_has_pointer)
+        return;
+    // An attack clicks at the centre, on no button, and that is where the pointer rests.
+    touch_move_pointer(RendererPhysicalWidth() / 2, RendererPhysicalHeight() / 2);
+    if (touch_attacks_owed > 0)
+    {
+        touch_attacks_owed--;
+        touch_click_as_tapped();
+    }
+}
+
 /**
  * Runs for every frame the game draws, before the cameras are interpolated.
  *
@@ -884,6 +1008,7 @@ void touch_frame_update(void)
 
 void update_touch_inputs(void)
 {
+    touch_sync_steering();
     if (!touch_controls_active())
     {
         if (touch_button_down_left || touch_button_down_right)
@@ -915,6 +1040,8 @@ void update_touch_inputs(void)
             touch_release_buttons();
         }
     }
+    if (touch_possess_steering())
+        touch_serve_steering();
 
     // A single finger resting in place turns into a right click (slap / drop).
     if ((touch_gesture == TGest_Point) && (touch_finger_count == 1))
@@ -1033,6 +1160,8 @@ float touch_game_key_axis_value(long key_id)
 {
     if (!touch_controls_active() || touch_camera_owns_view())
         return 0.0f;
+    if (touch_possess_owns_keys())
+        return touch_possess_axis(key_id);
     switch (key_id)
     {
     case Gkey_MoveLeft:  return touch_axis_pan_left;
@@ -1045,6 +1174,11 @@ float touch_game_key_axis_value(long key_id)
     case Gkey_RotateCCW: return touch_axis_rotate_ccw;
     default:             return 0.0f;
     }
+}
+
+TbBool touch_click_is_for_panel(void)
+{
+    return touch_panel_click;
 }
 
 TbBool touch_gesture_committed(void)

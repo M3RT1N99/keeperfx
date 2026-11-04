@@ -205,6 +205,8 @@ public final class Prefs {
         new TouchTunable("zoomgate",      2.0f,   0.2f,   20.0f,  0.1f),
         new TouchTunable("rotategate",   0.10f,  0.02f,    1.0f, 0.01f),
         new TouchTunable("flickdecay",   0.93f,   0.0f,  0.99f, 0.01f),
+        new TouchTunable("looksens",     0.20f,  0.05f,  0.60f, 0.01f),
+        new TouchTunable("stickradius",  15.0f,   8.0f,  25.0f,  1.0f),
     };
 
     public float getTouchTune(TouchTunable tunable) {

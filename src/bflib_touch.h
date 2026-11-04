@@ -56,7 +56,7 @@ TbBool touch_parse_control_mode(const char *text, unsigned char *mode);
 /**
  * Adjusts one gesture constant at run time, by name.
  *
- * Names: longpress, dragslop, panslop, zoomgate, rotategate, flickdecay.
+ * Names: longpress, dragslop, panslop, zoomgate, rotategate, flickdecay, looksens, stickradius.
  * @return true when the name was recognised.
  */
 TbBool touch_tune(const char *name, float value);
@@ -85,6 +85,9 @@ void touch_frame_update(void);
 
 /** The window lost the focus: whatever the fingers are doing, this game no longer hears of it. */
 void touch_focus_lost(void);
+
+/** True while a click from a finger on the panel of a possessed creature is under way. */
+TbBool touch_click_is_for_panel(void);
 
 /** True when a two finger gesture has become more than a tap: it wants the camera. */
 TbBool touch_gesture_committed(void);

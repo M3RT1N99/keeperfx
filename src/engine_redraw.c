@@ -70,6 +70,7 @@
 #include "packets.h"
 #include "custom_sprites.h"
 #include "keeperfx.hpp"
+#include "touch_possess.h"
 #include "post_inc.h"
 
 #ifdef __cplusplus
@@ -570,6 +571,7 @@ void redraw_creature_view(void)
             }
         }
     }
+    touch_possess_draw();
 }
 
 void redraw_isometric_view(void)

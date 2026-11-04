@@ -26,6 +26,7 @@
 #include "bflib_joyst.h"
 #include "bflib_touch.h"
 #include "touch_camera.h"
+#include "touch_possess.h"
 #include "bflib_video.h"
 #include "bflib_keybrd.h"
 #include "bflib_mouse.h"
@@ -2840,7 +2841,9 @@ static void get_creature_control_nonaction_inputs(void)
     struct Thing* thing = thing_get(get_local_user_state()->controlled_thing_idx);
     TRACE_THING(thing);
     TbBool cheat_menu_active = cheat_menu_is_active();
-    if (((MyScreenWidth >> 1) != x) || ((MyScreenHeight >> 1) != y))
+    // Fingers turn the view by what they travel, and the pointer is for the panel.
+    const TbBool touch_steers = touch_possess_steering();
+    if (!touch_steers && (((MyScreenWidth >> 1) != x) || ((MyScreenHeight >> 1) != y)))
     {
         if (!cheat_menu_active && !a_menu_window_is_active())
         {
@@ -2849,7 +2852,11 @@ static void get_creature_control_nonaction_inputs(void)
     }
     pckt->pos_x = 0;
     pckt->pos_y = 0;
-    if (!cheat_menu_active && !a_menu_window_is_active())
+    if (touch_steers)
+    {
+        touch_possess_take_look(thing, &pckt->pos_x, &pckt->pos_y);
+    }
+    else if (!cheat_menu_active && !a_menu_window_is_active())
     {
         long centerX = MyScreenWidth / 2;
         long centerY = MyScreenHeight / 2;
@@ -3168,6 +3175,9 @@ static short get_inputs(void)
         get_creature_control_nonaction_inputs();
         get_player_gui_clicks();
         get_packet_control_mouse_clicks();
+        // A press on the panel is the panel's, even between its buttons: no attack.
+        if (touch_click_is_for_panel())
+            unset_players_packet_control(player, PCtr_LBtnHeld|PCtr_LBtnClick|PCtr_LBtnRelease);
         return inp_handled;
     case PVT_CreaturePasngr:
         if (!inp_handled)
