@@ -35,6 +35,8 @@
 #include <string>
 #include <vector>
 #include <jni.h>
+#include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <android/log.h>
 #include <SDL3/SDL.h>
@@ -116,6 +118,23 @@ static bool SDLCALL background_audio_watch(void *userdata, SDL_Event *event)
         break;
     }
     return true; // Leave the event in the queue for whoever else wants it
+}
+
+/**
+ * SDL_IOFromFile does not resolve a relative path against the working directory
+ * on Android: it looks at the internal storage root and in the APK assets. Every
+ * file that goes through LbFileOpen's stdio is unaffected, so only the few things
+ * handed to SDL by name need this - the music, the speech, the screenshots.
+ */
+extern "C" const char *android_absolute_path(const char *path, char *buf, size_t bufsize)
+{
+    if (path == nullptr || path[0] == '/' || getcwd(buf, bufsize) == nullptr)
+        return path;
+    if (path[0] == '.' && path[1] == '/')
+        path += 2;
+    const size_t len = strlen(buf);
+    snprintf(buf + len, bufsize - len, "/%s", path);
+    return buf;
 }
 
 /**

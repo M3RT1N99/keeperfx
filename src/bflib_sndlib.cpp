@@ -33,7 +33,7 @@
 #include <cmath>
 #ifdef __ANDROID__
 #include <iterator>
-#include <unistd.h>
+#include "android.h"
 #endif
 
 #include "keeperfx.hpp"
@@ -690,28 +690,6 @@ extern "C" void set_music_volume(SoundVolume value) {
 	}
 }
 
-#ifdef __ANDROID__
-// SDL_IOFromFile does not resolve a relative path against the working
-// directory on Android - it looks in the APK assets and at the internal
-// storage root instead - so the music and the streamed speech, the only
-// things the mixer opens by name, have to be handed an absolute path. Every
-// other file goes through LbFileOpen's stdio and is unaffected.
-static const char * mix_file_path(const char * fname, char * buf, size_t bufsize) {
-	if (fname == nullptr || fname[0] == '/') {
-		return fname;
-	}
-	if (getcwd(buf, bufsize) == nullptr) {
-		return fname;
-	}
-	if (fname[0] == '.' && fname[1] == '/') {
-		fname += 2;
-	}
-	const size_t len = strlen(buf);
-	snprintf(buf + len, bufsize - len, "/%s", fname);
-	return buf;
-}
-#endif
-
 extern "C" TbBool play_music(const char * fname) {
 	std::lock_guard<std::mutex> guard(g_mix_mutex);
 	if (g_current_music_fname == fname) {
@@ -729,7 +707,7 @@ extern "C" TbBool play_music(const char * fname) {
 	const char * music_path = game.music_fname;
 #ifdef __ANDROID__
 	char full_path[2048];
-	music_path = mix_file_path(game.music_fname, full_path, sizeof(full_path));
+	music_path = android_absolute_path(game.music_fname, full_path, sizeof(full_path));
 #endif
 	// SDL3_mixer: load into a MIX_Audio and bind it to the persistent music track.
 	MIX_Audio* new_audio = MIX_LoadAudio(g_mixer, music_path, false);
@@ -1450,7 +1428,7 @@ extern "C" TbBool play_streamed_sample(const char* fname, SoundVolume volume)
 	}
 #ifdef __ANDROID__
 	char full_path[2048];
-	fname = mix_file_path(fname, full_path, sizeof(full_path));
+	fname = android_absolute_path(fname, full_path, sizeof(full_path));
 	// The speech files are mp3; decoding them straight into the OpenAL source
 	// skips the mixer-format resample and most of the start-up lag. Anything
 	// else, and any decode failure, still goes through the mixer's decoder.

@@ -12,6 +12,9 @@
 #include "kfx/renderer/RendererFrameCounter.h"
 #include "bflib_mouse.h"       // LbMouseOnBeginSwap/EndSwap (submits the cursor sprite around present)
 #include <SDL3_image/SDL_image.h> // IMG_SavePNG (screenshots)
+#if defined(__ANDROID__)
+#include "android.h"
+#endif
 #include "post_inc.h"
 
 bool RendererSoftware::Init()
@@ -221,6 +224,10 @@ bool RendererSoftware::ScheduleScreenshot(const char* path, int fmt)
     SDL_Surface* draw_surface = SwDisplaySurfaceGet();
     if (draw_surface == NULL)
         return false;
+#if defined(__ANDROID__)
+    char full_path[2048];
+    path = android_absolute_path(path, full_path, sizeof(full_path));
+#endif
     bool ok;
     switch (fmt)
     {

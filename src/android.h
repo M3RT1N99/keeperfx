@@ -34,6 +34,12 @@ void android_frame_watch(void);
 size_t android_codepage_to_utf8(const char *charset, const char *src, size_t src_size,
                                 char *dst, size_t dst_size);
 
+/**
+ * What to hand SDL's file functions for a path relative to the working directory.
+ * @return path itself when it is absolute already, otherwise buf.
+ */
+const char *android_absolute_path(const char *path, char *buf, size_t bufsize);
+
 #ifdef __cplusplus
 }
 #endif
