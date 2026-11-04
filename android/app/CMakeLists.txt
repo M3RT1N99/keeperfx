@@ -194,6 +194,12 @@ set(USE_STATIC_MBEDTLS_LIBRARY ON  CACHE BOOL "" FORCE)
 # warning set for, and a single new warning would fail the whole APK build.
 set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
 set(GEN_FILES OFF CACHE BOOL "" FORCE)
+# curl keeps one random generator for all its connections and leaves the locking
+# to mbedTLS, which has none unless asked. The lobby browser opens three TLS
+# connections at once (net_matchmaking.c), and their concurrent reseeds ended in a
+# double free. Directory wide because the mutexes change the layout of the structs
+# curl shares with mbedTLS, so both have to be compiled with them.
+add_compile_definitions(MBEDTLS_THREADING_C MBEDTLS_THREADING_PTHREAD)
 add_subdirectory("${KFX_DEPS}/mbedtls" "${CMAKE_CURRENT_BINARY_DIR}/mbedtls" EXCLUDE_FROM_ALL)
 
 # curl looks for mbedTLS with find_package. Pointing the four variables it
