@@ -723,10 +723,10 @@ static void touch_steering_event(const SDL_Event *ev)
         touch_possess_finger_move(id, x, y, ms);
         break;
     case SDL_EVENT_FINGER_UP:
-        touch_possess_finger_up(id, ms, false);
+        touch_possess_finger_up(id, x, y, ms);
         break;
     case SDL_EVENT_FINGER_CANCELED:
-        touch_possess_finger_up(id, ms, true);
+        touch_possess_finger_cancel(id);
         break;
     default:
         break;

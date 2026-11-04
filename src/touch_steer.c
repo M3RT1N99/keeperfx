@@ -187,18 +187,27 @@ void ts_finger_move(struct TsSteer *s, unsigned long long id, float x, float y, 
     }
 }
 
-void ts_finger_up(struct TsSteer *s, unsigned long long id, long long ms, int canceled)
+void ts_finger_cancel(struct TsSteer *s, unsigned long long id)
 {
     struct TsFinger *f = ts_find(s, id);
     if (f == NULL)
         return;
-    if (canceled) {
-        // The fingers of a tap go together: the system taking one away leaves no tap.
-        for (int i = 0; i < TS_MAX_FINGERS; i++)
-            s->fingers[i].may_tap = 0;
-        s->tap_members = 0;
-        s->tap_lifted = 0;
-    } else if (f->may_tap && ((ms - f->down_ms) < TS_TAP_MS)) {
+    // The fingers of a tap go together: the system taking one away leaves no tap.
+    for (int i = 0; i < TS_MAX_FINGERS; i++)
+        s->fingers[i].may_tap = 0;
+    s->tap_members = 0;
+    s->tap_lifted = 0;
+    f->role = TsR_Free;
+}
+
+void ts_finger_up(struct TsSteer *s, unsigned long long id, float x, float y, long long ms,
+    const struct TsScreen *screen)
+{
+    ts_finger_move(s, id, x, y, ms, screen);
+    struct TsFinger *f = ts_find(s, id);
+    if (f == NULL)
+        return;
+    if (f->may_tap && ((ms - f->down_ms) < TS_TAP_MS)) {
         s->tap_lifted++;
         s->tap_role = f->role;
         s->tap_x = f->x;

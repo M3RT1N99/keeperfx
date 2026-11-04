@@ -69,14 +69,23 @@ static void move(unsigned long long id, float x, float y)
     ts_finger_move(&s, id, x, y, now, &phone);
 }
 
+/** Lifts where it last was, or an unknown finger anywhere. */
 static void up(unsigned long long id)
 {
-    ts_finger_up(&s, id, now, 0);
+    float x = 0.0f;
+    float y = 0.0f;
+    for (int i = 0; i < TS_MAX_FINGERS; i++) {
+        if ((s.fingers[i].role != TsR_Free) && (s.fingers[i].id == id)) {
+            x = s.fingers[i].x;
+            y = s.fingers[i].y;
+        }
+    }
+    ts_finger_up(&s, id, x, y, now, &phone);
 }
 
 static void cancel(unsigned long long id)
 {
-    ts_finger_up(&s, id, now, 1);
+    ts_finger_cancel(&s, id);
 }
 
 /** Time passes the way the game sees it: a look at the clock now and then. */
@@ -363,6 +372,35 @@ static void test_tiny_steps_add_up(void)
     const long expected = (long)(100.0f * UNITS_PER_PX);
     CHECK(labs(total - expected) <= 1, "%ld units against %ld", total, expected);
     up(1);
+}
+
+static void test_the_lift_says_where_the_finger_really_was(void)
+{
+    // A fast drag stops and lifts: the last move was an estimate past the real end.
+    begin();
+    down(1, LOOK_X, LOOK_Y);
+    now += 16;
+    move(1, LOOK_X - 150.0f, LOOK_Y);
+    now += 16;
+    move(1, LOOK_X - 324.0f, LOOK_Y);
+    now += 100;
+    ts_finger_up(&s, 1, LOOK_X - 300.0f, LOOK_Y, now, &phone);
+    long total = 0;
+    for (int turn = 0; turn < 20; turn++) {
+        int x;
+        int y;
+        look_taken(&x, &y);
+        total += x;
+    }
+    const long expected = (long)(-300.0f * UNITS_PER_PX);
+    CHECK(labs(total - expected) <= 1, "%ld units against %ld", total, expected);
+    CHECK(nothing_came_of_it(), "a drag does not click");
+    // A tap that slid past the slop on its way off the glass is no tap.
+    begin();
+    down(1, LOOK_X, LOOK_Y);
+    now += 60;
+    ts_finger_up(&s, 1, LOOK_X + 30.0f, LOOK_Y, now, &phone);
+    CHECK(nothing_came_of_it(), "slid off");
 }
 
 static void test_what_a_turn_cannot_take_stays_owed(void)
@@ -887,6 +925,7 @@ int touch_steer_tests(int *total_checks)
     test_a_tremble_is_nothing();
     test_a_drag_loses_nothing();
     test_tiny_steps_add_up();
+    test_the_lift_says_where_the_finger_really_was();
     test_what_a_turn_cannot_take_stays_owed();
     test_a_tap_attacks_once_and_turns_nothing();
     test_tap_or_drag_by_time();

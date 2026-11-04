@@ -101,9 +101,16 @@ void touch_possess_finger_move(unsigned long long id, long x, long y, long long 
     ts_finger_move(&steer, id, (float)x, (float)y, ms, &screen);
 }
 
-void touch_possess_finger_up(unsigned long long id, long long ms, TbBool canceled)
+void touch_possess_finger_up(unsigned long long id, long x, long y, long long ms)
 {
-    ts_finger_up(&steer, id, ms, canceled);
+    struct TsScreen screen;
+    current_screen(&screen);
+    ts_finger_up(&steer, id, (float)x, (float)y, ms, &screen);
+}
+
+void touch_possess_finger_cancel(unsigned long long id)
+{
+    ts_finger_cancel(&steer, id);
 }
 
 void touch_possess_poll(long long now_ms, struct TsActions *actions)
@@ -130,13 +137,25 @@ TbBool touch_possess_owns_keys(void)
 
 float touch_possess_axis(long key_id)
 {
+    // The game asks about every key it knows, many times a turn, so these come first.
+    switch (key_id)
+    {
+    case Gkey_MoveUp:
+    case Gkey_MoveDown:
+    case Gkey_MoveRight:
+    case Gkey_MoveLeft:
+    case Gkey_Ascend:
+    case Gkey_Descend:
+        break;
+    default:
+        return 0.0f;
+    }
     if (!touch_possess_steering())
         return 0.0f;
-    struct TsScreen screen;
-    current_screen(&screen);
+    const float radius = (float)RendererPhysicalHeight() * touch_stick_radius_percent / 100.0f;
     int forward;
     int right;
-    ts_walk(&steer, screen.stick_radius, &forward, &right);
+    ts_walk(&steer, radius, &forward, &right);
     switch (key_id)
     {
     case Gkey_MoveUp:    return (forward > 0) ? 1.0f : 0.0f;
@@ -144,8 +163,7 @@ float touch_possess_axis(long key_id)
     case Gkey_MoveRight: return (right > 0) ? 1.0f : 0.0f;
     case Gkey_MoveLeft:  return (right < 0) ? 1.0f : 0.0f;
     case Gkey_Ascend:    return ts_holding(&steer, TsR_Ascend) ? 1.0f : 0.0f;
-    case Gkey_Descend:   return ts_holding(&steer, TsR_Descend) ? 1.0f : 0.0f;
-    default:             return 0.0f;
+    default:             return ts_holding(&steer, TsR_Descend) ? 1.0f : 0.0f;
     }
 }
 
