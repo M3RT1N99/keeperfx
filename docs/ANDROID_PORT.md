@@ -10,12 +10,14 @@ reading the code. Rules for working on it are in `AGENTS.md`.
 
 ## Status
 
-This describes port version 1.132 on `feature/android-sdl3`, engine build 5591.
+This describes port version 1.135, the release built from `feature/android-support`,
+engine build 5591. Everything measured below ran on 1.132 or earlier, and 1.135 only
+adds comments, documents and one line of the workflow to it.
 
 | | |
 |---|---|
 | **Run on** | x86_64 emulators, API 36, 1544x720, software GPU, with the arm64 libraries under translation |
-| **Built by** | a copy of CI's environment in WSL. The workflow itself has not run on this code yet |
+| **Built by** | a copy of CI's environment in WSL for what was measured, and the workflow for the release, whose unit tests, touch tests, APK and Linux build all passed |
 | **Not run** | any phone, any Android older than 16, real Wi-Fi radios, a game against a desktop client |
 | **Not heard** | the emulators start with `-no-audio`, so nobody has listened to this build |
 

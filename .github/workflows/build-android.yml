@@ -322,7 +322,10 @@ jobs:
       with:
         fetch-depth: 0
 
+    # It hung on a package mirror once, in a step that normally takes 22 s, with the
+    # release waiting behind this job and a job's own limit at 6 hours.
     - name: Update system
+      timeout-minutes: 10
       run: |
         set -eux
         sudo apt update
