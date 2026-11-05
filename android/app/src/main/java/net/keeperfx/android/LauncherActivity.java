@@ -391,7 +391,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
         new Thread(() -> {
             final List<UpdateManager.Item> items = UpdateManager.check(this).items;
             postIfAlive(() -> {
-                if (!items.isEmpty() && !busy) {
+                // With nothing installed the button keeps its name: that is the name the
+                // hint above it tells a new player to look for.
+                if (!items.isEmpty() && !busy && GameData.isKeeperfxInstalled(this)) {
                     installButton.setText(getString(R.string.button_updates_waiting, items.size()));
                 }
             });
