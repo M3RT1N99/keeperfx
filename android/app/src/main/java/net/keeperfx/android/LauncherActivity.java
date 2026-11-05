@@ -87,6 +87,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private TextView languageNote;
 
     private DataImporter runningImport;
+    private boolean workRunning = false;
     private boolean busy = false;
     private boolean downloadWasRunning = false;
     private int loadedSettingsGeneration;
@@ -496,9 +497,9 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             return;
         }
         // The service's idle state must not unlock the buttons while a folder
-        // import is still copying - the observer fires with the current state
-        // the moment it attaches, which is also every onResume().
-        setBusy(state.running || runningImport != null);
+        // import is still copying or a Reset still deleting - the observer fires
+        // with the current state the moment it attaches, which is also every onResume().
+        setBusy(state.running || runningImport != null || workRunning);
         cancelJobButton.setVisibility(state.running ? View.VISIBLE : View.GONE);
         if (state.running) {
             downloadWasRunning = true;
@@ -812,11 +813,13 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
      * and then what follows from it, if the player is still here.
      */
     private <T> void whileBusy(String threadName, Supplier<T> work, Consumer<T> then) {
+        workRunning = true;
         setBusy(true);
         progressBar.setIndeterminate(true);
         new Thread(() -> {
             final T result = work.get();
             postIfAlive(() -> {
+                workRunning = false;
                 setBusy(false);
                 refreshStatus();
                 then.accept(result);
