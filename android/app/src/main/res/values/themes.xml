@@ -4,6 +4,10 @@
         <item name="android:colorBackground">@color/kfx_background</item>
         <item name="android:textColorPrimary">@color/kfx_text</item>
         <item name="android:colorAccent">@color/kfx_accent</item>
+        <!-- A line of Arabic that starts with a Latin name is still a line of Arabic, or its
+             parts come out in the wrong order. A line with nothing but a path stays left to right.
+             Not "locale", which goes by the phone's language and not by the language box. -->
+        <item name="android:textDirection">anyRtl</item>
     </style>
 
     <style name="Theme.KeeperFX.Game" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
