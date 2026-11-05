@@ -288,7 +288,7 @@ public class UpdatePlanTest {
     @Test
     public void aRepairNamesItsSizeAndTheFirstFewFiles() {
         facts.verified.stableProblems.addAll(Arrays.asList("a", "b", "c", "d"));
-        assertEquals("Files missing or damaged: 4. Reinstalling repairs them, 357.2 MB\n"
+        assertEquals("Files missing or damaged: 4. Reinstalling repairs them (357.2 MB)\n"
             + "For example: a, b, c\n", plannedDetail(0));
     }
 
@@ -300,7 +300,7 @@ public class UpdatePlanTest {
         facts.appUpdate = new AppRelease("1.60", "https://example.test/app.apk", 1,
             Collections.<String>emptyList());
         assertEquals("\u2022 KeeperFX 1.4.0\n"
-            + "    Update from 1.3.2, 357.2 MB\n"
+            + "    Update from 1.3.2 (357.2 MB)\n"
             + "\u2022 KeeperFX alpha 1.4.0.5591\n"
             + "    Replaces 1.4.0.5598\n"
             + "    Download: 22.7 MB\n"
