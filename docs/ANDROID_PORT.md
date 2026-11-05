@@ -224,9 +224,9 @@ The launcher's language box has the 21 languages the engine knows. It decides th
 phone, Latin included, which no phone offers. `GameLanguage.localized()` sets the locale in
 `attachBaseContext` of the launcher's activities and of what shows notifications, and a
 change recreates the screen. The folders are `values-<code>`, with `values-nb` for
-Norwegian and `values-zh-rCN` and `values-zh-rTW` for the two Chinese. What a language does
-not have yet falls back to English. Arabic mirrors the launcher; the game's picture does not
-mirror.
+Norwegian and `values-zh-rCN` and `values-zh-rTW` for the two Chinese. Every language has
+every string, and the build refuses one that does not. Arabic mirrors the launcher; the
+game's picture does not mirror.
 
 Every word comes from `res/values/strings.xml`. Classes without a Context, which the JVM
 tests drive, name a `Message`, a string and its arguments, and it becomes words where Android
