@@ -172,6 +172,7 @@ public final class UpdateManager {
         boolean dataInstalled;
         List<Message> missingEntries = new ArrayList<>();
         String stableVersion = "";
+        boolean hasManifest;
         InstallManifest.Report verified = new InstallManifest.Report();
         boolean alphaEnabled;
         String alphaVersion = "";
@@ -202,6 +203,7 @@ public final class UpdateManager {
         facts.missingEntries = GameData.findMissingKeeperfxEntries(context);
         facts.dataInstalled = facts.missingEntries.isEmpty();
         facts.stableVersion = prefs.getInstalledVersion();
+        facts.hasManifest = GameData.hasManifest(context);
         // Local disk work, no network: every file the archives said they
         // unpacked, compared with what is actually there.
         facts.verified = GameData.verifyInstalledFiles(context);
@@ -291,6 +293,12 @@ public final class UpdateManager {
             } else if (!current.equals(release.version)) {
                 items.add(new Item(Kind.GAME_DATA, latest, null,
                     new Message(R.string.update_from_version, current, size)));
+            } else if (!f.hasManifest) {
+                // Data from a build older than the manifests, which an APK update keeps.
+                // Nothing can say it is damaged, but nothing can say it is whole either, and
+                // Export refuses it and sends the player here. Installing writes the manifest.
+                items.add(new Item(Kind.GAME_DATA, latest, null,
+                    new Message(R.string.update_release_size, size)));
             } else if (!f.verified.stableProblems.isEmpty()) {
                 final List<String> gaps = f.verified.stableProblems;
                 items.add(new Item(Kind.GAME_DATA, new Message(R.string.update_repair, current), null,

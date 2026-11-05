@@ -44,6 +44,7 @@ public class UpdatePlanTest {
         facts = new UpdateManager.Facts();
         facts.dataInstalled = true;
         facts.stableVersion = "1.4.0";
+        facts.hasManifest = true;
         facts.alphaEnabled = true;
         facts.alphaVersion = "1.4.0.5591";
         facts.hasMusic = true;
@@ -175,6 +176,15 @@ public class UpdatePlanTest {
         facts.stableVersion = "";
         assertEquals(Arrays.asList(UpdateManager.Kind.GAME_DATA), plannedKinds());
         assertEquals("KeeperFX 1.4.0", plannedTitle(0));
+    }
+
+    /** Export refuses this and says "Check for downloads" offers the release, so it has to. */
+    @Test
+    public void aVersionWithNoManifestIsOfferedTheRelease() {
+        facts.hasManifest = false;
+        assertEquals(Arrays.asList(UpdateManager.Kind.GAME_DATA), plannedKinds());
+        assertEquals("KeeperFX 1.4.0", plannedTitle(0));
+        assertEquals("Game data, 357.2 MB\n", plannedDetail(0));
     }
 
     @Test
