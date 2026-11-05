@@ -148,7 +148,7 @@
     <string name="update_release_size">Game data, %1$s</string>
     <string name="update_missing">Missing: %1$s</string>
     <string name="update_missing_and_more">Missing: %1$s and %2$d more</string>
-    <!-- The last %s of these three is the size of the download. -->
+    <!-- The last %s of these two is the size of the download. -->
     <string name="update_replaces_folder">Replaces the imported folder with the official release (%1$s)</string>
     <string name="update_from_version">Update from %1$s (%2$s)</string>
     <string name="update_repair">Repair KeeperFX %1$s</string>
