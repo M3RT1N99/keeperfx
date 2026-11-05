@@ -315,8 +315,7 @@ public final class UpdateManager {
         // font16.fxfont and sounds.cfg, all three of which the alpha patch
         // carries. It is only meaningful once the release it patches is there,
         // and that check must never ask for a file only this patch brings.
-        if (f.dataInstalled && f.alphaEnabled && f.alphaForEngine != null
-                && !f.alphaForEngine.version.isEmpty()) {
+        if (f.dataInstalled && f.alphaEnabled && f.alphaForEngine != null) {
             final ReleaseApi.ReleaseInfo alpha = f.alphaForEngine;
             final String current = f.alphaVersion;
             // Nothing to fetch if the archive is still on the device from a

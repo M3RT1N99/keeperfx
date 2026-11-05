@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">Téléchargement annulé.</string>
     <string name="job_unpack_cancelled">Annulé pendant l’extraction.</string>
     <string name="job_no_download_address">Le serveur n’a indiqué aucune adresse de téléchargement.</string>
+    <string name="release_no_version">Le serveur n’a indiqué aucun numéro de version pour ce téléchargement.</string>
     <string name="job_no_music_download">Le serveur ne propose aucune musique à télécharger.</string>
     <string name="http_status">Le serveur a répondu avec le code HTTP %1$d.</string>
+    <string name="http_redirect_insecure">Le serveur a redirigé vers une adresse non sécurisée.</string>
+    <string name="http_redirect_nowhere">Le serveur a redirigé sans indiquer d’adresse.</string>
     <string name="download_cut_short">Le téléchargement s’est arrêté à %1$s sur %2$s.</string>
     <string name="archive_empty">L’archive ne contient aucun fichier.</string>
     <string name="release_unusable">La dernière version publiée ne comporte pas de numéro de version ou pas d’APK.</string>

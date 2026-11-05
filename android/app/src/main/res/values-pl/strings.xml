@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">Anulowano pobieranie.</string>
     <string name="job_unpack_cancelled">Anulowano podczas rozpakowywania.</string>
     <string name="job_no_download_address">Serwer nie podał adresu do pobrania.</string>
+    <string name="release_no_version">Serwer nie podał numeru wersji do pobrania.</string>
     <string name="job_no_music_download">Serwer nie podaje muzyki do pobrania.</string>
     <string name="http_status">Serwer odpowiedział kodem HTTP %1$d.</string>
+    <string name="http_redirect_insecure">Serwer przekierował na adres, który nie jest bezpieczny.</string>
+    <string name="http_redirect_nowhere">Serwer przekierował bez podania adresu.</string>
     <string name="download_cut_short">Pobieranie zatrzymało się na %1$s z %2$s.</string>
     <string name="archive_empty">Archiwum nie zawiera żadnych plików.</string>
     <string name="release_unusable">Najnowsze wydanie nie ma numeru wersji albo pliku APK.</string>

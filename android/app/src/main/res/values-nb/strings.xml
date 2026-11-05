@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">Nedlastingen ble avbrutt.</string>
     <string name="job_unpack_cancelled">Avbrutt under utpakking.</string>
     <string name="job_no_download_address">Serveren oppga ingen adresse å laste ned dette fra.</string>
+    <string name="release_no_version">Serveren oppga ikke noe versjonsnummer for denne nedlastingen.</string>
     <string name="job_no_music_download">Serveren oppgir ingen musikk å laste ned.</string>
     <string name="http_status">Serveren svarte med HTTP %1$d.</string>
+    <string name="http_redirect_insecure">Serveren omdirigerte til en adresse som ikke er sikker.</string>
+    <string name="http_redirect_nowhere">Serveren omdirigerte uten å oppgi en adresse.</string>
     <string name="download_cut_short">Nedlastingen stoppet ved %1$s av %2$s.</string>
     <string name="archive_empty">Arkivet inneholder ingen filer.</string>
     <string name="release_unusable">Den nyeste utgivelsen mangler versjon eller APK.</string>

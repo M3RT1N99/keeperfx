@@ -316,6 +316,17 @@ public class ResumableDownloadTest {
         assertEquals(23838887, info.sizeInBytes);
     }
 
+    /** Nothing here could say what got installed, or show a version for it. */
+    @Test
+    public void aReleaseWithNoVersionIsNoAnswer() throws Exception {
+        try {
+            ReleaseApi.ReleaseInfo.fromJson(new org.json.JSONObject("{\"download_url\":\"https://x/a.7z\"}"));
+            fail("no version has to throw");
+        } catch (Message.Failure expected) {
+            assertEquals(new Message(R.string.release_no_version), expected.message);
+        }
+    }
+
     @Test
     public void aReleaseWithoutAVersionedTagOrAnApkIsNotAnUpdate() throws Exception {
         assertNull(AppRelease.fromGithub(new org.json.JSONObject(
@@ -368,14 +379,25 @@ public class ResumableDownloadTest {
     }
 
     @Test
-    public void aRedirectCannotDropTheEncryption() {
+    public void aRedirectCannotDropTheEncryption() throws IOException {
         for (String location : new String[] {"http://example.test/a.7z", "file:///data/secret"}) {
             try {
                 Http.redirectTarget("https://example.test/x", location);
                 fail(location);
-            } catch (IOException expected) {
-                assertTrue(expected.getMessage().contains("redirect"));
+            } catch (Message.Failure expected) {
+                assertEquals(new Message(R.string.http_redirect_insecure), expected.message);
             }
+        }
+    }
+
+    @Test
+    public void aRedirectToNowhereSaysSo() throws IOException {
+        serve((range, out) -> answer(out, "302 Found", length(""), ""));
+        try {
+            fetch(BODY.length());
+            fail("a redirect without an address has to throw");
+        } catch (Message.Failure expected) {
+            assertEquals(new Message(R.string.http_redirect_nowhere), expected.message);
         }
     }
 

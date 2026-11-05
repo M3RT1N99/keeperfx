@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">Download annulleret.</string>
     <string name="job_unpack_cancelled">Annulleret under udpakning.</string>
     <string name="job_no_download_address">Serveren angav ingen adresse at downloade dette fra.</string>
+    <string name="release_no_version">Serveren angav intet versionsnummer for denne download.</string>
     <string name="job_no_music_download">Serveren angiver ingen musik at downloade.</string>
     <string name="http_status">Serveren svarede med HTTP %1$d.</string>
+    <string name="http_redirect_insecure">Serveren omdirigerede til en adresse, der ikke er sikker.</string>
+    <string name="http_redirect_nowhere">Serveren omdirigerede uden at angive en adresse.</string>
     <string name="download_cut_short">Downloaden stoppede ved %1$s af %2$s.</string>
     <string name="archive_empty">Arkivet indeholder ingen filer.</string>
     <string name="release_unusable">Den nyeste udgivelse har ingen version eller ingen APK.</string>

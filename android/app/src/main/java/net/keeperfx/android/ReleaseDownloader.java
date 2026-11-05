@@ -132,7 +132,7 @@ public final class ReleaseDownloader {
             if (alpha.downloadUrl.isEmpty()) {
                 return new Message(R.string.job_no_download_address);
             }
-            final String version = alpha.version.isEmpty() ? "unknown" : alpha.version;
+            final String version = alpha.version;
             Log.i(TAG, "KeeperFX alpha for engine build " + BuildConfig.ENGINE_BUILD + ": "
                 + version + " at " + alpha.downloadUrl);
 
@@ -274,7 +274,7 @@ public final class ReleaseDownloader {
         try {
             stage(R.string.stage_release_check, -1, null);
             final ReleaseApi.ReleaseInfo release = ReleaseApi.latestStable();
-            final String version = release.version.isEmpty() ? "unknown" : release.version;
+            final String version = release.version;
             if (release.downloadUrl.isEmpty()) {
                 return new Message(R.string.job_no_download_address);
             }

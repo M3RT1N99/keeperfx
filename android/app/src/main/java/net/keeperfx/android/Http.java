@@ -62,7 +62,7 @@ final class Http {
             final String next = connection.getHeaderField("Location");
             connection.disconnect();
             if (next == null) {
-                throw new IOException("Redirect without a Location header");
+                throw new Message.Failure(R.string.http_redirect_nowhere);
             }
             connection = connect(redirectTarget(url, next), from, accept);
             url = connection.getURL().toString();
@@ -80,7 +80,7 @@ final class Http {
         final URL origin = new URL(from);
         final URL next = new URL(origin, location);
         if (origin.getProtocol().equals("https") && !next.getProtocol().equals("https")) {
-            throw new IOException("Refusing a redirect from https to " + next.getProtocol());
+            throw new Message.Failure(R.string.http_redirect_insecure);
         }
         return next.toString();
     }

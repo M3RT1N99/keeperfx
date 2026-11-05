@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">Загрузка отменена.</string>
     <string name="job_unpack_cancelled">Отменено во время распаковки.</string>
     <string name="job_no_download_address">Сервер не сообщил адрес для скачивания.</string>
+    <string name="release_no_version">Сервер не сообщил номер версии для скачивания.</string>
     <string name="job_no_music_download">На сервере нет музыки для скачивания.</string>
     <string name="http_status">Сервер ответил кодом HTTP %1$d.</string>
+    <string name="http_redirect_insecure">Сервер перенаправил на небезопасный адрес.</string>
+    <string name="http_redirect_nowhere">Сервер перенаправил, не указав адрес.</string>
     <string name="download_cut_short">Загрузка оборвалась на %1$s из %2$s.</string>
     <string name="archive_empty">В архиве нет файлов.</string>
     <string name="release_unusable">В последнем релизе нет номера версии или APK.</string>

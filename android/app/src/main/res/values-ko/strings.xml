@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">다운로드를 취소했습니다.</string>
     <string name="job_unpack_cancelled">압축을 푸는 중에 취소되었습니다.</string>
     <string name="job_no_download_address">서버가 다운로드 주소를 제공하지 않았습니다.</string>
+    <string name="release_no_version">서버가 이 다운로드의 버전 번호를 제공하지 않았습니다.</string>
     <string name="job_no_music_download">서버에 다운로드할 음악이 없습니다.</string>
     <string name="http_status">서버 응답: HTTP %1$d</string>
+    <string name="http_redirect_insecure">서버가 안전하지 않은 주소로 리디렉션했습니다.</string>
+    <string name="http_redirect_nowhere">서버가 주소 없이 리디렉션했습니다.</string>
     <string name="download_cut_short">다운로드가 %1$s / %2$s에서 중단되었습니다.</string>
     <string name="archive_empty">압축 파일에 들어 있는 파일이 없습니다.</string>
     <string name="release_unusable">최신 릴리스에 버전 정보나 APK가 없습니다.</string>

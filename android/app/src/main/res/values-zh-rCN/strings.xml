@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">已取消下载。</string>
     <string name="job_unpack_cancelled">已在解压时取消。</string>
     <string name="job_no_download_address">服务器没有提供下载地址。</string>
+    <string name="release_no_version">服务器没有提供此下载的版本号。</string>
     <string name="job_no_music_download">服务器上没有可下载的音乐。</string>
     <string name="http_status">服务器返回 HTTP %1$d。</string>
+    <string name="http_redirect_insecure">服务器重定向到了不安全的地址。</string>
+    <string name="http_redirect_nowhere">服务器进行了重定向，但没有提供地址。</string>
     <string name="download_cut_short">下载在 %1$s / %2$s 处中断。</string>
     <string name="archive_empty">压缩包中没有文件。</string>
     <string name="release_unusable">最新发布版本缺少版本号或 APK。</string>

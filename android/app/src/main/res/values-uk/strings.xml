@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">Завантаження скасовано.</string>
     <string name="job_unpack_cancelled">Скасовано під час розпакування.</string>
     <string name="job_no_download_address">Сервер не повідомив адреси для завантаження.</string>
+    <string name="release_no_version">Сервер не повідомив номера версії для завантаження.</string>
     <string name="job_no_music_download">На сервері немає музики для завантаження.</string>
     <string name="http_status">Сервер відповів кодом HTTP %1$d.</string>
+    <string name="http_redirect_insecure">Сервер перенаправив на небезпечну адресу.</string>
+    <string name="http_redirect_nowhere">Сервер перенаправив, не вказавши адреси.</string>
     <string name="download_cut_short">Завантаження обірвалося на %1$s з %2$s.</string>
     <string name="archive_empty">В архіві немає файлів.</string>
     <string name="release_unusable">В останньому релізі немає номера версії або APK.</string>

@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">Depromptio rescissa.</string>
     <string name="job_unpack_cancelled">Inter explicandum rescissum.</string>
     <string name="job_no_download_address">Servitor nullam inscriptionem dedit unde hoc depromi possit.</string>
+    <string name="release_no_version">Servitor nullam versionem huius depromptionis dedit.</string>
     <string name="job_no_music_download">Servitor nullam musicam depromendam indicat.</string>
     <string name="http_status">Servitor responsum HTTP %1$d dedit.</string>
+    <string name="http_redirect_insecure">Servitor ad inscriptionem non tutam transmisit.</string>
+    <string name="http_redirect_nowhere">Servitor nulla inscriptione data transmisit.</string>
     <string name="download_cut_short">Depromptio desiit ad %1$s ex %2$s.</string>
     <string name="archive_empty">Archivum nullos fasciculos continet.</string>
     <string name="release_unusable">Editio novissima nullam versionem aut nullum APK habet.</string>

@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">A letöltés megszakítva.</string>
     <string name="job_unpack_cancelled">Megszakítva kicsomagolás közben.</string>
     <string name="job_no_download_address">A szerver nem adott letöltési címet.</string>
+    <string name="release_no_version">A szerver nem adott meg verziószámot ehhez a letöltéshez.</string>
     <string name="job_no_music_download">A szerver nem kínál letölthető zenét.</string>
     <string name="http_status">A szerver válasza: HTTP %1$d.</string>
+    <string name="http_redirect_insecure">A szerver nem biztonságos címre irányított át.</string>
+    <string name="http_redirect_nowhere">A szerver cím megadása nélkül irányított át.</string>
     <string name="download_cut_short">A letöltés leállt: %1$s / %2$s.</string>
     <string name="archive_empty">Az archívumban nincsenek fájlok.</string>
     <string name="release_unusable">A legújabb kiadásnak nincs verziószáma vagy APK-ja.</string>

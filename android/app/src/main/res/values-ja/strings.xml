@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">ダウンロードをキャンセルしました。</string>
     <string name="job_unpack_cancelled">展開中にキャンセルしました。</string>
     <string name="job_no_download_address">サーバーからダウンロード先が返されませんでした。</string>
+    <string name="release_no_version">サーバーからこのダウンロードのバージョン番号が返されませんでした。</string>
     <string name="job_no_music_download">サーバーにダウンロードできる音楽がありません。</string>
     <string name="http_status">サーバーの応答: HTTP %1$d</string>
+    <string name="http_redirect_insecure">サーバーが安全でないアドレスにリダイレクトしました。</string>
+    <string name="http_redirect_nowhere">サーバーがアドレスを示さずにリダイレクトしました。</string>
     <string name="download_cut_short">ダウンロードが %1$s / %2$s で途切れました。</string>
     <string name="archive_empty">アーカイブにファイルがありません。</string>
     <string name="release_unusable">最新リリースにバージョン情報または APK がありません。</string>

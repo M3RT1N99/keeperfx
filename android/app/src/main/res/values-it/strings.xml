@@ -171,8 +171,11 @@
     <string name="job_download_cancelled">Download annullato.</string>
     <string name="job_unpack_cancelled">Annullato durante l’estrazione.</string>
     <string name="job_no_download_address">Il server non ha fornito un indirizzo da cui scaricare.</string>
+    <string name="release_no_version">Il server non ha fornito un numero di versione per questo download.</string>
     <string name="job_no_music_download">Il server non elenca musica da scaricare.</string>
     <string name="http_status">Il server ha risposto con HTTP %1$d.</string>
+    <string name="http_redirect_insecure">Il server ha reindirizzato a un indirizzo non sicuro.</string>
+    <string name="http_redirect_nowhere">Il server ha reindirizzato senza fornire un indirizzo.</string>
     <string name="download_cut_short">Il download si è fermato a %1$s di %2$s.</string>
     <string name="archive_empty">L’archivio non contiene file.</string>
     <string name="release_unusable">La versione più recente non indica un numero di versione o non contiene un APK.</string>

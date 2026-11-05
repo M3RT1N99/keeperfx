@@ -56,10 +56,17 @@ final class ReleaseApi {
             this.sizeInBytes = sizeInBytes;
         }
 
-        static ReleaseInfo fromJson(JSONObject release) {
-            return new ReleaseInfo(
-                release.optString("version", ""),
-                release.optString("download_url", ""),
+        /**
+         * The version is what an installation is recorded under and what its archive is
+         * named after, and nothing recorded means a folder the player brought. An answer
+         * without one is no answer, which whoever asked already knows what to do with.
+         */
+        static ReleaseInfo fromJson(JSONObject release) throws Message.Failure {
+            final String version = release.optString("version", "");
+            if (version.isEmpty()) {
+                throw new Message.Failure(R.string.release_no_version);
+            }
+            return new ReleaseInfo(version, release.optString("download_url", ""),
                 release.optLong("size_in_bytes", -1));
         }
     }
