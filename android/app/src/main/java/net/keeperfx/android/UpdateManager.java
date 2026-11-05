@@ -30,6 +30,7 @@ import org.json.JSONException;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public final class UpdateManager {
@@ -118,13 +119,23 @@ public final class UpdateManager {
     /** What the dialog says about what a check found. */
     static String describe(Result found, Message.Strings strings) {
         final StringBuilder body = new StringBuilder(describe(found.items, strings));
-        if (contains(found.items, Kind.GAME_DATA)) {
+        if (goesOverAnInstallation(found.items)) {
             body.append('\n').append(new Message(R.string.updates_replaces_data).text(strings));
         }
         if (found.unanswered) {
             body.append('\n').append(new Message(R.string.updates_unanswered_more).text(strings));
         }
         return body.append('\n').append(new Message(R.string.updates_use_wifi).text(strings)).toString();
+    }
+
+    /** With nothing there, what stays of it is no news: that is a new player's first dialog. */
+    private static boolean goesOverAnInstallation(List<Item> items) {
+        for (Item item : items) {
+            if (item.kind == Kind.GAME_DATA) {
+                return !Arrays.asList(item.lines).contains(new Message(R.string.missing_nothing_installed));
+            }
+        }
+        return false;
     }
 
     /**

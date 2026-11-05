@@ -359,6 +359,21 @@ public class UpdatePlanTest {
         assertTrue(partial, partial.contains("so there may be more than this.\nBest done on Wi-Fi."));
     }
 
+    @Test
+    public void overNothingTheDialogDoesNotTalkOfWhatIsKept() {
+        facts.dataInstalled = false;
+        facts.missingEntries = Arrays.asList(new Message(R.string.missing_nothing_installed));
+        final String first = UpdateManager.describe(
+            new UpdateManager.Result(UpdateManager.plan(facts), false), StringResources.ENGLISH);
+        assertTrue(first, first.contains("Nothing is installed yet."));
+        assertFalse(first, first.contains("anything you added"));
+
+        facts.missingEntries = Arrays.asList(new Message(R.string.missing_install_unfinished));
+        final String unfinished = UpdateManager.describe(
+            new UpdateManager.Result(UpdateManager.plan(facts), false), StringResources.ENGLISH);
+        assertTrue("a broken install can still hold saves", unfinished.contains("anything you added"));
+    }
+
     /** Android 11, where granting this ends every process of the app. */
     @Test
     public void thePermissionOnlyWaitsWhereGrantingItWouldEndTheDownloads() {
