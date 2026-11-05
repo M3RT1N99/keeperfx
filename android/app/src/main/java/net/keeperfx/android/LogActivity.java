@@ -110,7 +110,9 @@ public class LogActivity extends Activity {
                 text = body;
                 header = getString(R.string.log_header,
                     GameData.describeBytes(file.length()).in(this),
-                    java.text.DateFormat.getDateTimeInstance()
+                    // The screen's language, the language box's, which need not be the phone's.
+                    java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.DEFAULT,
+                            java.text.DateFormat.DEFAULT, getResources().getConfiguration().getLocales().get(0))
                         .format(new java.util.Date(file.lastModified())));
             }
             mainHandler.post(() -> {
