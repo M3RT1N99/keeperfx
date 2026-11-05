@@ -33,13 +33,6 @@ public class StringResourcesTest {
     /** A conversion with no number. A percent sign in front of a word has a space after it. */
     private static final Pattern UNNUMBERED = Pattern.compile("%(\\.\\d+)?[a-zA-Z]");
 
-    /**
-     * Languages that fall back to English for what they do not have yet. Those are still
-     * held to everything else here. Empty it when they are complete, along with making
-     * MissingTranslation fatal in the lint block of build.gradle.
-     */
-    private static final Set<String> STILL_BEING_TRANSLATED = Collections.singleton("values-de");
-
     private static List<String> placeholders(String text) {
         final List<String> found = new ArrayList<>();
         final Matcher matcher = PLACEHOLDER.matcher(text);
@@ -66,10 +59,8 @@ public class StringResourcesTest {
     public void noLanguageLacksAString() throws Exception {
         final StringResources.Language english = StringResources.english();
         for (StringResources.Language language : StringResources.translations()) {
-            if (!STILL_BEING_TRANSLATED.contains(language.folder)) {
-                assertEquals(language.folder + " lacks these", Collections.emptySet(),
-                    difference(english.strings.keySet(), language.strings.keySet()));
-            }
+            assertEquals(language.folder + " lacks these", Collections.emptySet(),
+                difference(english.strings.keySet(), language.strings.keySet()));
         }
     }
 

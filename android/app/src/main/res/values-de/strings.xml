@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  German launcher texts. Anything not translated here falls back to values/,
-  so this file can grow one string at a time without ever leaving a gap.
--->
 <resources>
     <string name="app_subtitle">Dungeon Keeper, neu gebaut — für Android (inoffiziell)</string>
-
     <string name="log_title">Engine-Protokoll</string>
     <string name="log_loading">Wird gelesen…</string>
     <string name="log_none">Noch kein Protokoll — starte das Spiel einmal.</string>
@@ -14,15 +9,73 @@
     <string name="log_copy">Kopieren</string>
     <string name="log_refresh">Neu laden</string>
     <string name="log_copied">Protokoll in die Zwischenablage kopiert</string>
-    <string name="log_copied_end">Nur das Ende des Protokolls passt in die Zwischenablage. Teilen schickt mehr davon.</string>
-    <string name="log_copy_failed">Das Protokoll konnte nicht kopiert werden. Nimm stattdessen Teilen.</string>
-    <string name="button_log">Protokoll</string>
-
+    <string name="log_copied_end">Nur das Ende des Protokolls passt in die Zwischenablage. „Teilen“ schickt mehr davon.</string>
+    <string name="log_copy_failed">Das Protokoll konnte nicht kopiert werden. Nimm stattdessen „Teilen“.</string>
+    <string name="log_read_failed">Das Protokoll konnte nicht gelesen werden: %1$s</string>
+    <string name="log_share_failed">Das Protokoll konnte nicht geteilt werden: %1$s</string>
+    <string name="size_bytes">%1$d B</string>
+    <string name="size_kb">%1$.1f KB</string>
+    <string name="size_mb">%1$.1f MB</string>
+    <string name="size_gb">%1$.1f GB</string>
+    <string name="progress_bytes">%1$s von %2$s</string>
+    <string name="button_export">Installation exportieren</string>
+    <string name="button_import">Installation importieren</string>
+    <string name="button_share_again">Erneut teilen</string>
+    <string name="button_delete_export">Löschen</string>
+    <string name="export_title">Installation exportieren</string>
+    <string name="export_offer_intro">Alles wird in eine einzige Datei gepackt, damit ein anderes Gerät danach genauso eingerichtet sein kann wie dieses:</string>
+    <string name="export_offer_game">• KeeperFX %1$s und die Dateien des originalen Dungeon Keeper</string>
+    <string name="export_offer_music">• Die Musik</string>
+    <string name="export_offer_saves">• Deine Spielstände (%1$d), Kampagnenfortschritt, Einstellungen, Mods und Screenshots</string>
+    <string name="export_offer_size">Größe: %1$s. Dateien: %2$d. Das Packen braucht bis zu %3$s freien Speicher. Jetzt frei: %4$s.</string>
+    <string name="export_offer_own_devices">Die Datei enthält deine Kopie der Dateien des originalen Dungeon Keeper und deine Spielstände und ist für deine eigenen Geräte gedacht. Sobald sie gepackt ist, zeigt dir dieses Gerät, wohin du sie schicken kannst.</string>
+    <string name="export_confirm">Packen</string>
+    <string name="export_share_title">KeeperFX exportieren (inoffiziell)</string>
+    <string name="export_ready_notification">Der Export ist fertig. Tippe, um zu wählen, wohin er geht.</string>
+    <string name="export_waiting">Bereit zum Exportieren: %1$s, %2$s. Die Datei bleibt hier, bis du sie löschst, höchstens aber einen Tag.</string>
+    <string name="export_not_installed">Das Spiel ist noch nicht vollständig installiert, es gibt also nichts zu exportieren.</string>
+    <string name="export_no_manifest">Diese Installation stammt aus einem Ordner, daher lässt sich nicht feststellen, ob sie vollständig ist. „Nach Downloads suchen“ bietet die offizielle Version an, danach lässt sie sich exportieren.</string>
+    <string name="export_damaged">Fehlende oder beschädigte Dateien: %1$d. „Nach Downloads suchen“ repariert sie, danach lässt sich die Installation exportieren.</string>
+    <string name="export_cannot_look">Die Installation konnte nicht geprüft werden: %1$s</string>
+    <string name="export_file_changed">%1$s hat sich beim Packen geändert.</string>
+    <string name="stage_packing">Wird gepackt</string>
+    <string name="job_packing_cancelled">Packen abgebrochen.</string>
+    <string name="job_packing_failed">Packen fehlgeschlagen: %1$s</string>
+    <string name="import_bundle_title">Installation importieren</string>
+    <string name="import_bundle_explanation">Wähle die Datei, die auf einem anderen Gerät exportiert wurde. Die App, die sie empfangen hat, entscheidet, wo sie liegt. Ist sie also nicht im Ordner Download, schau im Ordner dieser App nach.</string>
+    <string name="import_bundle_choose">Datei wählen</string>
+    <string name="import_bundle_offer">Diese Datei enthält KeeperFX %1$s, die Dateien des Originalspiels, den Kampagnenfortschritt und Spielstände (%2$d). Größe: %3$s.</string>
+    <string name="import_bundle_trust">Importiere nur, was du selbst exportiert oder von jemandem bekommen hast, dem du vertraust: Das Spiel führt die enthaltenen Skripte aus.</string>
+    <string name="import_bundle_replaces">Sie ersetzt alles auf diesem Gerät, auch den Kampagnenfortschritt. Spielstände hier, die verloren gehen würden: %1$d.</string>
+    <string name="import_bundle_replaces_no_saves">Sie ersetzt alles auf diesem Gerät, auch den Kampagnenfortschritt. Hier gibt es keine Spielstände, die verloren gehen könnten.</string>
+    <string name="import_bundle_nothing_here">Auf diesem Gerät ist noch nichts installiert.</string>
+    <string name="import_bundle_room">Das Entpacken braucht %1$s freien Speicher. Jetzt frei: %2$s.</string>
+    <string name="import_bundle_other_build">Sie stammt von App %1$s mit Engine-Build %2$d, und dies ist App %3$s mit Engine-Build %4$d. Das macht nichts, sie lässt sich trotzdem importieren. „Nach Downloads suchen“ bietet danach den Alpha-Patch an, der zu dieser Engine passt.</string>
+    <string name="import_bundle_confirm">Alles ersetzen</string>
+    <string name="import_bundle_done_notification">KeeperFX ist importiert und spielbereit.</string>
+    <string name="import_bundle_done_title">KeeperFX importiert</string>
+    <string name="import_bundle_done">KeeperFX ist spielbereit. Die importierte Datei wird nicht mehr gebraucht und belegt Speicher:\n\n%1$s</string>
+    <string name="import_bundle_delete">Datei löschen</string>
+    <string name="import_bundle_keep">Behalten</string>
+    <string name="import_bundle_not_deleted">Sie konnte von hier aus nicht gelöscht werden und ist also noch da:\n\n%1$s\n\nEin Dateimanager kann sie löschen.</string>
+    <string name="import_bundle_picked_file">Die gewählte Datei</string>
+    <string name="import_bundle_cannot_read">Diese Datei kann nicht gelesen werden.</string>
+    <string name="import_bundle_cannot_read_detail">Diese Datei kann nicht gelesen werden: %1$s</string>
+    <string name="stage_unpacking_import">Importierte Datei wird entpackt</string>
+    <string name="job_import_cancelled">Import abgebrochen. Es wurde nichts geändert.</string>
+    <string name="job_import_failed">Import fehlgeschlagen: %1$s</string>
+    <string name="transfer_not_a_bundle">Das ist keine exportierte KeeperFX-Installation. Es wurde nichts geändert.</string>
+    <string name="transfer_damaged">Diese Datei ist unvollständig oder beschädigt, wahrscheinlich wurde sie unterwegs abgeschnitten. Es wurde nichts geändert. Exportiere sie noch einmal.</string>
+    <string name="transfer_from_newer_app">Diese Datei stammt von einer neueren KeeperFX-App als dieser. Aktualisiere zuerst die App hier. Es wurde nichts geändert.</string>
+    <string name="transfer_holds_more">Diese Datei enthält mehr, als sie angibt, sie ist also nicht das, wofür sie sich ausgibt. Es wurde nichts geändert.</string>
+    <string name="transfer_outside_game">Diese Datei versucht, außerhalb des Spiels zu schreiben (%1$s), und wird deshalb nicht installiert. Es wurde nichts geändert.</string>
+    <string name="transfer_not_complete">Diese Datei enthält keine vollständige Installation, das Spiel könnte damit nicht starten. Es wurde nichts geändert.</string>
+    <string name="transfer_earlier_import_stuck">Ein früherer Import ließ sich weder abschließen noch rückgängig machen.</string>
+    <string name="transfer_settings_not_written">Die Einstellungen des Launchers konnten nicht geschrieben werden.</string>
     <string name="game_still_open_title">Das Spiel ist noch offen</string>
     <string name="game_still_open">Das Spiel ist im Hintergrund noch offen. Beende es zuerst, denn das hier ersetzt oder löscht Dateien, die es gerade benutzt.</string>
-
     <string name="version_imported_folder">importierter Ordner</string>
-
+    <string name="version_with_alpha">%1$s + Alpha %2$s</string>
     <string name="status_keeperfx_ready">KeeperFX: %1$s (%2$s)</string>
     <string name="status_keeperfx_missing">KeeperFX ist nicht installiert</string>
     <string name="status_original_ready">Dateien des originalen Dungeon Keeper vorhanden</string>
@@ -31,82 +84,164 @@
     <string name="status_searching_original">Originaldateien werden gesucht…</string>
     <string name="status_engine_mismatch">Der Alpha-Patch ist Build %1$d und die Engine dieser App Build %2$d, weil es für diesen Build keinen Patch gab. Falls etwas nicht stimmt, kann das der Grund sein.</string>
     <string name="status_import_progress">Kopierte Dateien: %1$d. %2$s</string>
-
+    <string name="status_missing_more">… und %1$d weitere</string>
     <string name="hint_install_keeperfx">Tippe auf „KeeperFX installieren“, um die aktuelle Version zu laden, oder importiere einen Ordner, den du schon hast.</string>
     <string name="hint_import_original">Fehlt noch aus einem originalen Dungeon Keeper:</string>
-
     <string name="button_install_keeperfx">KeeperFX installieren</string>
     <string name="button_update_keeperfx">Nach Downloads suchen</string>
     <string name="button_updates_waiting">Downloads verfügbar: %1$d</string>
     <string name="button_import_original">Original Dungeon Keeper importieren</string>
+    <string name="button_log">Protokoll</string>
     <string name="button_import_keeperfx">Ordner</string>
     <string name="button_remove">Zurücksetzen</string>
     <string name="button_play">Spielen</string>
-
-    <string name="status_checking_updates">Suche nach Downloads…</string>
-    <string name="status_downloading_app">App wird geladen…</string>
-
+    <string name="status_checking_updates">Suche nach Updates…</string>
+    <string name="status_downloading_app">App-Update wird geladen…</string>
     <string name="updates_none_title">Alles aktuell</string>
+    <string name="updates_none">Die App, die Spieldaten und die Musik sind alle aktuell.\n\nDateien aus einem originalen Dungeon Keeper lassen sich nicht herunterladen. Nimm dafür „Original Dungeon Keeper importieren“.</string>
     <string name="updates_unanswered_title">Suche nach Downloads fehlgeschlagen</string>
     <string name="updates_unanswered">Ein Server hat nicht geantwortet, es kann also etwas bereitstehen, das diese Suche nicht sieht. Prüfe die Internetverbindung und versuche es noch einmal. Ist die Verbindung in Ordnung, versuche es in einer Stunde wieder: GitHub begrenzt, wie oft es nach der neuesten App gefragt werden darf.</string>
     <string name="updates_unanswered_more">Ein Server hat nicht geantwortet, es kann also noch mehr geben.</string>
     <string name="updates_available_title">Downloads verfügbar: %1$d</string>
     <string name="updates_download_all">Alle laden</string>
-    <string name="updates_replaces_data">Die Spieldaten werden dabei ersetzt. Spielstände, importierte Originaldateien, Musik und eigene Karten bleiben erhalten.</string>
-    <string name="updates_use_wifi">Am besten im WLAN. Der Download läuft weiter, wenn du die App verlässt.</string>
-
+    <string name="updates_replaces_data">Die Spieldaten werden über die aktuelle Installation entpackt. Spielstände, die Dateien des Originalspiels, Musik und alles, was du hinzugefügt hast, bleiben erhalten.</string>
+    <string name="updates_use_wifi">Am besten im WLAN.</string>
+    <string name="update_release">KeeperFX %1$s</string>
+    <string name="update_release_size">Spieldaten, %1$s</string>
+    <string name="update_missing">Fehlt: %1$s</string>
+    <string name="update_missing_and_more">Fehlt: %1$s und %2$d weitere</string>
+    <string name="update_replaces_folder">Ersetzt den importierten Ordner durch die offizielle Version, %1$s</string>
+    <string name="update_from_version">Update von %1$s, %2$s</string>
+    <string name="update_repair">KeeperFX %1$s reparieren</string>
+    <string name="update_release_damaged">Fehlende oder beschädigte Dateien: %1$d. Neu installieren repariert sie, %2$s</string>
+    <string name="update_for_example">Zum Beispiel: %1$s</string>
+    <string name="update_alpha">KeeperFX Alpha %1$s</string>
+    <string name="update_repair_alpha">KeeperFX Alpha %1$s reparieren</string>
+    <string name="update_alpha_damaged">Fehlende oder beschädigte Dateien: %1$d</string>
+    <string name="update_alpha_adds">Dateien, die die aktuelle Engine braucht und %1$s nicht hat</string>
+    <string name="update_alpha_adds_to_folder">Dateien, die die aktuelle Engine braucht und diese Installation nicht hat</string>
+    <string name="update_alpha_replaces">Ersetzt %1$s</string>
+    <string name="update_alpha_other_build">Die neueste: Für Engine-Build %1$d gibt es keinen Patch</string>
+    <string name="update_cost_download">Download: %1$s</string>
+    <string name="update_cost_cached">Schon geladen, muss nur noch angewendet werden</string>
+    <string name="update_music">Hintergrundmusik</string>
+    <string name="update_music_size">Nicht in der offiziellen Version enthalten, etwa 42 MB</string>
+    <string name="update_music_why">Das Spiel spielt keine Musik, bis sie installiert ist.</string>
+    <string name="update_app">KeeperFX-App %1$s</string>
+    <string name="update_app_current">Derzeit %1$s</string>
+    <string name="missing_nothing_installed">Es ist noch nichts installiert.</string>
+    <string name="missing_install_unfinished">Die letzte Installation wurde nicht abgeschlossen.</string>
     <string name="updates_permission_title">Berechtigung nötig</string>
     <string name="updates_permission">Um sich selbst zu aktualisieren, braucht KeeperFX die Berechtigung, Apps zu installieren. Erteile sie einmal in den folgenden Einstellungen und starte das Update dann noch einmal.</string>
     <string name="updates_permission_rest_running">Die anderen Downloads laufen. Das App-Update wurde ausgelassen: Um sich selbst zu aktualisieren, braucht KeeperFX die Berechtigung, Apps zu installieren. Erteile sie einmal in den folgenden Einstellungen und starte das Update dann noch einmal.</string>
     <string name="updates_permission_rest_running_later">Die anderen Downloads laufen. Das App-Update wurde ausgelassen: Es braucht die Berechtigung, Apps zu installieren, und das Erteilen beendet alles, was die App gerade tut. Starte das Update noch einmal, wenn diese fertig sind.</string>
     <string name="updates_permission_open">Einstellungen öffnen</string>
-
-    <string name="notification_install_update">Update geladen. Zum Installieren tippen.</string>
+    <string name="button_update_app">App aktualisieren · %1$s</string>
+    <string name="app_update_title">App-Update</string>
+    <string name="app_update_available">Version %1$s ist verfügbar.\n\nDu hast %2$s.\n\nDas Update wird über diese Version installiert. Spieldaten und Einstellungen bleiben erhalten.</string>
+    <string name="app_update_none">Du hast die neueste Version (%1$s).</string>
+    <string name="app_update_changes">Änderungen:</string>
+    <string name="app_update_check">Wird geprüft…</string>
+    <string name="app_update_offline">Der Update-Server hat nicht geantwortet. Prüfe die Internetverbindung und versuche es noch einmal. Ist die Verbindung in Ordnung, versuche es in einer Stunde wieder: GitHub begrenzt, wie oft es gefragt werden darf.</string>
+    <string name="app_update_install">Laden und installieren</string>
+    <string name="notification_channel_downloads">Downloads</string>
+    <string name="notification_preparing">Wird vorbereitet…</string>
+    <string name="notification_done">Fertig.</string>
+    <string name="notification_install_update">Update geladen. Tippe zum Installieren.</string>
     <string name="updates_running">Es läuft bereits ein Download.</string>
     <string name="notification_channel_network_game">Netzwerkspiel</string>
-    <string name="notification_network_game">Netzwerkspiel läuft. Tippen, um zurückzukehren, die anderen warten.</string>
-
-    <string name="button_update_app">App-Version %1$s</string>
-    <string name="app_update_title">App-Update</string>
-    <string name="app_update_none">%1$s ist die neueste Version.</string>
-    <string name="app_update_changes">Änderungen:</string>
-    <string name="app_update_check">Suchen</string>
-    <string name="app_update_offline">Der Update-Server hat nicht geantwortet. Prüfe die Internetverbindung und versuche es noch einmal. Ist die Verbindung in Ordnung, versuche es in einer Stunde wieder: GitHub begrenzt, wie oft es gefragt werden darf.</string>
-    <string name="app_update_install">Installieren</string>
-
+    <string name="notification_network_game">Netzwerkspiel läuft. Tippe, um zurückzukehren, die anderen warten.</string>
+    <string name="stage_release_check">Aktuelle Version wird gesucht</string>
+    <string name="stage_download_version">KeeperFX %1$s wird geladen</string>
+    <string name="stage_unpacking">Wird entpackt</string>
+    <string name="stage_unpacked_files">Entpackte Dateien: %1$d</string>
+    <string name="stage_applying_config">Konfiguration wird angewendet</string>
+    <string name="stage_alpha_check">Alpha-Patch wird gesucht</string>
+    <string name="stage_archive_cached">Schon geladenes Archiv wird benutzt</string>
+    <string name="stage_saving_replaced">Alte Dateien werden gesichert</string>
+    <string name="stage_restoring_release">Version wird wiederhergestellt</string>
+    <string name="stage_music_lookup">Musikarchiv wird gesucht</string>
+    <string name="stage_music_download">Musik wird geladen</string>
+    <string name="stage_music_unpack">Musik wird entpackt</string>
+    <string name="job_failed">Fehlgeschlagen: %1$s</string>
+    <string name="job_cannot_start">Konnte nicht starten: %1$s</string>
+    <string name="job_app_update_failed">App-Update fehlgeschlagen: %1$s</string>
+    <string name="job_cancelled">Abgebrochen.</string>
+    <string name="job_download_cancelled">Download abgebrochen.</string>
+    <string name="job_unpack_cancelled">Beim Entpacken abgebrochen.</string>
+    <string name="job_no_download_address">Der Server hat keine Adresse für diesen Download genannt.</string>
+    <string name="job_no_music_download">Der Server führt keine Musik zum Herunterladen auf.</string>
+    <string name="http_status">Der Server hat mit HTTP %1$d geantwortet.</string>
+    <string name="download_cut_short">Der Download endete bei %1$s von %2$s.</string>
+    <string name="archive_empty">Das Archiv enthält keine Dateien.</string>
+    <string name="release_unusable">Das neueste Release nennt keine Version oder hat keine APK.</string>
+    <string name="no_room_download">Nicht genug freier Speicher: Dieser Download braucht %1$s. Jetzt frei: %2$s.</string>
+    <string name="no_room_unpack">Nicht genug freier Speicher: Das Entpacken braucht %1$s. Jetzt frei: %2$s.</string>
+    <string name="no_room_export">Nicht genug freier Speicher: Alles zu packen braucht %1$s. Jetzt frei: %2$s.</string>
+    <string name="no_room_import">Nicht genug freier Speicher: Diese Datei zu entpacken braucht %1$s. Jetzt frei: %2$s.</string>
+    <string name="file_cannot_create">%1$s kann nicht erstellt werden</string>
+    <string name="file_cannot_write">%1$s kann nicht geschrieben werden</string>
+    <string name="file_cannot_read">%1$s kann nicht gelesen werden</string>
+    <string name="file_cannot_move">%1$s kann nicht nach %2$s verschoben werden</string>
     <string name="install_failed">Installation fehlgeschlagen</string>
-
     <string name="import_keeperfx_title">KeeperFX-Ordner importieren</string>
+    <string name="import_keeperfx_explanation">Nimm das statt eines Downloads, wenn du schon eine KeeperFX-Installation auf diesem Gerät hast. Ihr Ordner wird über die aktuelle Installation kopiert, Spielstände und die Dateien des Originalspiels bleiben also erhalten.\n\nNimm zuerst „Zurücksetzen“, wenn du bei null anfangen willst.</string>
     <string name="import_original_title">Original Dungeon Keeper importieren</string>
+    <string name="import_original_explanation">KeeperFX darf ein paar Dateien nicht mitliefern, die aus einem originalen Dungeon Keeper kommen müssen. Wähle deinen Ordner von Dungeon Keeper, den mit DATA und SOUND darin, dann werden sie automatisch herausgesucht und kopiert.\n\nEin eingehängtes oder entpacktes CD-Image geht auch. Sonst wird nichts aus diesem Ordner kopiert.</string>
     <string name="import_choose">Ordner wählen</string>
     <string name="import_choose_folder">Ordner</string>
     <string name="import_choose_zip">Zip-Archiv</string>
-    <string name="import_failed">Import fehlgeschlagen</string>
-    <string name="config_failed">Konfiguration konnte nicht geschrieben werden</string>
-
-    <string name="remove_title">Installation löschen</string>
+    <string name="import_failed">Import unvollständig</string>
+    <string name="import_failed_detail">Import fehlgeschlagen: %1$s</string>
+    <string name="import_cancelled">Import abgebrochen.</string>
+    <string name="import_cannot_read_archive">Das Archiv kann nicht gelesen werden.</string>
+    <string name="import_original_incomplete_folder">Kopierte Dateien: %1$d. Diese fehlen noch:\n\n%2$s\n\nWähle den Ordner, der die Ordner DATA und SOUND des Originalspiels enthält.</string>
+    <string name="import_original_incomplete_zip">Kopierte Dateien: %1$d. Diese fehlen noch:\n\n%2$s\n\nDas Archiv muss die DATA- und SOUND-Dateien des Originalspiels enthalten.</string>
+    <string name="config_failed">Die mitgelieferte Konfiguration konnte nicht angewendet werden</string>
+    <string name="remove_title">Alles löschen</string>
     <string name="remove_explanation">Löscht die Installation einschließlich der Spielstände. Die Ordner, aus denen du importiert hast, bleiben unberührt.</string>
     <string name="remove_confirm">Löschen</string>
-
     <string name="settings_controls">Steuerung</string>
     <string name="input_auto">Automatisch — dem zuletzt benutzten Gerät folgen</string>
     <string name="input_touch">Touch — immer die Touch-Steuerung</string>
     <string name="input_pointer">Maus &amp; Tastatur — Touchscreen ignorieren</string>
-    <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Drehen · Zwei-Finger-Tipp = Rechtsklick · Drei-Finger-Tipp = zurück (die Karte hat einen eigenen Panel-Knopf)\n\nDie Zurück-Taste und die Zurück-Geste verlassen ein Menü ebenfalls. Auf dem Bildschirm: ein Zurück-Pfeil und ein Rechtsklick-Schalter — solange er an ist, schlägt ein Tipp zu und ein Ziehen hebt Markierungen auf.</string>
+    <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Rotieren · Zwei-Finger-Tipp = Rechtsklick · Drei-Finger-Tipp = zurück (die Karte hat einen eigenen Panel-Knopf)\n\nDie Zurück-Taste und die Zurück-Geste des Systems verlassen ein Menü ebenfalls. Auf dem Bildschirm: ein Zurück-Pfeil und ein Rechtsklick-Schalter. Solange er an ist, schlägt ein Tipp zu und ein Ziehen hebt Markierungen auf.</string>
     <string name="option_back_button">Bildschirmtasten im Spiel anzeigen</string>
     <string name="game_back">Zurück</string>
     <string name="game_right_click">Rechtsklick</string>
-
     <string name="settings_data">Spieldaten</string>
     <string name="option_use_alpha">Auch den Alpha-Patch zu dieser Engine installieren</string>
-    <string name="option_use_alpha_hint">Die Engine dieser App wird aus dem aktuellen Quellstand gebaut, und die Stable bringt nicht alles mit, was sie erwartet — unter anderem die Schriften für Japanisch, Chinesisch und Koreanisch. Der Alpha-Patch ergänzt das, ein kleiner Download zusätzlich zur Stable. Ausschalten, um strikt auf 1.4.0 zu bleiben; der Patch kommt dabei ohne Download wieder herunter.</string>
-
+    <string name="option_use_alpha_hint">Die Engine dieser App wird aus dem aktuellen Quellcode gebaut, und die stabile Version bringt nicht alles mit, was sie erwartet, unter anderem die Schriften für Japanisch, Chinesisch und Koreanisch. Der Alpha-Patch ergänzt das, ein kleiner Download zusätzlich zur stabilen Version. Schalte das aus, um genau bei 1.4.0 zu bleiben. Der Patch wird dann ohne Download wieder entfernt.</string>
     <string name="settings_language">Sprache</string>
+    <string name="settings_language_hint">Legt die Sprache dieses Launchers und des Spiels fest. Am Anfang ist es die des Geräts. Im Spiel erscheinen Sprachausgabe und Texte nur dann darin, wenn die Installation diese Sprache mitbringt.</string>
     <string name="language_not_installed">Diese Installation enthält keine Texte auf %1$s, das Spiel läuft deshalb auf Englisch.</string>
-    <string name="settings_language_hint">Legt die Sprache dieses Launchers und des Spiels fest. Beginnt mit der des Geräts. Im Spiel erscheinen Sprachausgabe und Texte nur dann darin, wenn die Installation diese Sprache mitbringt.</string>
-
     <string name="settings_startup">Start</string>
     <string name="option_no_intro">Intro überspringen</string>
     <string name="option_no_sound">Ohne Ton starten</string>
     <string name="option_extra_args">Zusätzliche Kommandozeilenoptionen (optional)</string>
+    <string name="button_touch_tuning">Touch &amp; Bildrate feinabstimmen</string>
+    <string name="tuning_title">Touch-Feinabstimmung</string>
+    <string name="tuning_intro">Jeder Regler hier geht als Startoption -touchtune an die Engine, das Feld für zusätzliche Kommandozeilenoptionen hat also weiterhin Vorrang. Änderungen gelten ab dem nächsten Spielstart.</string>
+    <string name="tuning_reset">Auf Standard zurücksetzen</string>
+    <string name="tuning_value">%1$s: %2$s</string>
+    <string name="tuning_value_default">%1$s: %2$s (Standard)</string>
+    <string name="tuning_fps">Bildraten-Limit</string>
+    <string name="tuning_fps_hint">60 teilt die Bildwiederholrate des Displays glatt und lässt das Handy kühl. Unbegrenzt zeichnet so schnell, wie der Prozessor kann, und heizt ihn auf, bis alles ruckelt.</string>
+    <string name="tuning_fps_unlimited">Unbegrenzt (Engine-Standard)</string>
+    <string name="tuning_longpress">Zeit für langes Drücken (ms)</string>
+    <string name="tuning_longpress_hint">Wie lange ein ruhender Finger liegen muss, bis daraus ein Rechtsklick wird.</string>
+    <string name="tuning_dragslop">Schwelle fürs Ziehen (px)</string>
+    <string name="tuning_dragslop_hint">Bewegung unterhalb dieses Werts zählt noch als Tippen und nicht als Ziehen.</string>
+    <string name="tuning_panslop">Schwelle fürs Schieben (% der Bildschirmhöhe)</string>
+    <string name="tuning_panslop_hint">Wie weit zwei Finger wandern, bevor die Karte ihnen folgt. Sie holt danach auf, es geht also nichts verloren.</string>
+    <string name="tuning_zoomgate">Schwelle fürs Zoomen (% der Bildschirmhöhe)</string>
+    <string name="tuning_zoomgate_hint">Wie stark sich der Abstand der Finger ändert, bevor die Karte zoomt. Erhöhe den Wert, wenn aus Schieben immer wieder Zoomen wird.</string>
+    <string name="tuning_rotategate">Schwelle fürs Drehen (rad)</string>
+    <string name="tuning_rotategate_hint">Wie weit sich die Finger drehen, bevor sich die Karte mitdreht. Erhöhe den Wert, wenn aus Schieben immer wieder Drehen wird.</string>
+    <string name="tuning_flickdecay">Nachlauf beim Wischen</string>
+    <string name="tuning_flickdecay_hint">Wie viel Tempo ein losgelassener Wisch pro Sechzigstelsekunde behält. Bei 0 steht die Karte sofort still, sobald sich die Finger heben.</string>
+    <string name="tuning_looksens">Symbiose: Blicktempo (Grad pro Pixel bei 720 Höhe)</string>
+    <string name="tuning_looksens_hint">Wie weit sich der Blick einer Kreatur in Symbiose dreht, wenn der Finger wandert.</string>
+    <string name="tuning_stickradius">Symbiose: Stick-Größe (% der Bildschirmhöhe)</string>
+    <string name="tuning_stickradius_hint">Radius des Rings, der unter dem Daumen erscheint. Bei einem größeren muss der Daumen weiter schieben, bis die Kreatur losläuft.</string>
 </resources>

@@ -165,6 +165,9 @@ android {
         // has to stop the release build: lintVitalRelease, part of assembleRelease,
         // looks only at fatal issues. See lint.xml for the one hit that is ignored.
         fatal "NewApi"
+        // Every language of the language box has every string: a new one in English alone
+        // would show English in the middle of another language, with nothing to say so.
+        fatal "MissingTranslation"
     }
 
     testOptions {

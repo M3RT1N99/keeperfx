@@ -46,12 +46,12 @@
     <string name="export_offer_music">• The music</string>
     <string name="export_offer_saves">• Your saved games (%1$d), campaign progress, settings, mods and screenshots</string>
     <string name="export_offer_size">Size: %1$s. Files: %2$d. Packing needs up to %3$s of free storage. Free now: %4$s.</string>
-    <string name="export_offer_own_devices">The file contains your copy of the original Dungeon Keeper files and your saves, and is meant for your own devices. Once it is packed, this device shows you where it can go.</string>
+    <string name="export_offer_own_devices">The file contains your copy of the original Dungeon Keeper files and your saves, and is meant for your own devices. Once it is packed, your phone\'s share menu shows where it can go.</string>
     <string name="export_confirm">Pack it</string>
     <string name="export_share_title">Export KeeperFX (unofficial)</string>
     <string name="export_ready_notification">The export is ready. Tap to choose where it goes.</string>
     <!-- %1$s is the name of the file, %2$s its size. -->
-    <string name="export_waiting">Ready to export: %1$s, %2$s. It stays here until you delete it, or for a day.</string>
+    <string name="export_waiting">Ready to export: %1$s, %2$s. It stays here until you delete it, for a day at most.</string>
     <string name="export_not_installed">The game is not completely installed yet, so there is nothing to export.</string>
     <string name="export_no_manifest">This installation came from a folder, so nothing can tell whether it is whole. \"Check for downloads\" offers the official release, then it can be exported.</string>
     <string name="export_damaged">Files missing or damaged: %1$d. \"Check for downloads\" repairs them, then it can be exported.</string>
@@ -88,7 +88,7 @@
     <string name="transfer_not_a_bundle">This is not an exported KeeperFX installation. Nothing was changed.</string>
     <string name="transfer_damaged">This file is incomplete or damaged, probably cut off on its way here. Nothing was changed. Export it again.</string>
     <string name="transfer_from_newer_app">This file was made by a newer KeeperFX app than this one. Update the app here first. Nothing was changed.</string>
-    <string name="transfer_holds_more">This file holds more than it says it does, so it is not what it claims to be. Nothing was changed.</string>
+    <string name="transfer_holds_more">This file holds more data than it declares, so it is not a real export. Nothing was changed.</string>
     <!-- %1$s is a path. -->
     <string name="transfer_outside_game">This file tries to write outside the game (%1$s), so it will not be installed. Nothing was changed.</string>
     <string name="transfer_not_complete">This file does not hold a complete installation, so the game could not start from it. Nothing was changed.</string>
@@ -110,7 +110,7 @@
     <string name="status_original_missing">Files missing from the original Dungeon Keeper: %1$d</string>
     <string name="status_importing">Copying KeeperFX…</string>
     <string name="status_searching_original">Searching for the original game files…</string>
-    <string name="status_engine_mismatch">The alpha patch is build %1$d and this app\'s engine is build %2$d, because there was no patch for that build. If something looks wrong, this may be why.</string>
+    <string name="status_engine_mismatch">The alpha patch is build %1$d and this app\'s engine is build %2$d, because there is no patch for the engine\'s build. If something looks wrong, this may be why.</string>
     <!-- %2$s is the name of the file being copied, and can be empty. -->
     <string name="status_import_progress">Files copied: %1$d. %2$s</string>
     <string name="status_missing_more">… and %1$d more</string>
@@ -129,13 +129,13 @@
     <string name="button_remove">Reset</string>
     <string name="button_play">Play</string>
 
-    <string name="status_checking_updates">Checking for updates…</string>
+    <string name="status_checking_updates">Checking for downloads…</string>
     <string name="status_downloading_app">Downloading the app update…</string>
 
     <string name="updates_none_title">Everything is up to date</string>
     <string name="updates_none">The app, the game data and the music are all current.\n\nFiles from an original Dungeon Keeper cannot be downloaded. Use \"Import original Dungeon Keeper\" for those.</string>
     <string name="updates_unanswered_title">Could not check for downloads</string>
-    <string name="updates_unanswered">A server did not answer, so something may be waiting that this cannot see. Check the internet connection and try again. If the connection is fine, try again in an hour: GitHub limits how often it can be asked for the newest app.</string>
+    <string name="updates_unanswered">A server did not answer, so there may be something to download that could not be seen. Check the internet connection and try again. If the connection is fine, try again in an hour: GitHub limits how often it can be asked for the newest app.</string>
     <string name="updates_unanswered_more">A server did not answer, so there may be more than this.</string>
     <string name="updates_available_title">Downloads available: %1$d</string>
     <string name="updates_download_all">Download all</string>
@@ -147,11 +147,12 @@
     <string name="update_release_size">Game data, %1$s</string>
     <string name="update_missing">Missing: %1$s</string>
     <string name="update_missing_and_more">Missing: %1$s and %2$d more</string>
-    <string name="update_replaces_folder">Replaces the imported folder with the official release, %1$s</string>
-    <string name="update_from_version">Update from %1$s, %2$s</string>
+    <!-- The last %s of these three is the size of the download. -->
+    <string name="update_replaces_folder">Replaces the imported folder with the official release (%1$s)</string>
+    <string name="update_from_version">Update from %1$s (%2$s)</string>
     <string name="update_repair">Repair KeeperFX %1$s</string>
     <!-- %2$s is the size of the download. -->
-    <string name="update_release_damaged">Files missing or damaged: %1$d. Reinstalling repairs them, %2$s</string>
+    <string name="update_release_damaged">Files missing or damaged: %1$d. Reinstalling repairs them (%2$s)</string>
     <string name="update_for_example">For example: %1$s</string>
     <string name="update_alpha">KeeperFX alpha %1$s</string>
     <string name="update_repair_alpha">Repair KeeperFX alpha %1$s</string>
@@ -159,6 +160,7 @@
     <string name="update_alpha_adds">Files the current engine needs and %1$s does not have</string>
     <string name="update_alpha_adds_to_folder">Files the current engine needs and this installation does not have</string>
     <string name="update_alpha_replaces">Replaces %1$s</string>
+    <!-- About the alpha patch. -->
     <string name="update_alpha_other_build">The newest one: there is no patch for engine build %1$d</string>
     <string name="update_cost_download">Download: %1$s</string>
     <string name="update_cost_cached">Already downloaded, it only needs applying</string>
@@ -180,7 +182,7 @@
     <string name="button_update_app">Update app · %1$s</string>
     <string name="app_update_title">App update</string>
     <string name="app_update_available">Version %1$s is available.\n\nYou are on %2$s.\n\nThe update installs over this one. Game data and settings are kept.</string>
-    <string name="app_update_none">You are on the newest build (%1$s).</string>
+    <string name="app_update_none">You are on the newest version (%1$s).</string>
     <string name="app_update_changes">What changed:</string>
     <string name="app_update_check">Checking…</string>
     <string name="app_update_offline">The update server did not answer. Check the internet connection and try again. If the connection is fine, try again in an hour: GitHub limits how often it can be asked.</string>
@@ -258,18 +260,20 @@
     <string name="input_auto">Automatic — follow the device last used</string>
     <string name="input_touch">Touch — always use the touch scheme</string>
     <string name="input_pointer">Mouse &amp; keyboard — ignore the touch screen</string>
-    <string name="input_gestures">Tap = left click · hold = right click · drag = paint area · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back (the map has its own panel button)\n\nThe system back button and the back gesture also leave a menu. On screen: a back arrow, and a right click toggle. While it is on, a tap slaps and a drag undesignates.</string>
+    <string name="input_gestures">Tap = left click · hold = right click · drag = mark an area · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back\n\nThe system back button and the back gesture also leave a menu. On screen: a back arrow, and a right click toggle. While it is on, a tap slaps a creature and a drag removes marks.</string>
     <string name="option_back_button">Show the on screen buttons while playing</string>
     <string name="game_back">Back</string>
     <string name="game_right_click">Right click</string>
 
     <string name="settings_data">Game data</string>
     <string name="option_use_alpha">Also install the alpha patch for this engine</string>
-    <string name="option_use_alpha_hint">The engine in this app is built from the current source, and the stable release does not carry everything it expects, the fonts for Japanese, Chinese and Korean among them. The alpha patch adds those, a small download on top of the release. Turn this off to stay strictly on 1.4.0. The patch comes back off without downloading anything.</string>
+    <string name="option_use_alpha_hint">The engine in this app is built from the current source, and the stable release does not carry everything it expects, the fonts for Japanese, Chinese and Korean among them. The alpha patch adds those, a small download on top of the release. Turn this off to stay strictly on 1.4.0. Turning it off removes the patch again, with no download.</string>
 
     <string name="settings_language">Language</string>
     <string name="settings_language_hint">Sets the language of this launcher and of the game. It starts on the one the device uses. In the game, speech and text only appear in it when the installation carries that language.</string>
 
+    <!-- %1$s is the language's own name as the language box lists it, such as Français or Polski.
+         It cannot be inflected, so word the sentence around it. -->
     <string name="language_not_installed">This installation has no texts in %1$s, so the game runs in English.</string>
 
     <string name="settings_startup">Startup</string>
@@ -279,13 +283,13 @@
 
     <string name="button_touch_tuning">Fine-tune touch &amp; frame rate</string>
     <string name="tuning_title">Touch tuning</string>
-    <string name="tuning_intro">Every knob here reaches the engine as its -touchtune startup option, so the extra command line options field still overrides them. Changes apply the next time the game starts.</string>
+    <string name="tuning_intro">Every setting here reaches the engine as its -touchtune startup option, so the extra command line options field still overrides them. Changes apply the next time the game starts.</string>
     <string name="tuning_reset">Reset to defaults</string>
     <!-- %1$s is one of the knobs below, %2$s its value. -->
     <string name="tuning_value">%1$s: %2$s</string>
     <string name="tuning_value_default">%1$s: %2$s (default)</string>
     <string name="tuning_fps">Frame rate limit</string>
-    <string name="tuning_fps_hint">60 divides the display evenly and leaves the phone cool. Unlimited draws as fast as the processor can, which heats it up until everything stutters.</string>
+    <string name="tuning_fps_hint">60 suits most screens and leaves the phone cool. Unlimited draws as fast as the processor can, which heats it up until everything stutters.</string>
     <string name="tuning_fps_unlimited">Unlimited (engine default)</string>
     <string name="tuning_longpress">Long press time (ms)</string>
     <string name="tuning_longpress_hint">How long a still finger rests before it turns into a right click.</string>
@@ -297,10 +301,10 @@
     <string name="tuning_zoomgate_hint">How much the distance between the fingers changes before the map starts to zoom. Raise this if panning keeps turning into zooming.</string>
     <string name="tuning_rotategate">Rotate threshold (rad)</string>
     <string name="tuning_rotategate_hint">How far the fingers twist before the map starts to turn. Raise this if panning keeps turning into rotating.</string>
-    <string name="tuning_flickdecay">Flick roll-out</string>
+    <string name="tuning_flickdecay">Roll-out after a swipe</string>
     <string name="tuning_flickdecay_hint">How much speed a released swipe keeps per sixtieth of a second. 0 stops the map dead the moment the fingers lift.</string>
     <string name="tuning_looksens">Possession look speed (degrees per pixel at 720 high)</string>
     <string name="tuning_looksens_hint">How far the view of a possessed creature turns for the travel of a finger.</string>
     <string name="tuning_stickradius">Possession stick size (% of the screen height)</string>
-    <string name="tuning_stickradius_hint">Radius of the ring that appears under the thumb. A larger one takes a longer push to start walking.</string>
+    <string name="tuning_stickradius_hint">Radius of the ring that appears under the thumb. With a larger one the thumb has to travel further before walking starts.</string>
 </resources>
