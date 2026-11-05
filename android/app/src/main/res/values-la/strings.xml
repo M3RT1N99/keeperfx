@@ -87,6 +87,7 @@
     <string name="status_missing_more">… et reliqui: %1$d</string>
     <string name="hint_install_keeperfx">Tange «Installa KeeperFX» ut editionem novissimam depromas, aut importa scrinium quod iam habes.</string>
     <string name="hint_import_original">Adhuc desunt ex Dungeon Keeper originali:</string>
+    <string name="hint_original_source">Hi fasciculi ex tuo ipsius exemplari Dungeon Keeper veniunt, exempli gratia ex GOG, Steam aut CD. Pone eos in scrinio proprio in hoc instrumento, quia Android ipsum scrinium Download non praebet.</string>
     <string name="button_install_keeperfx">Installa KeeperFX</string>
     <string name="button_update_keeperfx">Quaere depromenda</string>
     <string name="button_updates_waiting">Depromenda: %1$d</string>

@@ -87,6 +87,7 @@
     <string name="status_missing_more">… és még %1$d</string>
     <string name="hint_install_keeperfx">Koppints a „KeeperFX telepítése” gombra az aktuális kiadás letöltéséhez, vagy importálj egy már meglévő mappát.</string>
     <string name="hint_import_original">Még hiányzik az eredeti Dungeon Keeper fájljai közül:</string>
+    <string name="hint_original_source">A fájlok a saját Dungeon Keeper példányodból származnak, például a GOG-ról, a Steamről vagy a CD-ről. Tedd őket ezen az eszközön egy külön mappába, mert magát a Letöltések mappát az Android nem kínálja fel.</string>
     <string name="button_install_keeperfx">KeeperFX telepítése</string>
     <string name="button_update_keeperfx">Letöltések keresése</string>
     <string name="button_updates_waiting">Elérhető letöltések: %1$d</string>

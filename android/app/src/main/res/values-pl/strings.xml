@@ -87,6 +87,7 @@
     <string name="status_missing_more">… i jeszcze %1$d</string>
     <string name="hint_install_keeperfx">Dotknij „Zainstaluj KeeperFX”, aby pobrać aktualne wydanie, albo zaimportuj folder, który już masz.</string>
     <string name="hint_import_original">Nadal brakuje z oryginalnej gry Dungeon Keeper:</string>
+    <string name="hint_original_source">Pliki pochodzą z własnej kopii gry Dungeon Keeper, na przykład z GOG, Steama lub płyty CD. Umieść je na tym urządzeniu w osobnym folderze, bo samego folderu Pobrane Android nie udostępnia.</string>
     <string name="button_install_keeperfx">Zainstaluj KeeperFX</string>
     <string name="button_update_keeperfx">Szukaj plików do pobrania</string>
     <string name="button_updates_waiting">Do pobrania: %1$d</string>

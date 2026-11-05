@@ -87,6 +87,7 @@
     <string name="status_missing_more">…还有 %1$d 个</string>
     <string name="hint_install_keeperfx">点击“安装 KeeperFX”下载当前正式版，或导入你已有的文件夹。</string>
     <string name="hint_import_original">还缺少原版 Dungeon Keeper 的这些文件：</string>
+    <string name="hint_original_source">这些文件来自你自己的 Dungeon Keeper，例如 GOG、Steam 或 CD 版。请把它们放到这台设备上单独的文件夹中，因为 Android 不提供“下载”文件夹本身。</string>
     <string name="button_install_keeperfx">安装 KeeperFX</string>
     <string name="button_update_keeperfx">检查可用下载</string>
     <string name="button_updates_waiting">可用下载：%1$d 个</string>

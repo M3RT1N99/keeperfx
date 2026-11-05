@@ -87,6 +87,7 @@
     <string name="status_missing_more">… en nog %1$d</string>
     <string name="hint_install_keeperfx">Tik op ‘KeeperFX installeren’ om de huidige release te downloaden, of importeer een map die je al hebt.</string>
     <string name="hint_import_original">Nog nodig uit een originele Dungeon Keeper:</string>
+    <string name="hint_original_source">De bestanden komen uit je eigen exemplaar van Dungeon Keeper, bijvoorbeeld van GOG, Steam of de cd. Zet ze op dit apparaat in een eigen map, want de map Download zelf biedt Android niet aan.</string>
     <string name="button_install_keeperfx">KeeperFX installeren</string>
     <string name="button_update_keeperfx">Zoeken naar downloads</string>
     <string name="button_updates_waiting">Downloads beschikbaar: %1$d</string>

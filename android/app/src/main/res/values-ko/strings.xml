@@ -87,6 +87,7 @@
     <string name="status_missing_more">… 외 %1$d개</string>
     <string name="hint_install_keeperfx">‘KeeperFX 설치’를 탭하여 현재 릴리스를 다운로드하거나, 이미 가지고 있는 폴더를 가져오세요.</string>
     <string name="hint_import_original">원작 Dungeon Keeper에서 아직 필요한 파일:</string>
+    <string name="hint_original_source">이 파일들은 GOG, Steam, CD 등 직접 가지고 있는 Dungeon Keeper에서 가져옵니다. 이 기기의 별도 폴더에 넣으세요. Android에서는 ‘다운로드’ 폴더 자체를 선택할 수 없습니다.</string>
     <string name="button_install_keeperfx">KeeperFX 설치</string>
     <string name="button_update_keeperfx">다운로드 확인</string>
     <string name="button_updates_waiting">다운로드 가능: %1$d개</string>

@@ -87,6 +87,7 @@
     <string name="status_missing_more">… och %1$d till</string>
     <string name="hint_install_keeperfx">Tryck på ”Installera KeeperFX” för att ladda ner den senaste utgåvan, eller importera en mapp du redan har.</string>
     <string name="hint_import_original">Saknas fortfarande från originalspelet Dungeon Keeper:</string>
+    <string name="hint_original_source">Filerna kommer från ditt eget exemplar av Dungeon Keeper, till exempel från GOG, Steam eller cd-skivan. Lägg dem i en egen mapp på den här enheten, eftersom Android inte erbjuder själva mappen Download.</string>
     <string name="button_install_keeperfx">Installera KeeperFX</string>
     <string name="button_update_keeperfx">Sök efter nedladdningar</string>
     <string name="button_updates_waiting">Nedladdningar tillgängliga: %1$d</string>

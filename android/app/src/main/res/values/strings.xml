@@ -117,6 +117,7 @@
 
     <string name="hint_install_keeperfx">Tap \"Install KeeperFX\" to download the current release, or import a folder you already have.</string>
     <string name="hint_import_original">Still missing from an original Dungeon Keeper:</string>
+    <string name="hint_original_source">The files come from your own copy of Dungeon Keeper, for example from GOG, Steam or the CD. Put them in a folder of their own on this device, because Android does not offer the Download folder itself.</string>
 
     <string name="button_install_keeperfx">Install KeeperFX</string>
     <string name="button_update_keeperfx">Check for downloads</string>

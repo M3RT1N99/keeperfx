@@ -87,6 +87,7 @@
     <string name="status_missing_more">… a ještě %1$d</string>
     <string name="hint_install_keeperfx">Klepni na „Instalovat KeeperFX“ a stáhni aktuální vydání, nebo importuj složku, kterou už máš.</string>
     <string name="hint_import_original">Z původní hry Dungeon Keeper ještě chybí:</string>
+    <string name="hint_original_source">Soubory pocházejí z tvé vlastní kopie hry Dungeon Keeper, například z GOG, Steamu nebo z CD. Ulož je v tomto zařízení do samostatné složky, protože samotnou složku Stažené soubory Android nenabízí.</string>
     <string name="button_install_keeperfx">Instalovat KeeperFX</string>
     <string name="button_update_keeperfx">Hledat soubory ke stažení</string>
     <string name="button_updates_waiting">Ke stažení: %1$d</string>

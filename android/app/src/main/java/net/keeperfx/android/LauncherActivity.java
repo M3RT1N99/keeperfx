@@ -67,6 +67,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
 
     private TextView keeperfxStatus;
     private TextView originalDkStatus;
+    private View originalHint;
     private TextView detailView;
     private ProgressBar progressBar;
     private Button installButton;
@@ -123,6 +124,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
     private void findViews() {
         keeperfxStatus = findViewById(R.id.keeperfxStatus);
         originalDkStatus = findViewById(R.id.originalDkStatus);
+        originalHint = findViewById(R.id.originalHint);
         detailView = findViewById(R.id.detail);
         progressBar = findViewById(R.id.progress);
         installButton = findViewById(R.id.installKeeperfx);
@@ -344,6 +346,7 @@ public class LauncherActivity extends Activity implements DownloadService.Observ
             originalDkStatus.setText(getString(R.string.status_original_missing, missingOriginal.size()));
         }
         originalDkStatus.setTextColor(getColor(hasOriginal ? R.color.kfx_ok : R.color.kfx_warn));
+        originalHint.setVisibility(hasOriginal ? View.GONE : View.VISIBLE);
 
         installButton.setText(hasKeeperfx
             ? getString(R.string.button_update_keeperfx)

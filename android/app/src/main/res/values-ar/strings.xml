@@ -87,6 +87,7 @@
     <string name="status_missing_more">… وغيرها: %1$d</string>
     <string name="hint_install_keeperfx">انقر على «تثبيت KeeperFX» لتنزيل الإصدار الحالي، أو استورد مجلدًا لديك بالفعل.</string>
     <string name="hint_import_original">ما زال ينقص من لعبة Dungeon Keeper الأصلية:</string>
+    <string name="hint_original_source">تأتي هذه الملفات من نسختك الخاصة من Dungeon Keeper، مثل GOG أو Steam أو قرص CD. ضعها في مجلد خاص بها على هذا الجهاز، لأن Android لا يتيح مجلد «التنزيلات» نفسه.</string>
     <string name="button_install_keeperfx">تثبيت KeeperFX</string>
     <string name="button_update_keeperfx">البحث عن تنزيلات</string>
     <string name="button_updates_waiting">التنزيلات المتاحة: %1$d</string>
