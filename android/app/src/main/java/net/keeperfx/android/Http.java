@@ -15,6 +15,8 @@
 /******************************************************************************/
 package net.keeperfx.android;
 
+import android.util.Log;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -25,6 +27,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 final class Http {
+
+    private static final String TAG = "KeeperFX";
 
     private static final int CONNECT_TIMEOUT_MS = 20000;
     private static final int READ_TIMEOUT_MS = 60000;
@@ -38,6 +42,17 @@ final class Http {
     }
 
     private Http() {
+    }
+
+    /**
+     * What to throw for a status nothing here can use. The player's sentence has only the
+     * number, and one queue of downloads talks to keeperfx.net, its CDN, the workshop and
+     * GitHub, so the log is where it says which of them answered that.
+     */
+    static Message.Failure statusFailure(HttpURLConnection connection, int status) {
+        Log.w(TAG, "HTTP " + status + " from " + connection.getURL());
+        return (status == HttpURLConnection.HTTP_NOT_FOUND)
+            ? new NotFoundException() : new Message.Failure(R.string.http_status, status);
     }
 
     /**
@@ -62,6 +77,7 @@ final class Http {
             final String next = connection.getHeaderField("Location");
             connection.disconnect();
             if (next == null) {
+                Log.w(TAG, "HTTP " + status + " with no Location from " + url);
                 throw new Message.Failure(R.string.http_redirect_nowhere);
             }
             connection = connect(redirectTarget(url, next), from, accept);
@@ -80,6 +96,7 @@ final class Http {
         final URL origin = new URL(from);
         final URL next = new URL(origin, location);
         if (origin.getProtocol().equals("https") && !next.getProtocol().equals("https")) {
+            Log.w(TAG, "Refused a redirect from " + from + " to " + next);
             throw new Message.Failure(R.string.http_redirect_insecure);
         }
         return next.toString();
@@ -104,11 +121,8 @@ final class Http {
         final HttpURLConnection connection = open(url, 0, "application/json");
         try {
             final int status = connection.getResponseCode();
-            if (status == HttpURLConnection.HTTP_NOT_FOUND) {
-                throw new NotFoundException();
-            }
             if (status != HttpURLConnection.HTTP_OK) {
-                throw new Message.Failure(R.string.http_status, status);
+                throw statusFailure(connection, status);
             }
             final ByteArrayOutputStream body = new ByteArrayOutputStream();
             try (InputStream in = connection.getInputStream()) {

@@ -132,7 +132,7 @@ public final class ResumableDownload {
                 append = false;
                 existing = 0;
             } else {
-                throw new Message.Failure(R.string.http_status, status);
+                throw Http.statusFailure(connection, status);
             }
 
             final long remaining = connection.getContentLengthLong();
