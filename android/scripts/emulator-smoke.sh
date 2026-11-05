@@ -130,11 +130,6 @@ scroll_to_top() {
     for i in 1 2 3 4 5; do adb shell input swipe 360 300 360 1400 150; done
 }
 
-scroll_to_bottom() {
-    local i
-    for i in 1 2 3 4 5; do adb shell input swipe 360 1400 360 300 150; done
-}
-
 back_to_launcher() {
     adb shell am start -W -n "${PKG}/.LauncherActivity" > /dev/null
 }
@@ -273,7 +268,6 @@ adb shell "sed -i 's#</map>#<string name=\"extra_args\">${SMOKE_ARGS}</string></
 adb shell chown "${APP_UID}:${APP_UID}" "${PREFS}"
 back_to_launcher
 sleep 2
-scroll_to_bottom
 ui | grep -F "resource-id=\"${ID}/play\"" | grep -qF 'enabled="true"' || fail "Play is not enabled"
 say "pressing Play"
 tap "${ID}/play"

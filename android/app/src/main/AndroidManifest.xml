@@ -49,13 +49,17 @@
 
         <!--
           Handles rotation and the like itself: its layout is the same either way, and
-          being recreated would cancel a folder import that is running.
+          being recreated would cancel a folder import that is running. The keyboard
+          resizes it, so that Play rides above the keyboard and the scrolling part brings
+          the field being typed in between them. Left unspecified this would pan: a
+          ScrollView without scrollbars does not count as something that can resize.
         -->
         <activity
             android:name=".LauncherActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
             android:exported="true"
-            android:label="@string/app_name">
+            android:label="@string/app_name"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

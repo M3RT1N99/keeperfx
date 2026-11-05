@@ -2,10 +2,12 @@
 <!--
   Arranged the way the desktop Qt launcher is: the Dungeon Keeper land view
   behind a dark scrim, one big Play button as the hero action, and the utilities
-  (log file, folder, reset) as a row of small icon buttons underneath it. Colours
-  and icons come from keeperfx-launcher-qt, which is GPL v2 like this repository.
+  (log file, folder, reset) as a row of small icon buttons. Colours and icons come
+  from keeperfx-launcher-qt, which is GPL v2 like this repository. Play stays on screen
+  under the scrolling part, or a new player has a page and a half of settings to get
+  through with nothing saying that it is down there.
 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/kfx_background">
@@ -26,6 +28,7 @@
         android:id="@+id/scroll"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_above="@+id/play"
         android:fillViewport="true"
         android:scrollbars="none">
 
@@ -442,19 +445,6 @@
                     android:textSize="14sp" />
             </LinearLayout>
 
-            <!-- Hero action -->
-            <Button
-                android:id="@+id/play"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="76dp"
-                android:layout_marginTop="26dp"
-                android:background="@drawable/btn_orange"
-                android:text="@string/button_play"
-                android:textColor="@color/btn_text"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-
             <!--
               Utility row, as in the desktop launcher. The reset sits at the far
               end, deliberately not next to the log button it would otherwise be
@@ -464,7 +454,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="26dp"
                 android:baselineAligned="false"
                 android:orientation="horizontal">
 
@@ -540,4 +530,21 @@
                 android:textSize="12sp" />
         </LinearLayout>
     </ScrollView>
-</FrameLayout>
+
+    <!-- Hero action -->
+    <Button
+        android:id="@+id/play"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="76dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="14dp"
+        android:background="@drawable/btn_orange"
+        android:text="@string/button_play"
+        android:textColor="@color/btn_text"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+</RelativeLayout>
