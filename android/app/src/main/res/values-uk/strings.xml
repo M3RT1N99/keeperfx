@@ -218,7 +218,7 @@
     <string name="settings_startup">Запуск</string>
     <string name="option_no_intro">Пропускати вступ</string>
     <string name="option_no_sound">Запускати без звуку</string>
-    <string name="option_extra_args">Додаткові параметри командного рядка (необов’язково)</string>
+    <string name="option_extra_args">Параметри запуску (необов’язково)</string>
     <string name="button_touch_tuning">Точне налаштування дотиків і частоти кадрів</string>
     <string name="tuning_title">Налаштування дотиків</string>
     <string name="tuning_intro">Кожен параметр тут передається рушію через параметр запуску -touchtune, тому поле додаткових параметрів командного рядка все одно має пріоритет. Зміни наберуть чинності під час наступного запуску гри.</string>

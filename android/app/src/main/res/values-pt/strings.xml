@@ -218,7 +218,7 @@
     <string name="settings_startup">Inicialização</string>
     <string name="option_no_intro">Ignorar a introdução</string>
     <string name="option_no_sound">Iniciar sem som</string>
-    <string name="option_extra_args">Opções extras de linha de comando (opcional)</string>
+    <string name="option_extra_args">Opções de linha de comando (opcional)</string>
     <string name="button_touch_tuning">Ajuste fino de toque e FPS</string>
     <string name="tuning_title">Ajuste de toque</string>
     <string name="tuning_intro">Cada ajuste daqui chega ao motor pela opção de inicialização -touchtune, por isso o campo de opções extras de linha de comando ainda tem prioridade. As alterações valem a partir do próximo início do jogo.</string>

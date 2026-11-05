@@ -218,7 +218,7 @@
     <string name="settings_startup">Start</string>
     <string name="option_no_intro">Intro überspringen</string>
     <string name="option_no_sound">Ohne Ton starten</string>
-    <string name="option_extra_args">Zusätzliche Kommandozeilenoptionen (optional)</string>
+    <string name="option_extra_args">Zusätzliche Startoptionen (optional)</string>
     <string name="button_touch_tuning">Touch &amp; Bildrate feinabstimmen</string>
     <string name="tuning_title">Touch-Feinabstimmung</string>
     <string name="tuning_intro">Jeder Regler hier geht als Startoption -touchtune an die Engine, das Feld für zusätzliche Kommandozeilenoptionen hat also weiterhin Vorrang. Änderungen gelten ab dem nächsten Spielstart.</string>

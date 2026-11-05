@@ -218,7 +218,7 @@
     <string name="settings_startup">Indítás</string>
     <string name="option_no_intro">Intró kihagyása</string>
     <string name="option_no_sound">Indítás hang nélkül</string>
-    <string name="option_extra_args">További parancssori kapcsolók (nem kötelező)</string>
+    <string name="option_extra_args">Parancssori kapcsolók (nem kötelező)</string>
     <string name="button_touch_tuning">Érintés és képkockasebesség finomhangolása</string>
     <string name="tuning_title">Érintés finomhangolása</string>
     <string name="tuning_intro">Minden itteni beállítás a -touchtune indítási kapcsolón keresztül jut el a motorhoz, így a további parancssori kapcsolók mezője továbbra is felülírja őket. A változások a játék következő indításakor lépnek életbe.</string>

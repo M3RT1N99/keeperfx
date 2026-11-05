@@ -218,7 +218,7 @@
     <string name="settings_startup">Inicio</string>
     <string name="option_no_intro">Saltar la introducción</string>
     <string name="option_no_sound">Iniciar sin sonido</string>
-    <string name="option_extra_args">Opciones adicionales de línea de comandos (opcional)</string>
+    <string name="option_extra_args">Opciones de línea de comandos (opcional)</string>
     <string name="button_touch_tuning">Ajuste fino: táctil y fotogramas por segundo</string>
     <string name="tuning_title">Ajuste táctil</string>
     <string name="tuning_intro">Cada ajuste de esta pantalla llega al motor a través de su opción de inicio -touchtune, por lo que el campo de opciones adicionales de línea de comandos sigue teniendo prioridad. Los cambios se aplican la próxima vez que se inicie el juego.</string>

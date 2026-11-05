@@ -218,7 +218,7 @@
     <string name="settings_startup">Initium</string>
     <string name="option_no_intro">Praetermitte introductionem</string>
     <string name="option_no_sound">Incipe sine sono</string>
-    <string name="option_extra_args">Optiones additae lineae mandatorum (ad libitum)</string>
+    <string name="option_extra_args">Optiones lineae mandatorum (ad libitum)</string>
     <string name="button_touch_tuning">Tempera tactum &amp; frequentiam imaginum</string>
     <string name="tuning_title">Temperatio tactus</string>
     <string name="tuning_intro">Omne temperamentum hic ad machinam pervenit per optionem initii -touchtune, itaque campus optionum additarum lineae mandatorum adhuc praevalet. Mutationes valent cum ludus proxime incipit.</string>

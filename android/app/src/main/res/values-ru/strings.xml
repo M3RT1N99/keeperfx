@@ -218,7 +218,7 @@
     <string name="settings_startup">Запуск</string>
     <string name="option_no_intro">Пропускать вступление</string>
     <string name="option_no_sound">Запускать без звука</string>
-    <string name="option_extra_args">Дополнительные параметры командной строки (необязательно)</string>
+    <string name="option_extra_args">Параметры запуска (необязательно)</string>
     <string name="button_touch_tuning">Тонкая настройка касаний и частоты кадров</string>
     <string name="tuning_title">Настройка касаний</string>
     <string name="tuning_intro">Каждый параметр здесь передаётся движку через параметр запуска -touchtune, поэтому поле дополнительных параметров командной строки всё равно имеет приоритет. Изменения вступят в силу при следующем запуске игры.</string>

@@ -218,7 +218,7 @@
     <string name="settings_startup">Avvio</string>
     <string name="option_no_intro">Salta l’introduzione</string>
     <string name="option_no_sound">Avvia senza audio</string>
-    <string name="option_extra_args">Opzioni aggiuntive della riga di comando (facoltative)</string>
+    <string name="option_extra_args">Opzioni da riga di comando (facoltative)</string>
     <string name="button_touch_tuning">Regolazione fine di tocco e fotogrammi al secondo</string>
     <string name="tuning_title">Regolazione del tocco</string>
     <string name="tuning_intro">Ogni regolazione di questa schermata arriva al motore tramite la sua opzione di avvio -touchtune, quindi il campo delle opzioni aggiuntive della riga di comando ha comunque la precedenza. Le modifiche si applicano al prossimo avvio del gioco.</string>

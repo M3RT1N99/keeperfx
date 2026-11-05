@@ -218,7 +218,7 @@
     <string name="settings_startup">Démarrage</string>
     <string name="option_no_intro">Passer l’intro</string>
     <string name="option_no_sound">Démarrer sans le son</string>
-    <string name="option_extra_args">Options de ligne de commande supplémentaires (facultatif)</string>
+    <string name="option_extra_args">Options de ligne de commande (facultatif)</string>
     <string name="button_touch_tuning">Régler finement le tactile et la fréquence d’images</string>
     <string name="tuning_title">Réglage du tactile</string>
     <string name="tuning_intro">Chaque réglage de cet écran est transmis au moteur par son option de démarrage -touchtune : le champ des options de ligne de commande supplémentaires garde donc la priorité. Les changements s’appliquent au prochain démarrage du jeu.</string>

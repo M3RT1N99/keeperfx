@@ -218,7 +218,7 @@
     <string name="settings_startup">Uruchamianie</string>
     <string name="option_no_intro">Pomiń intro</string>
     <string name="option_no_sound">Uruchamiaj bez dźwięku</string>
-    <string name="option_extra_args">Dodatkowe opcje wiersza poleceń (opcjonalnie)</string>
+    <string name="option_extra_args">Opcje wiersza poleceń (opcjonalnie)</string>
     <string name="button_touch_tuning">Dostrój dotyk i liczbę klatek</string>
     <string name="tuning_title">Strojenie dotyku</string>
     <string name="tuning_intro">Każde ustawienie trafia do silnika jako jego opcja startowa -touchtune, więc pole dodatkowych opcji wiersza poleceń nadal ma pierwszeństwo. Zmiany zadziałają przy następnym uruchomieniu gry.</string>
