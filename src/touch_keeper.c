@@ -90,10 +90,20 @@ TbBool touch_keeper_in_force(void)
 #endif
 }
 
+/** The same reach as touch_assist_gui_pointer(), which would take the pointer away. */
+static long finger_reach(void)
+{
+    return max(8, MyScreenHeight / 30);
+}
+
+TbBool touch_keeper_over_panel(long x)
+{
+    return local_state.show_gui && (x < (long)status_panel_width + finger_reach());
+}
+
 TbBool touch_keeper_over_gui(long x, long y)
 {
-    // The same reach as touch_assist_gui_pointer(), which would take the pointer away.
-    const long slop = max(8, MyScreenHeight / 30);
+    const long slop = finger_reach();
     for (int i = 0; i < ACTIVE_MENUS_COUNT; i++)
     {
         const struct GuiMenu *gmnu = &active_menus[i];

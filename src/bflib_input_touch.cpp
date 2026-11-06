@@ -141,6 +141,7 @@ struct TouchFinger {
     Uint64 down_ticks;
     TbBool moved;
     TbBool on_gui;         /**< It landed on the panel or a menu. */
+    TbBool on_panel;       /**< It landed on the panel. */
     TbBool beside;         /**< On the panel beside a finger on the map: part of no gesture, see touch_keep_panel_finger_aside(). */
     TbBool spoiled;        /**< One beside that became part of a grip or a three finger tap, and clicks nothing. */
 };
@@ -711,7 +712,7 @@ static TbBool touch_keep_panel_finger_aside(struct TouchFinger *finger)
         return false;
     if (touch_beside_fingers > 0)
     {
-        if (finger->on_gui)
+        if (finger->on_panel)
         {
             for (int i = 0; i < TOUCH_MAX_FINGERS; i++) {
                 if (touch_fingers[i].active && touch_fingers[i].beside) {
@@ -728,14 +729,14 @@ static TbBool touch_keep_panel_finger_aside(struct TouchFinger *finger)
     struct TouchFinger *other = touch_gesture_finger(finger);
     if (other == NULL)
         return false;
-    if (finger->on_gui && !other->on_gui
+    if (finger->on_panel && !other->on_gui
      && ((touch_gesture == TGest_Point) || (touch_gesture == TGest_Hand) || (touch_gesture == TGest_LongTap) || (touch_gesture == TGest_Drag)))
     {
         finger->beside = true;
         touch_beside_fingers++;
         return true;
     }
-    if (!finger->on_gui && other->on_gui && (touch_gesture == TGest_Point))
+    if (!finger->on_gui && other->on_panel && (touch_gesture == TGest_Point))
     {
         // The other way round: the one on the panel was first, and has not pressed anything yet.
         other->beside = true;
@@ -846,6 +847,7 @@ void TEvent(const SDL_Event *ev)
         finger->down_ticks = touch_event_ms(ev);
         finger->moved = false;
         finger->on_gui = touch_keeper_over_gui(finger->x, finger->y);
+        finger->on_panel = touch_keeper_over_panel(finger->x);
         if (touch_keep_panel_finger_aside(finger))
             break;
         touch_finger_count++;

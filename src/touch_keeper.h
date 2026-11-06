@@ -42,6 +42,9 @@ TbBool touch_keeper_in_force(void);
  */
 TbBool touch_keeper_over_gui(long x, long y);
 
+/** True on the panel, with the same reach. */
+TbBool touch_keeper_over_panel(long x);
+
 void touch_keeper_stroke_begin(long long ms);
 void touch_keeper_stroke_moved(long long ms);
 void touch_keeper_stroke_end(void);
