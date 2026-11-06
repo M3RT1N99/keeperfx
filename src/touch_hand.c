@@ -25,6 +25,7 @@
 /******************************************************************************/
 #include "touch_hand.h"
 
+#include <math.h>
 #include <string.h>
 
 enum ThPhase {
@@ -235,8 +236,15 @@ enum ThClick th_click_due(struct ThHand *h, const struct ThSees *s, const struct
     const long long since_right = packet_turn - h->last_right_turn;
     if ((h->last_right_turn >= 0) && (since_right >= 0) && (since_right < t->whip_turns))
         return ThC_None;
+    // A swipe is a finger going over something. One that has come to rest on a creature has
+    // said what it wanted, and slaps take health.
+    if (k->slapped_once && (hypotf(s->x - k->slap_x, s->y - k->slap_y) < t->rest_px))
+        return ThC_None;
     if (!th_slap_is_due(k, s->creature, t->slap_ms, now))
         return ThC_None;
+    k->slapped_once = 1;
+    k->slap_x = s->x;
+    k->slap_y = s->y;
     return ThC_Slap;
 }
 

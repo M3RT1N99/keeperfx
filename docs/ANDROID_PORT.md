@@ -306,8 +306,9 @@ above says. Android only: the hooks that feed them are inside `#ifdef __ANDROID_
 | Stroke from a wall | The left button: tags and untags | The left button: tags and untags |
 
 A swipe slaps every own creature under the finger, again and again for as long as the
-finger stays down, at most once per creature every `slaprate` (0.15 s), and presses no left
-button. It reaches a wall with nothing crossed yet and it turns into the ordinary drag, which
+finger stays down and goes on moving, however slowly, at most once per creature every
+`slaprate` (0.15 s), and presses no left button. A finger that comes to rest on a creature
+stops slapping it. It reaches a wall with nothing crossed yet and it turns into the ordinary drag, which
 tags from there. A stroke with something in the hand that starts on a floor does not tag
 any more, one that starts on the wall does, and with an empty hand a drag whose press lands
 on the floor never tagged. Second fingers on the map are the grip and end all of this.

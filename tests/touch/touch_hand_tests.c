@@ -41,7 +41,7 @@ static int checks = 0;
 #define CREATURE_A 21UL
 #define CREATURE_B 22UL
 
-static const struct ThTuning tuning = {250.0f, 100.0f, 150.0f, 420.0f, 4, 50.0f};
+static const struct ThTuning tuning = {250.0f, 100.0f, 150.0f, 420.0f, 4, 50.0f, 6.0f};
 
 static struct ThHand h;
 static struct ThSees sees;
@@ -56,6 +56,7 @@ static int picks_landed;
 static int right_click_waiting;
 static int pick_waiting;
 static int pick_fails;
+static int rubbing;
 static unsigned char sent_right[PACKETS];
 static unsigned char sent_pick[PACKETS];
 static long long click_turns[64];
@@ -74,7 +75,7 @@ static void begin(int hand, int lag)
     game_lag = lag;
     game_hand = hand;
     drops = slaps = picks_landed = 0;
-    right_click_waiting = pick_waiting = pick_fails = 0;
+    right_click_waiting = pick_waiting = pick_fails = rubbing = 0;
     clicks = 0;
     memset(sent_right, 0, sizeof(sent_right));
     memset(sent_pick, 0, sizeof(sent_pick));
@@ -128,6 +129,8 @@ static void run_ms(int ms)
     for (int t = 0; t < ms; t += 16) {
         now += 16;
         refresh();
+        if (rubbing)
+            sees.x = (float)((now / 16) % 40) * 8.0f;
         if (th_decide(&h, &sees, &tuning, now) == ThV_Hand) {
             if (!right_click_waiting) {
                 const enum ThClick click = th_click_due(&h, &sees, &tuning, now);
@@ -173,7 +176,7 @@ static void test_a_held_finger_drops_at_the_rate_asked(void)
 
 static void test_a_hold_time_past_the_long_press_time(void)
 {
-    const struct ThTuning long_hold = {800.0f, 100.0f, 150.0f, 420.0f, 4, 50.0f};
+    const struct ThTuning long_hold = {800.0f, 100.0f, 150.0f, 420.0f, 4, 50.0f, 6.0f};
     begin(3, 0);
     th_stroke_begin(&h, now);
     refresh();
@@ -187,7 +190,7 @@ static void test_a_hold_time_past_the_long_press_time(void)
 
 static void test_a_rate_between_turns_keeps_to_it(void)
 {
-    const struct ThTuning between = {250.0f, 75.0f, 150.0f, 420.0f, 4, 50.0f};
+    const struct ThTuning between = {250.0f, 75.0f, 150.0f, 420.0f, 4, 50.0f, 6.0f};
     begin(0, 0);
     game_hand = 40;
     th_stroke_begin(&h, now);
@@ -206,7 +209,7 @@ static void test_a_rate_between_turns_keeps_to_it(void)
         CHECK((gap == 1) || (gap == 2), "a turn or two, %lld", gap);
     }
     // At the fastest the knob allows, one click per turn.
-    const struct ThTuning fastest = {250.0f, 50.0f, 150.0f, 420.0f, 4, 50.0f};
+    const struct ThTuning fastest = {250.0f, 50.0f, 150.0f, 420.0f, 4, 50.0f, 6.0f};
     begin(0, 0);
     game_hand = 40;
     th_stroke_begin(&h, now);
@@ -473,15 +476,30 @@ static void test_a_quick_stroke_with_an_empty_hand_slaps(void)
     CHECK(slaps == 0, "bare floor: %d", slaps);
     sees.thing = 1;
     sees.creature = CREATURE_A;
-    // Rubbing goes on for as long as the finger stays, at the game's pace.
+    // Rubbing goes on for as long as the finger goes on, at the game's pace.
+    rubbing = 1;
     run_ms(2000);
     CHECK((slaps >= 8) && (slaps <= 11), "one per whip of 4 turns, %d in 2 s", slaps);
     CHECK(drops == 0, "drops %d", drops);
+    // Come to rest on the creature: one more at most, and then nothing however long it stays.
+    rubbing = 0;
+    run_ms(300);
+    const int at_rest = slaps;
+    run_ms(2000);
+    CHECK(slaps == at_rest, "a resting finger: %d, was %d", slaps, at_rest);
+    // A tremble is still a rest.
+    sees.x += 3.0f;
+    run_ms(500);
+    CHECK(slaps == at_rest, "a trembling finger: %d, was %d", slaps, at_rest);
+    // It moves on, however slowly.
+    sees.x += 10.0f;
+    run_ms(300);
+    CHECK(slaps == at_rest + 1, "moving again: %d, was %d", slaps, at_rest);
 }
 
 static void test_the_slap_rate_keeps_a_creature_waiting(void)
 {
-    const struct ThTuning slow = {250.0f, 100.0f, 500.0f, 420.0f, 4, 50.0f};
+    const struct ThTuning slow = {250.0f, 100.0f, 500.0f, 420.0f, 4, 50.0f, 6.0f};
     begin(0, 0);
     th_stroke_begin(&h, now);
     th_stroke_moved(&h, now);
@@ -495,6 +513,7 @@ static void test_the_slap_rate_keeps_a_creature_waiting(void)
     game_turn += 6;
     now += 300;
     refresh();
+    sees.x += 20.0f;
     CHECK(th_click_due(&h, &sees, &slow, now) == ThC_None, "under the rate");
     // Another one does not wait for this one's rate, only for the whip.
     sees.creature = CREATURE_B;
@@ -502,6 +521,7 @@ static void test_the_slap_rate_keeps_a_creature_waiting(void)
     th_note_packet(&h, sees.turn, sees.lag, 1, 0);
     now += 16;
     sees.creature = CREATURE_A;
+    sees.x += 20.0f;
     game_turn += 1;
     now += 200;
     refresh();

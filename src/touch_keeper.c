@@ -52,6 +52,9 @@
 extern "C" {
 #endif
 /******************************************************************************/
+/** What a finger resting on glass trembles by, the same as a possessed creature's look allows. */
+#define TOUCH_HAND_REST_SHARE (6.0f / 720.0f)
+
 float touch_hand_hold_ms = 250.0f;
 float touch_hand_rain_ms = 100.0f;
 float touch_hand_slap_ms = 150.0f;
@@ -139,6 +142,7 @@ static void current_tuning(float longpress_ms, struct ThTuning *tuning)
     tuning->longpress_ms = longpress_ms;
     tuning->whip_turns = player_instance_info[PI_Whip].length_turns;
     tuning->turn_ms = 1000.0f / (float)max(turns_per_second, 1);
+    tuning->rest_px = (float)MyScreenHeight * TOUCH_HAND_REST_SHARE;
 }
 
 static void what_is_seen(long x, long y, TbBool settled, struct ThSees *sees)
@@ -146,6 +150,8 @@ static void what_is_seen(long x, long y, TbBool settled, struct ThSees *sees)
     memset(sees, 0, sizeof(*sees));
     sees->turn = (long long)get_gameturn();
     sees->lag = game.input_lag_turns;
+    sees->x = (float)x;
+    sees->y = (float)y;
     sees->in_force = touch_keeper_in_force() && !touch_keeper_over_gui(x, y);
 #ifdef __ANDROID__
     if (!sees->in_force || !settled)

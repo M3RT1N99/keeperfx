@@ -39,6 +39,7 @@ struct ThTuning {
     float longpress_ms;  /**< The ordinary long press, which still is one where nothing can fall. */
     int whip_turns;      /**< A slap takes this long, and the game ignores another one meanwhile. */
     float turn_ms;       /**< How long a game turn is meant to take. */
+    float rest_px;       /**< Travel below this is a resting finger trembling, not a finger moving. */
 };
 
 /** What the game says at this moment, about the hand and the place under the finger. */
@@ -53,6 +54,7 @@ struct ThSees {
     unsigned long creature;    /**< That is an own creature, and this one; 0 when it is not. */
     long long turn;            /**< The game turn. */
     int lag;                   /**< Input lag: what goes out now arrives this many turns later. */
+    float x, y;                /**< Where the finger is. */
 };
 
 /** What is to become of a finger that has not started anything yet. */
@@ -94,6 +96,8 @@ struct ThStroke {
     long long down_ms;
     long long moved_ms;
     double next_drop_turn;       /**< The packet the next drop is due in, with what a rate between turns carries over. */
+    unsigned char slapped_once;  /**< It has slapped, so the next slap asks for travel from where that was. */
+    float slap_x, slap_y;
     struct ThSlapped slapped[TH_SLAP_MEMORY];
 };
 
