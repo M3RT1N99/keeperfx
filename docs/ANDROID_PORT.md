@@ -334,10 +334,8 @@ A slap takes the game 4 turns, and it ignores another one meanwhile or within 10
 drop (`magic_use_power_slap_thing()`). So 0.2 s is the most a swipe gets, whatever `slaprate`
 says, and the rules leave the turns of the whip free so that a click is not wasted on one.
 
-All of this rests on x86_64 emulators at API 36 with the arm64 libraries under translation,
-scripted fingers, one player and two on the LAN bed. No phone has run it and nobody has
-said how it feels. The rate is in turns, 2 at the default, so it stretches with the game when
-a phone cannot keep up its 20 turns a second.
+The rate of the drops is counted in turns, 2 at the default, so it stretches with the game
+when a phone cannot keep up its 20 turns a second.
 
 ### A possessed creature
 
