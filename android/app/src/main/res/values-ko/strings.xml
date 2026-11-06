@@ -209,7 +209,7 @@
     <string name="input_auto">자동 — 마지막으로 사용한 입력 장치를 따름</string>
     <string name="input_touch">터치 — 항상 터치 조작 사용</string>
     <string name="input_pointer">마우스 및 키보드 — 터치스크린 무시</string>
-    <string name="input_gestures">탭 = 좌클릭 · 길게 누르기 = 우클릭 · 드래그 = 영역 지정 · 두 손가락 = 화면 이동, 핀치로 확대/축소, 비틀어 회전 · 두 손가락 탭 = 우클릭 · 세 손가락 탭 = 뒤로 (맵은 패널에 전용 버튼이 있습니다)\n\n시스템 뒤로 버튼과 뒤로 제스처로도 메뉴에서 나갈 수 있습니다. 화면에는 뒤로 화살표와 우클릭 전환 버튼이 있습니다. 켜져 있는 동안 탭하면 때리고, 드래그하면 지정을 해제합니다.</string>
+    <string name="input_gestures">탭 = 좌클릭 · 길게 누르기 = 우클릭 · 드래그 = 영역 지정 · 손에 크리처가 있을 때: 길게 누르기 또는 드래그 = 손가락 아래로 하나씩 떨어짐 · 빈손으로 빠르게 긋기 = 지나간 크리처를 때림 · 두 손가락 = 화면 이동, 핀치로 확대/축소, 비틀어 회전 · 두 손가락 탭 = 우클릭 · 세 손가락 탭 = 뒤로 (맵은 패널에 전용 버튼이 있습니다)\n\n시스템 뒤로 버튼과 뒤로 제스처로도 메뉴에서 나갈 수 있습니다. 화면에는 뒤로 화살표가 있습니다.</string>
     <string name="option_back_button">플레이 중 화면 버튼 표시</string>
     <string name="game_back">뒤로</string>
     <string name="game_right_click">우클릭</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">손가락이 움직인 거리에 비해 빙의한 크리처의 시점이 얼마나 회전하는지 정합니다.</string>
     <string name="tuning_stickradius">빙의 시 스틱 크기 (화면 높이 대비 %)</string>
     <string name="tuning_stickradius_hint">엄지손가락 아래에 나타나는 고리의 반지름입니다. 클수록 걷기 시작하려면 더 멀리 밀어야 합니다.</string>
+    <string name="tuning_handhold">손: 떨어뜨리기 전 시간 (ms)</string>
+    <string name="tuning_handhold_hint">손에 든 것이 손가락 아래로 떨어지기 시작할 때까지 손가락을 얼마나 두어야 하는지 정합니다.</string>
+    <string name="tuning_handrain">손: 떨어뜨리는 간격 (ms)</string>
+    <string name="tuning_handrain_hint">손가락을 둔 동안 다음 것을 떨어뜨릴 때까지의 시간입니다. 게임은 턴마다, 즉 50ms마다 클릭을 한 번만 받습니다.</string>
+    <string name="tuning_slaprate">긋기: 같은 크리처를 때리는 간격 (ms)</string>
+    <string name="tuning_slaprate_hint">빠르게 그을 때 같은 크리처를 얼마나 빨리 다시 때릴 수 있는지 정합니다. 게임은 먼저 때리기를 끝내며, 약 200ms가 걸립니다.</string>
 </resources>

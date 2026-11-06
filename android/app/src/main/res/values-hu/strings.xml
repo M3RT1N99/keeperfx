@@ -209,7 +209,7 @@
     <string name="input_auto">Automatikus — a legutóbb használt eszköz szerint</string>
     <string name="input_touch">Érintés — mindig érintéses irányítás</string>
     <string name="input_pointer">Egér és billentyűzet — figyelmen kívül hagyja az érintőképernyőt</string>
-    <string name="input_gestures">Koppintás = bal kattintás · nyomva tartás = jobb kattintás · húzás = terület kijelölése · két ujj = mozgatás, csippentés = nagyítás, csavarás = forgatás · koppintás két ujjal = jobb kattintás · koppintás három ujjal = vissza (a térképnek saját gombja van a panelen)\n\nA rendszer Vissza gombja és a vissza kézmozdulat is kilép a menüből. A képernyőn: egy vissza nyíl és egy jobb kattintás kapcsoló. Ha be van kapcsolva, a koppintás pofont ad, a húzás pedig törli a kijelölést.</string>
+    <string name="input_gestures">Koppintás = bal kattintás · nyomva tartás = jobb kattintás · húzás = terület kijelölése · lényekkel a kézben: nyomva tartás vagy húzás = egymás után az ujj alá esnek · gyors húzás üres kézzel = pofont ad a lényeknek, amelyeken áthalad · két ujj = mozgatás, csippentés = nagyítás, csavarás = forgatás · koppintás két ujjal = jobb kattintás · koppintás három ujjal = vissza (a térképnek saját gombja van a panelen)\n\nA rendszer Vissza gombja és a vissza kézmozdulat is kilép a menüből. A képernyőn: egy vissza nyíl.</string>
     <string name="option_back_button">Képernyőgombok mutatása játék közben</string>
     <string name="game_back">Vissza</string>
     <string name="game_right_click">Jobb kattintás</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">Mennyit fordul a megszállt lény nézete az ujj mozgásának hatására.</string>
     <string name="tuning_stickradius">A botkormány mérete megszálláskor (% a képernyő magasságához képest)</string>
     <string name="tuning_stickradius_hint">A hüvelykujj alatt megjelenő gyűrű sugara. A nagyobbhoz hosszabb tolás kell az induláshoz.</string>
+    <string name="tuning_handhold">Kéz: idő a letétel előtt (ms)</string>
+    <string name="tuning_handhold_hint">Mennyi ideig kell egy ujjnak nyugodnia, mielőtt a kézben lévő dolgok elkezdenek alá esni.</string>
+    <string name="tuning_handrain">Kéz: idő két letétel között (ms)</string>
+    <string name="tuning_handrain_hint">Idő az egyik letételtől a következőig, amíg az ujj a helyén marad. A játék körönként legfeljebb egy kattintást fogad, 50 ms-onként.</string>
+    <string name="tuning_slaprate">Húzás: idő két pofon között egy lénynek (ms)</string>
+    <string name="tuning_slaprate_hint">Milyen hamar kaphat újra pofont ugyanaz a lény egy gyors húzástól. A játék előbb befejez egy pofont, ami kb. 200 ms.</string>
 </resources>

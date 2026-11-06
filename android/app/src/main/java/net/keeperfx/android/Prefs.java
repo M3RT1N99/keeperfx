@@ -237,6 +237,12 @@ public final class Prefs {
             R.string.tuning_looksens, R.string.tuning_looksens_hint),
         new TouchTunable("stickradius",  15.0f,   8.0f,  25.0f,  1.0f,
             R.string.tuning_stickradius, R.string.tuning_stickradius_hint),
+        new TouchTunable("handhold",    250.0f, 120.0f, 1000.0f, 10.0f,
+            R.string.tuning_handhold, R.string.tuning_handhold_hint),
+        new TouchTunable("handrain",    100.0f,  50.0f,  500.0f, 10.0f,
+            R.string.tuning_handrain, R.string.tuning_handrain_hint),
+        new TouchTunable("slaprate",    150.0f, 100.0f,  500.0f, 10.0f,
+            R.string.tuning_slaprate, R.string.tuning_slaprate_hint),
     };
 
     public float getTouchTune(TouchTunable tunable) {

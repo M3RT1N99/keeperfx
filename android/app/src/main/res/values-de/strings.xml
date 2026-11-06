@@ -209,7 +209,7 @@
     <string name="input_auto">Automatisch — dem zuletzt benutzten Gerät folgen</string>
     <string name="input_touch">Touch — immer die Touch-Steuerung</string>
     <string name="input_pointer">Maus &amp; Tastatur — Touchscreen ignorieren</string>
-    <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Rotieren · Zwei-Finger-Tipp = Rechtsklick · Drei-Finger-Tipp = zurück (die Karte hat einen eigenen Panel-Knopf)\n\nDie Zurück-Taste und die Zurück-Geste des Systems verlassen ein Menü ebenfalls. Auf dem Bildschirm: ein Zurück-Pfeil und ein Rechtsklick-Schalter. Solange er an ist, schlägt ein Tipp zu und ein Ziehen hebt Markierungen auf.</string>
+    <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · mit Kreaturen in der Hand: Halten oder Ziehen = setzt sie unter dem Finger ab, eine nach der anderen · schneller Strich mit leerer Hand = schlägt die Kreaturen, die er kreuzt · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Rotieren · Zwei-Finger-Tipp = Rechtsklick · Drei-Finger-Tipp = zurück (die Karte hat einen eigenen Panel-Knopf)\n\nDie Zurück-Taste und die Zurück-Geste des Systems verlassen ein Menü ebenfalls. Auf dem Bildschirm: ein Zurück-Pfeil.</string>
     <string name="option_back_button">Bildschirmtasten im Spiel anzeigen</string>
     <string name="game_back">Zurück</string>
     <string name="game_right_click">Rechtsklick</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">Wie weit sich der Blick einer Kreatur in Symbiose dreht, wenn der Finger wandert.</string>
     <string name="tuning_stickradius">Symbiose: Stick-Größe (% der Bildschirmhöhe)</string>
     <string name="tuning_stickradius_hint">Radius des Rings, der unter dem Daumen erscheint. Bei einem größeren muss der Daumen weiter schieben, bis die Kreatur losläuft.</string>
+    <string name="tuning_handhold">Hand: Haltezeit vor dem Absetzen (ms)</string>
+    <string name="tuning_handhold_hint">Wie lange ein Finger liegen muss, bis unter ihm abgesetzt wird, was die Hand hält.</string>
+    <string name="tuning_handrain">Hand: Takt beim Absetzen (ms)</string>
+    <string name="tuning_handrain_hint">Zeit von einem Absetzen zum nächsten, solange der Finger liegen bleibt. Das Spiel nimmt höchstens einen Klick pro Spielzug, alle 50 ms.</string>
+    <string name="tuning_slaprate">Wischen: Takt der Schläge je Kreatur (ms)</string>
+    <string name="tuning_slaprate_hint">Wie bald ein schneller Strich dieselbe Kreatur wieder schlagen kann. Das Spiel führt zuerst einen Schlag zu Ende, das dauert etwa 200 ms.</string>
 </resources>

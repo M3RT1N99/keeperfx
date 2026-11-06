@@ -209,7 +209,7 @@
     <string name="input_auto">Automatico — segue l’ultimo dispositivo usato</string>
     <string name="input_touch">Touch — usa sempre i comandi touch</string>
     <string name="input_pointer">Mouse e tastiera — ignora il touchscreen</string>
-    <string name="input_gestures">Tocco = clic sinistro · tieni premuto = clic destro · trascina = segna un’area · due dita = sposta, pizzica per lo zoom, ruota per girare · tocco con due dita = clic destro · tocco con tre dita = indietro (la mappa ha il suo pulsante sul pannello)\n\nAnche il tasto Indietro del sistema e il gesto Indietro escono da un menu. Sullo schermo: una freccia Indietro e un interruttore per il clic destro. Quando è attivo, un tocco dà uno schiaffo e trascinare toglie i segni.</string>
+    <string name="input_gestures">Tocco = clic sinistro · tieni premuto = clic destro · trascina = segna un’area · con creature in mano: tieni premuto o trascina = cadono sotto il dito una dopo l’altra · tratto rapido a mano vuota = schiaffeggia le creature che incrocia · due dita = sposta, pizzica per lo zoom, ruota per girare · tocco con due dita = clic destro · tocco con tre dita = indietro (la mappa ha il suo pulsante sul pannello)\n\nAnche il tasto Indietro del sistema e il gesto Indietro escono da un menu. Sullo schermo: una freccia Indietro.</string>
     <string name="option_back_button">Mostra i pulsanti sullo schermo durante il gioco</string>
     <string name="game_back">Indietro</string>
     <string name="game_right_click">Clic destro</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">Di quanto ruota la visuale di una creatura posseduta in base allo spostamento del dito.</string>
     <string name="tuning_stickradius">Dimensione dello stick in possessione (% dell’altezza dello schermo)</string>
     <string name="tuning_stickradius_hint">Raggio dell’anello che appare sotto il pollice. Più è grande, più bisogna spingere per iniziare a camminare.</string>
+    <string name="tuning_handhold">Mano: attesa prima di posare (ms)</string>
+    <string name="tuning_handhold_hint">Quanto deve restare fermo un dito prima che ciò che la mano tiene inizi a cadere sotto di esso.</string>
+    <string name="tuning_handrain">Mano: tempo tra due cadute (ms)</string>
+    <string name="tuning_handrain_hint">Tempo da una caduta alla successiva finché il dito resta giù. Il gioco accetta al massimo un clic per turno, ogni 50 ms.</string>
+    <string name="tuning_slaprate">Tratto: tempo tra schiaffi a una creatura (ms)</string>
+    <string name="tuning_slaprate_hint">Dopo quanto un tratto rapido può schiaffeggiare di nuovo la stessa creatura. Il gioco finisce prima uno schiaffo, che dura circa 200 ms.</string>
 </resources>

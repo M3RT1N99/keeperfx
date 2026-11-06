@@ -209,7 +209,7 @@
     <string name="input_auto">Automatisch — volg het laatst gebruikte apparaat</string>
     <string name="input_touch">Aanraken — altijd aanraakbesturing gebruiken</string>
     <string name="input_pointer">Muis &amp; toetsenbord — aanraakscherm negeren</string>
-    <string name="input_gestures">Tikken = linksklik · vasthouden = rechtsklik · slepen = gebied markeren · twee vingers = schuiven, knijpen om te zoomen, draaien om te roteren · tik met twee vingers = rechtsklik · tik met drie vingers = terug (de kaart heeft een eigen paneelknop)\n\nOok met de terugknop en het teruggebaar van het systeem verlaat je een menu. Op het scherm: een terugpijl en een rechtsklikschakelaar. Zolang die aanstaat, deelt een tik een klap uit en haalt slepen de markering weg.</string>
+    <string name="input_gestures">Tikken = linksklik · vasthouden = rechtsklik · slepen = gebied markeren · met wezens in de hand: vasthouden of slepen = ze vallen een voor een onder je vinger · snelle veeg met lege hand = deelt een klap uit aan de wezens die hij kruist · twee vingers = schuiven, knijpen om te zoomen, draaien om te roteren · tik met twee vingers = rechtsklik · tik met drie vingers = terug (de kaart heeft een eigen paneelknop)\n\nOok met de terugknop en het teruggebaar van het systeem verlaat je een menu. Op het scherm: een terugpijl.</string>
     <string name="option_back_button">Schermknoppen tonen tijdens het spelen</string>
     <string name="game_back">Terug</string>
     <string name="game_right_click">Rechtsklik</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">Hoe ver het zicht van een beheerst wezen draait als je vinger beweegt.</string>
     <string name="tuning_stickradius">Wezenbeheersing: grootte van de stick (% van de schermhoogte)</string>
     <string name="tuning_stickradius_hint">Straal van de ring die onder je duim verschijnt. Bij een grotere ring moet je verder duwen voordat het wezen gaat lopen.</string>
+    <string name="tuning_handhold">Hand: tijd voor het neerzetten (ms)</string>
+    <string name="tuning_handhold_hint">Hoe lang een vinger moet rusten voordat wat de hand vasthoudt eronder begint te vallen.</string>
+    <string name="tuning_handrain">Hand: tijd tussen het neerzetten (ms)</string>
+    <string name="tuning_handrain_hint">Tijd van de ene val tot de volgende zolang de vinger blijft liggen. Het spel neemt hoogstens één klik per beurt, elke 50 ms.</string>
+    <string name="tuning_slaprate">Veeg: tijd tussen klappen voor een wezen (ms)</string>
+    <string name="tuning_slaprate_hint">Hoe snel een snelle veeg hetzelfde wezen opnieuw een klap kan geven. Het spel maakt eerst een klap af, dat duurt ongeveer 200 ms.</string>
 </resources>

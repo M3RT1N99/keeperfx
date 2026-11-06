@@ -209,7 +209,7 @@
     <string name="input_auto">Automático — segue o último dispositivo usado</string>
     <string name="input_touch">Toque — usa sempre os comandos por toque</string>
     <string name="input_pointer">Mouse e teclado — ignora os toques</string>
-    <string name="input_gestures">Toque = clique esquerdo · manter pressionado = clique direito · arrastar = marcar área · dois dedos = mover, pinça = zoom, girar = rotação · toque com dois dedos = clique direito · toque com três dedos = voltar (o mapa tem o próprio botão no painel)\n\nO botão Voltar do sistema e o gesto de voltar também saem de um menu. Botões virtuais: uma seta de voltar e um interruptor de clique direito. Com ele ativado, um toque dá um tapa e arrastar desmarca.</string>
+    <string name="input_gestures">Toque = clique esquerdo · manter pressionado = clique direito · arrastar = marcar área · com criaturas na mão: manter pressionado ou arrastar = elas caem sob o dedo uma após a outra · traço rápido com a mão vazia = dá um tapa nas criaturas que cruza · dois dedos = mover, pinça = zoom, girar = rotação · toque com dois dedos = clique direito · toque com três dedos = voltar (o mapa tem o próprio botão no painel)\n\nO botão Voltar do sistema e o gesto de voltar também saem de um menu. Botões virtuais: uma seta de voltar.</string>
     <string name="option_back_button">Mostrar os botões virtuais durante o jogo</string>
     <string name="game_back">Voltar</string>
     <string name="game_right_click">Clique direito</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">Quanto a visão de uma criatura possuída gira conforme o percurso do dedo.</string>
     <string name="tuning_stickradius">Tamanho do stick em possessão (% da altura do display)</string>
     <string name="tuning_stickradius_hint">Raio do anel que aparece sob o polegar. Quanto maior, mais é preciso empurrar para começar a andar.</string>
+    <string name="tuning_handhold">Mão: tempo antes de soltar (ms)</string>
+    <string name="tuning_handhold_hint">Quanto tempo um dedo fica pousado antes de o que a mão segura começar a cair sob ele.</string>
+    <string name="tuning_handrain">Mão: tempo entre quedas (ms)</string>
+    <string name="tuning_handrain_hint">Tempo de uma queda à seguinte enquanto o dedo fica pousado. O jogo aceita no máximo um clique por turno, a cada 50 ms.</string>
+    <string name="tuning_slaprate">Traço: tempo entre tapas em uma criatura (ms)</string>
+    <string name="tuning_slaprate_hint">Em quanto tempo um traço rápido pode dar outro tapa na mesma criatura. O jogo termina um tapa antes, o que leva cerca de 200 ms.</string>
 </resources>

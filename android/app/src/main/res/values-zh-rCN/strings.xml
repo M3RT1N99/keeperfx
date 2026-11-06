@@ -209,7 +209,7 @@
     <string name="input_auto">自动：跟随上次使用的输入设备</string>
     <string name="input_touch">触控：始终使用触控操作</string>
     <string name="input_pointer">鼠标和键盘：忽略触摸屏</string>
-    <string name="input_gestures">点击 = 左键单击 · 长按 = 右键单击 · 拖动 = 标记区域 · 双指 = 平移，捏合缩放，扭转旋转 · 双指点击 = 右键单击 · 三指点击 = 返回（地图在面板上有专用按钮）\n\n系统返回键和返回手势也可以退出菜单。屏幕上有返回箭头和右键开关。开启时，点击会扇巴掌，拖动会取消标记。</string>
+    <string name="input_gestures">点击 = 左键单击 · 长按 = 右键单击 · 拖动 = 标记区域 · 手中有生物时：长按或拖动 = 它们逐个落到手指下方 · 空手快速划过 = 扇划过的生物巴掌 · 双指 = 平移，捏合缩放，扭转旋转 · 双指点击 = 右键单击 · 三指点击 = 返回（地图在面板上有专用按钮）\n\n系统返回键和返回手势也可以退出菜单。屏幕上有返回箭头。</string>
     <string name="option_back_button">游戏时显示屏幕按钮</string>
     <string name="game_back">返回</string>
     <string name="game_right_click">右键单击</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">手指移动时，被附身生物的视角转动多少。</string>
     <string name="tuning_stickradius">附身摇杆大小（占屏幕高度的 %）</string>
     <string name="tuning_stickradius_hint">拇指下方出现的圆环半径。圆环越大，需要推得越远才会开始行走。</string>
+    <string name="tuning_handhold">手：放下前的时间（毫秒）</string>
+    <string name="tuning_handhold_hint">手指停留多久后，手中的东西开始落到手指下方。</string>
+    <string name="tuning_handrain">手：放下的间隔（毫秒）</string>
+    <string name="tuning_handrain_hint">手指不动时，从一次放下到下一次的时间。游戏每回合（50 毫秒）最多接受一次点击。</string>
+    <string name="tuning_slaprate">划动：同一生物挨巴掌的间隔（毫秒）</string>
+    <string name="tuning_slaprate_hint">快速划动多久后可以再次扇同一个生物巴掌。游戏要先完成一次巴掌，约需 200 毫秒。</string>
 </resources>

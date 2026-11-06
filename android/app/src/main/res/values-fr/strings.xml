@@ -209,7 +209,7 @@
     <string name="input_auto">Automatique — selon le dernier périphérique utilisé</string>
     <string name="input_touch">Tactile — toujours utiliser les commandes tactiles</string>
     <string name="input_pointer">Souris et clavier — ignorer l’écran tactile</string>
-    <string name="input_gestures">Appui = clic gauche · appui long = clic droit · glisser = marquer une zone · deux doigts = déplacer, pincer pour zoomer, pivoter pour tourner · appui à deux doigts = clic droit · appui à trois doigts = retour (la carte a son propre bouton sur le panneau)\n\nLe bouton Retour du système et le geste de retour permettent aussi de quitter un menu. À l’écran : une flèche de retour et un interrupteur de clic droit. Quand il est activé, un appui donne une gifle et un glissement retire le marquage.</string>
+    <string name="input_gestures">Appui = clic gauche · appui long = clic droit · glisser = marquer une zone · avec des créatures en main : appui long ou glisser = elles tombent sous le doigt l’une après l’autre · trait rapide main vide = gifle les créatures qu’il croise · deux doigts = déplacer, pincer pour zoomer, pivoter pour tourner · appui à deux doigts = clic droit · appui à trois doigts = retour (la carte a son propre bouton sur le panneau)\n\nLe bouton Retour du système et le geste de retour permettent aussi de quitter un menu. À l’écran : une flèche de retour.</string>
     <string name="option_back_button">Afficher les boutons à l’écran pendant le jeu</string>
     <string name="game_back">Retour</string>
     <string name="game_right_click">Clic droit</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">De combien la vue d’une créature possédée tourne selon le déplacement du doigt.</string>
     <string name="tuning_stickradius">Taille du stick en possession (% de la hauteur de l’écran)</string>
     <string name="tuning_stickradius_hint">Rayon de l’anneau qui apparaît sous le pouce. Plus il est grand, plus il faut pousser loin pour commencer à marcher.</string>
+    <string name="tuning_handhold">Main : temps d’appui avant de lâcher (ms)</string>
+    <string name="tuning_handhold_hint">Combien de temps un doigt reste posé avant que ce que tient la main commence à tomber dessous.</string>
+    <string name="tuning_handrain">Main : temps entre deux lâchers (ms)</string>
+    <string name="tuning_handrain_hint">Temps d’un lâcher au suivant tant que le doigt reste posé. Le jeu prend au plus un clic par tour, toutes les 50 ms.</string>
+    <string name="tuning_slaprate">Trait : temps entre deux gifles d’une créature (ms)</string>
+    <string name="tuning_slaprate_hint">À quelle vitesse un trait rapide peut gifler de nouveau la même créature. Le jeu termine d’abord une gifle, ce qui prend environ 200 ms.</string>
 </resources>

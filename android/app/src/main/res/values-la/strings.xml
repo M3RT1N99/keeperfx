@@ -209,7 +209,7 @@
     <string name="input_auto">Automatice — instrumentum ultimo adhibitum sequere</string>
     <string name="input_touch">Tactus — semper ratione tactili utere</string>
     <string name="input_pointer">Mus &amp; claviatura — scaenam tactilem neglege</string>
-    <string name="input_gestures">Tange = pressus sinister · tene = pressus dexter · trahe = aream pinge · duo digiti = move, contrahe ad amplificandum, torque ad rotandum · tange duobus digitis = pressus dexter · tange tribus digitis = redi (charta suum butonem in pannello habet)\n\nEtiam buto reditus et gestus reditus systematis ex tabula exeunt. In scaena: sagitta reditus et commutator pressus dextri. Dum accensus est, tactus alapam dat et tractus designationem tollit.</string>
+    <string name="input_gestures">Tange = pressus sinister · tene = pressus dexter · trahe = aream pinge · creaturis in manu: tene aut trahe = sub digito aliae post alias cadunt · ductus celer manu vacua = alapam dat creaturis quas transit · duo digiti = move, contrahe ad amplificandum, torque ad rotandum · tange duobus digitis = pressus dexter · tange tribus digitis = redi (charta suum butonem in pannello habet)\n\nEtiam buto reditus et gestus reditus systematis ex tabula exeunt. In scaena: sagitta reditus.</string>
     <string name="option_back_button">Inter ludendum butones in scaena ostende</string>
     <string name="game_back">Redi</string>
     <string name="game_right_click">Pressus dexter</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">Quam longe visus creaturae possessae vertatur cum digitus movetur.</string>
     <string name="tuning_stickradius">Possessio: magnitudo baculi (% altitudinis scaenae)</string>
     <string name="tuning_stickradius_hint">Radius anuli qui sub pollice apparet. Maior longiorem impulsum postulat ut creatura ambulare incipiat.</string>
+    <string name="tuning_handhold">Manus: tempus ante demissionem (ms)</string>
+    <string name="tuning_handhold_hint">Quamdiu digitus quiescat antequam quod manus tenet sub eo cadere incipiat.</string>
+    <string name="tuning_handrain">Manus: tempus inter demissiones (ms)</string>
+    <string name="tuning_handrain_hint">Tempus ab una demissione ad proximam dum digitus manet. Ludus plurimum unum pressum per vicem accipit, quaque 50 ms.</string>
+    <string name="tuning_slaprate">Ductus: tempus inter alapas creaturae (ms)</string>
+    <string name="tuning_slaprate_hint">Quam cito ductus celer eandem creaturam iterum alapa ferire possit. Ludus prius alapam perficit, quod circiter 200 ms durat.</string>
 </resources>

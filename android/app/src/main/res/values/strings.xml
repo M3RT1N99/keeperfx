@@ -264,7 +264,7 @@
     <string name="input_auto">Automatic — follow the device last used</string>
     <string name="input_touch">Touch — always use the touch scheme</string>
     <string name="input_pointer">Mouse &amp; keyboard — ignore the touch screen</string>
-    <string name="input_gestures">Tap = left click · hold = right click · drag = mark an area · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back\n\nThe system back button and the back gesture also leave a menu. On screen: a back arrow, and a right click toggle. While it is on, a tap slaps a creature and a drag removes marks.</string>
+    <string name="input_gestures">Tap = left click · hold = right click · drag = mark an area · with creatures in the hand: hold or drag = they fall under the finger one by one · quick stroke with an empty hand = slaps the creatures it crosses · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back\n\nThe system back button and the back gesture also leave a menu. On screen: a back arrow.</string>
     <string name="option_back_button">Show the on screen buttons while playing</string>
     <string name="game_back">Back</string>
     <string name="game_right_click">Right click</string>
@@ -311,4 +311,10 @@
     <string name="tuning_looksens_hint">How far the view of a possessed creature turns for the travel of a finger.</string>
     <string name="tuning_stickradius">Possession stick size (% of the screen height)</string>
     <string name="tuning_stickradius_hint">Radius of the ring that appears under the thumb. With a larger one the thumb has to travel further before walking starts.</string>
+    <string name="tuning_handhold">Hand: hold time before dropping (ms)</string>
+    <string name="tuning_handhold_hint">How long a finger rests before what the hand holds starts to fall under it.</string>
+    <string name="tuning_handrain">Hand: time between drops (ms)</string>
+    <string name="tuning_handrain_hint">Time from one drop to the next while the finger stays. The game takes at most one click per turn, every 50 ms.</string>
+    <string name="tuning_slaprate">Swipe: time between slaps of a creature (ms)</string>
+    <string name="tuning_slaprate_hint">How soon a quick stroke can slap the same creature again. The game finishes a slap first, which takes about 200 ms.</string>
 </resources>

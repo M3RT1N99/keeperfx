@@ -209,7 +209,7 @@
     <string name="input_auto">Automático — según el último dispositivo usado</string>
     <string name="input_touch">Táctil — usar siempre los controles táctiles</string>
     <string name="input_pointer">Ratón y teclado — ignorar la pantalla táctil</string>
-    <string name="input_gestures">Tocar = clic izquierdo · mantener pulsado = clic derecho · arrastrar = marcar zona · dos dedos = desplazar, pellizcar para hacer zoom, girar para rotar · tocar con dos dedos = clic derecho · tocar con tres dedos = atrás (el mapa tiene su propio botón en el panel)\n\nEl botón Atrás del sistema y el gesto de volver también salen de un menú. En pantalla: una flecha para volver y un interruptor de clic derecho. Mientras está activado, un toque da un azote y arrastrar quita las marcas.</string>
+    <string name="input_gestures">Tocar = clic izquierdo · mantener pulsado = clic derecho · arrastrar = marcar zona · con criaturas en la mano: mantener pulsado o arrastrar = caen bajo el dedo una tras otra · trazo rápido con la mano vacía = da un azote a las criaturas que cruza · dos dedos = desplazar, pellizcar para hacer zoom, girar para rotar · tocar con dos dedos = clic derecho · tocar con tres dedos = atrás (el mapa tiene su propio botón en el panel)\n\nEl botón Atrás del sistema y el gesto de volver también salen de un menú. En pantalla: una flecha para volver.</string>
     <string name="option_back_button">Mostrar los botones en pantalla durante la partida</string>
     <string name="game_back">Atrás</string>
     <string name="game_right_click">Clic derecho</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">Cuánto gira la vista de una criatura poseída según lo que recorra el dedo.</string>
     <string name="tuning_stickradius">Tamaño del stick en posesión (% de la altura de la pantalla)</string>
     <string name="tuning_stickradius_hint">Radio del anillo que aparece bajo el pulgar. Cuanto más grande, más hay que empujar para empezar a caminar.</string>
+    <string name="tuning_handhold">Mano: tiempo antes de soltar (ms)</string>
+    <string name="tuning_handhold_hint">Cuánto tiempo debe permanecer un dedo antes de que lo que lleva la mano empiece a caer bajo él.</string>
+    <string name="tuning_handrain">Mano: tiempo entre caídas (ms)</string>
+    <string name="tuning_handrain_hint">Tiempo de una caída a la siguiente mientras el dedo siga ahí. El juego acepta como mucho un clic por turno, cada 50 ms.</string>
+    <string name="tuning_slaprate">Trazo: tiempo entre azotes a una criatura (ms)</string>
+    <string name="tuning_slaprate_hint">Con qué rapidez un trazo rápido puede azotar de nuevo a la misma criatura. El juego termina antes un azote, que tarda unos 200 ms.</string>
 </resources>

@@ -209,7 +209,7 @@
     <string name="input_auto">自動 — 最後に使った入力デバイスに合わせる</string>
     <string name="input_touch">タッチ — 常にタッチ操作を使う</string>
     <string name="input_pointer">マウスとキーボード — タッチスクリーンを無視する</string>
-    <string name="input_gestures">タップ = 左クリック · 長押し = 右クリック · ドラッグ = 範囲を指定 · 2 本指 = スクロール、ピンチでズーム、ひねって回転 · 2 本指タップ = 右クリック · 3 本指タップ = 戻る（マップはパネルに専用ボタンがあります）\n\nシステムの戻るボタンと戻るジェスチャーでもメニューを閉じられます。画面上には戻る矢印と右クリック切り替えがあります。オンの間は、タップで叩き、ドラッグで指定を解除します。</string>
+    <string name="input_gestures">タップ = 左クリック · 長押し = 右クリック · ドラッグ = 範囲を指定 · クリーチャーを手に持っているとき: 長押しまたはドラッグ = 指の下に 1 体ずつ落ちる · 手が空のときに素早くなぞる = なぞったクリーチャーを叩く · 2 本指 = スクロール、ピンチでズーム、ひねって回転 · 2 本指タップ = 右クリック · 3 本指タップ = 戻る（マップはパネルに専用ボタンがあります）\n\nシステムの戻るボタンと戻るジェスチャーでもメニューを閉じられます。画面上には戻る矢印があります。</string>
     <string name="option_back_button">プレイ中に画面上のボタンを表示</string>
     <string name="game_back">戻る</string>
     <string name="game_right_click">右クリック</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">指の移動量に対して、憑依したクリーチャーの視点がどれだけ回転するかを決めます。</string>
     <string name="tuning_stickradius">憑依中のスティックの大きさ（画面の高さに対する %）</string>
     <string name="tuning_stickradius_hint">親指の下に表示されるリングの半径です。大きいほど、歩き出すまでに指を大きく動かす必要があります。</string>
+    <string name="tuning_handhold">手: 落とすまでの時間（ミリ秒）</string>
+    <string name="tuning_handhold_hint">手に持ったものが指の下に落ち始めるまで、指をどれくらい置くかを決めます。</string>
+    <string name="tuning_handrain">手: 落とす間隔（ミリ秒）</string>
+    <string name="tuning_handrain_hint">指を置いている間、次を落とすまでの時間です。ゲームが受け付けるクリックは 1 ターンに 1 回まで、50 ミリ秒ごとです。</string>
+    <string name="tuning_slaprate">なぞり: 同じクリーチャーを叩く間隔（ミリ秒）</string>
+    <string name="tuning_slaprate_hint">素早くなぞったとき、同じクリーチャーをどれくらいで再び叩けるかを決めます。ゲームは先に叩く動作を終えるため、約 200 ミリ秒かかります。</string>
 </resources>

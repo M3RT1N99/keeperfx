@@ -209,7 +209,7 @@
     <string name="input_auto">Automatiskt — följ enheten som användes senast</string>
     <string name="input_touch">Pekskärm — använd alltid pekstyrning</string>
     <string name="input_pointer">Mus &amp; tangentbord — ignorera pekskärmen</string>
-    <string name="input_gestures">Tryck = vänsterklick · håll = högerklick · dra = markera område · två fingrar = panorera, nyp för att zooma, vrid för att rotera · tryck med två fingrar = högerklick · tryck med tre fingrar = tillbaka (kartan har en egen panelknapp)\n\nMed systemets bakåtknapp och bakåtgest lämnar du också en meny. På skärmen: en bakåtpil och en högerklicksknapp. När den är på slår ett tryck till och en dragning tar bort markeringen.</string>
+    <string name="input_gestures">Tryck = vänsterklick · håll = högerklick · dra = markera område · med varelser i handen: håll eller dra = de faller under fingret en efter en · snabbt drag med tom hand = slår varelserna det korsar · två fingrar = panorera, nyp för att zooma, vrid för att rotera · tryck med två fingrar = högerklick · tryck med tre fingrar = tillbaka (kartan har en egen panelknapp)\n\nMed systemets bakåtknapp och bakåtgest lämnar du också en meny. På skärmen: en bakåtpil.</string>
     <string name="option_back_button">Visa skärmknapparna under spelet</string>
     <string name="game_back">Tillbaka</string>
     <string name="game_right_click">Högerklick</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">Hur långt en besatt varelses blick vrids när fingret flyttas.</string>
     <string name="tuning_stickradius">Besatt varelse: spakens storlek (% av skärmhöjden)</string>
     <string name="tuning_stickradius_hint">Radien på ringen som visas under tummen. Med en större ring måste du trycka längre innan varelsen börjar gå.</string>
+    <string name="tuning_handhold">Hand: tid innan något släpps (ms)</string>
+    <string name="tuning_handhold_hint">Hur länge ett finger ska vila innan det handen håller börjar falla under det.</string>
+    <string name="tuning_handrain">Hand: tid mellan släpp (ms)</string>
+    <string name="tuning_handrain_hint">Tid från ett släpp till nästa medan fingret ligger kvar. Spelet tar högst ett klick per drag, var 50:e ms.</string>
+    <string name="tuning_slaprate">Svep: tid mellan slag på en varelse (ms)</string>
+    <string name="tuning_slaprate_hint">Hur snart ett snabbt drag kan slå samma varelse igen. Spelet gör först klart ett slag, vilket tar cirka 200 ms.</string>
 </resources>

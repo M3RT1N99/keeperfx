@@ -209,7 +209,7 @@
     <string name="input_auto">Automatisk — følg enheten som sist ble brukt</string>
     <string name="input_touch">Berøring — bruk alltid berøringsstyring</string>
     <string name="input_pointer">Mus &amp; tastatur — ignorer berøringsskjermen</string>
-    <string name="input_gestures">Trykk = venstreklikk · hold = høyreklikk · dra = marker område · to fingre = panorer, knip for å zoome, vri for å rotere · trykk med to fingre = høyreklikk · trykk med tre fingre = tilbake (kartet har sin egen panelknapp)\n\nMed systemets tilbakeknapp og tilbakebevegelsen forlater du også en meny. På skjermen: en tilbakepil og en høyreklikkbryter. Når den er på, gir et trykk et slag, og et drag fjerner markeringen.</string>
+    <string name="input_gestures">Trykk = venstreklikk · hold = høyreklikk · dra = marker område · med vesener i hånden: hold eller dra = de faller under fingeren ett om gangen · raskt strøk med tom hånd = gir vesenene det krysser et slag · to fingre = panorer, knip for å zoome, vri for å rotere · trykk med to fingre = høyreklikk · trykk med tre fingre = tilbake (kartet har sin egen panelknapp)\n\nMed systemets tilbakeknapp og tilbakebevegelsen forlater du også en meny. På skjermen: en tilbakepil.</string>
     <string name="option_back_button">Vis skjermknappene under spillet</string>
     <string name="game_back">Tilbake</string>
     <string name="game_right_click">Høyreklikk</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">Hvor langt synet til et besatt vesen dreier når fingeren flyttes.</string>
     <string name="tuning_stickradius">Besettelse: spakens størrelse (% av skjermhøyden)</string>
     <string name="tuning_stickradius_hint">Radius på ringen som vises under tommelen. Med en større ring må du skyve lenger før vesenet begynner å gå.</string>
+    <string name="tuning_handhold">Hånd: tid før noe slippes (ms)</string>
+    <string name="tuning_handhold_hint">Hvor lenge en finger må hvile før det hånden holder begynner å falle under den.</string>
+    <string name="tuning_handrain">Hånd: tid mellom hvert slipp (ms)</string>
+    <string name="tuning_handrain_hint">Tiden fra ett slipp til det neste mens fingeren blir liggende. Spillet tar høyst ett klikk per tur, hvert 50. ms.</string>
+    <string name="tuning_slaprate">Strøk: tid mellom slag på et vesen (ms)</string>
+    <string name="tuning_slaprate_hint">Hvor fort et raskt strøk kan slå det samme vesenet igjen. Spillet gjør først ferdig et slag, som tar omtrent 200 ms.</string>
 </resources>

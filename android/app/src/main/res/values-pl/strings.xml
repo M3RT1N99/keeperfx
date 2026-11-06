@@ -209,7 +209,7 @@
     <string name="input_auto">Automatycznie — według ostatnio używanego urządzenia</string>
     <string name="input_touch">Dotyk — zawsze sterowanie dotykowe</string>
     <string name="input_pointer">Mysz i klawiatura — ignoruj ekran dotykowy</string>
-    <string name="input_gestures">Dotknięcie = lewy klik · przytrzymanie = prawy klik · przeciągnięcie = zaznaczenie obszaru · dwa palce = przesuwanie, zsuwanie i rozsuwanie to zoom, skręt to obrót · dotknięcie dwoma palcami = prawy klik · dotknięcie trzema palcami = wstecz (mapa ma własny przycisk na panelu)\n\nSystemowy przycisk Wstecz i gest cofania też wychodzą z menu. Na ekranie: strzałka Wstecz i przełącznik prawego kliku. Gdy jest włączony, dotknięcie daje klapsa, a przeciągnięcie cofa zaznaczenie.</string>
+    <string name="input_gestures">Dotknięcie = lewy klik · przytrzymanie = prawy klik · przeciągnięcie = zaznaczenie obszaru · ze stworami w ręce: przytrzymanie lub przeciągnięcie = spadają pod palec jeden po drugim · szybkie pociągnięcie pustą ręką = daje klapsa stworom, które przecina · dwa palce = przesuwanie, zsuwanie i rozsuwanie to zoom, skręt to obrót · dotknięcie dwoma palcami = prawy klik · dotknięcie trzema palcami = wstecz (mapa ma własny przycisk na panelu)\n\nSystemowy przycisk Wstecz i gest cofania też wychodzą z menu. Na ekranie: strzałka Wstecz.</string>
     <string name="option_back_button">Pokazuj przyciski ekranowe podczas gry</string>
     <string name="game_back">Wstecz</string>
     <string name="game_right_click">Prawy klik</string>
@@ -248,4 +248,10 @@
     <string name="tuning_looksens_hint">O ile obraca się widok opętanego stwora przy danym ruchu palca.</string>
     <string name="tuning_stickradius">Rozmiar drążka w opętaniu (% wysokości ekranu)</string>
     <string name="tuning_stickradius_hint">Promień pierścienia, który pojawia się pod kciukiem. Im większy, tym dalej trzeba pchnąć, aby ruszyć.</string>
+    <string name="tuning_handhold">Ręka: czas przed upuszczeniem (ms)</string>
+    <string name="tuning_handhold_hint">Jak długo palec musi spoczywać, zanim to, co trzyma ręka, zacznie pod nim spadać.</string>
+    <string name="tuning_handrain">Ręka: czas między upuszczeniami (ms)</string>
+    <string name="tuning_handrain_hint">Czas od jednego upuszczenia do następnego, póki palec leży. Gra przyjmuje najwyżej jedno kliknięcie na turę, co 50 ms.</string>
+    <string name="tuning_slaprate">Pociągnięcie: czas między klapsami dla stwora (ms)</string>
+    <string name="tuning_slaprate_hint">Jak szybko szybkie pociągnięcie może znów dać klapsa temu samemu stworowi. Gra najpierw kończy jednego klapsa, co trwa około 200 ms.</string>
 </resources>
