@@ -89,18 +89,6 @@ static int th_count_flights(const struct ThHand *h, int is_pick)
     return count;
 }
 
-int th_drops_under_way(struct ThHand *h, long long turn, int lag)
-{
-    th_age_flights(h, turn, lag);
-    return th_count_flights(h, 0);
-}
-
-int th_picks_under_way(struct ThHand *h, long long turn, int lag)
-{
-    th_age_flights(h, turn, lag);
-    return th_count_flights(h, 1);
-}
-
 void th_stroke_begin(struct ThHand *h, long long ms)
 {
     memset(&h->stroke, 0, sizeof(h->stroke));

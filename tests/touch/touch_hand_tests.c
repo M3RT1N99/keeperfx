@@ -686,7 +686,7 @@ static void test_a_new_level_starts_the_turns_over(void)
     sees.thing = 1;
     sees.creature = CREATURE_A;
     CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Slap, "not waiting for turn 5004");
-    CHECK(th_drops_under_way(&h, 50, 0) == 0, "and nothing under way");
+    CHECK(h.flights_count == 0, "and nothing under way: %d", h.flights_count);
 }
 
 static void test_the_book_keeping(void)
@@ -696,9 +696,9 @@ static void test_the_book_keeping(void)
         th_note_packet(&h, 2000 + t, 12, 1, 1);
         CHECK(h.flights_count <= TH_MAX_FLIGHTS, "flights %d", h.flights_count);
     }
-    CHECK(th_drops_under_way(&h, 2099, 12) == 13, "the ages 0 to 12: %d", th_drops_under_way(&h, 2099, 12));
-    CHECK(th_picks_under_way(&h, 2099, 12) == 13, "%d", th_picks_under_way(&h, 2099, 12));
-    CHECK(th_drops_under_way(&h, 2200, 12) == 0, "all landed: %d", th_drops_under_way(&h, 2200, 12));
+    CHECK(h.flights_count == 26, "the ages 0 to 12, both kinds: %d", h.flights_count);
+    th_note_packet(&h, 2200, 12, 0, 0);
+    CHECK(h.flights_count == 0, "all landed: %d", h.flights_count);
 }
 
 int touch_hand_tests(int *total_checks)

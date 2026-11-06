@@ -120,10 +120,6 @@ void th_reset(struct ThHand *h);
  */
 void th_note_packet(struct ThHand *h, long long turn, int lag, int right_released, int picking);
 
-/** How many of those are under way, as of this turn. */
-int th_drops_under_way(struct ThHand *h, long long turn, int lag);
-int th_picks_under_way(struct ThHand *h, long long turn, int lag);
-
 /** A finger landed on the map as the first one. Anything else is never asked about. */
 void th_stroke_begin(struct ThHand *h, long long ms);
 /** That finger has travelled further than a tap may. Only the first time counts. */
