@@ -212,7 +212,6 @@
     <string name="input_gestures">Appui = clic gauche · appui long = clic droit · glisser = marquer une zone · avec des créatures en main : appui long ou glisser = elles tombent sous le doigt l’une après l’autre · trait rapide main vide = gifle les créatures qu’il croise · deux doigts = déplacer, pincer pour zoomer, pivoter pour tourner · appui à deux doigts = clic droit · appui à trois doigts = retour (la carte a son propre bouton sur le panneau)\n\nLe bouton Retour du système et le geste de retour permettent aussi de quitter un menu. À l’écran : une flèche de retour.</string>
     <string name="option_back_button">Afficher les boutons à l’écran pendant le jeu</string>
     <string name="game_back">Retour</string>
-    <string name="game_right_click">Clic droit</string>
     <string name="settings_data">Données du jeu</string>
     <string name="option_use_alpha">Installer aussi le patch alpha pour ce moteur</string>
     <string name="option_use_alpha_hint">Le moteur de cette application est compilé à partir du code source actuel, et la version stable ne contient pas tout ce qu’il attend, notamment les polices pour le japonais, le chinois et le coréen. Le patch alpha les ajoute : un petit téléchargement en plus de la version stable. Désactivez cette option pour rester strictement sur la 1.4.0. Le patch est alors retiré sans rien télécharger.</string>

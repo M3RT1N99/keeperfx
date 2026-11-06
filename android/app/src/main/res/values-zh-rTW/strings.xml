@@ -212,7 +212,6 @@
     <string name="input_gestures">輕觸 = 按左鍵 · 長按 = 按右鍵 · 拖曳 = 標記區域 · 手中有生物時：長按或拖曳 = 牠們逐一落到手指下方 · 空手快速劃過 = 甩劃過的生物巴掌 · 雙指 = 平移，雙指開合可縮放，扭轉可旋轉 · 雙指輕觸 = 按右鍵 · 三指輕觸 = 返回（地圖在面板上有專用按鈕）\n\n系統返回鍵和返回手勢也可以離開選單。畫面上有返回箭頭。</string>
     <string name="option_back_button">遊戲時顯示螢幕按鈕</string>
     <string name="game_back">返回</string>
-    <string name="game_right_click">按右鍵</string>
     <string name="settings_data">遊戲資料</string>
     <string name="option_use_alpha">同時安裝這個引擎的 Alpha 修補程式</string>
     <string name="option_use_alpha_hint">這個應用程式的引擎是以最新的原始碼建置，而穩定版並未包含它需要的所有內容，其中包括日文、中文和韓文字型。Alpha 修補程式會補上這些內容，只需在正式版之外再下載一小部分。如果想嚴格維持在 1.4.0，請關閉這個選項。修補程式會被移除，不需要下載任何內容。</string>

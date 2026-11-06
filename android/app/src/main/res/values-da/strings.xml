@@ -212,7 +212,6 @@
     <string name="input_gestures">Tryk = venstreklik · hold = højreklik · træk = markér område · med væsner i hånden: hold eller træk = de falder under fingeren ét ad gangen · hurtigt strøg med tom hånd = giver de væsner, det krydser, et slag · to fingre = panorér, knib for at zoome, drej for at rotere · tryk med to fingre = højreklik · tryk med tre fingre = tilbage (kortet har sin egen panelknap)\n\nMed systemets tilbageknap og tilbagebevægelsen forlader du også en menu. På skærmen: en tilbagepil.</string>
     <string name="option_back_button">Vis skærmknapperne under spillet</string>
     <string name="game_back">Tilbage</string>
-    <string name="game_right_click">Højreklik</string>
     <string name="settings_data">Spildata</string>
     <string name="option_use_alpha">Installér også alfapatchen til denne motor</string>
     <string name="option_use_alpha_hint">Spilmotoren i denne app er bygget fra den aktuelle kildekode, og den stabile udgivelse indeholder ikke alt, hvad den forventer, blandt andet skrifttyperne til japansk, kinesisk og koreansk. Alfapatchen tilføjer dem, en lille download oven i udgivelsen. Slå dette fra for at holde dig strengt til 1.4.0. Patchen fjernes så igen, uden at noget downloades.</string>

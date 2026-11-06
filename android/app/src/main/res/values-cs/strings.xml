@@ -212,7 +212,6 @@
     <string name="input_gestures">Klepnutí = levý klik · podržení = pravý klik · tažení = označení oblasti · se stvořeními v ruce: podržení nebo tažení = padají pod prst jedno po druhém · rychlý tah s prázdnou rukou = propleskne stvoření, která přejede · dva prsty = posun, sevření = přiblížení, otočení = rotace · klepnutí dvěma prsty = pravý klik · klepnutí třemi prsty = zpět (mapa má vlastní tlačítko na panelu)\n\nSystémové tlačítko Zpět a gesto zpět také opustí nabídku. Na obrazovce: šipka zpět.</string>
     <string name="option_back_button">Při hře zobrazovat tlačítka na obrazovce</string>
     <string name="game_back">Zpět</string>
-    <string name="game_right_click">Pravý klik</string>
     <string name="settings_data">Data hry</string>
     <string name="option_use_alpha">Nainstalovat také alfa patch pro tento engine</string>
     <string name="option_use_alpha_hint">Engine v této aplikaci je sestaven z aktuálního zdrojového kódu a stabilní vydání neobsahuje vše, co očekává, mimo jiné písma pro japonštinu, čínštinu a korejštinu. Alfa patch je doplní, je to malé stažení navíc k vydání. Vypni to, pokud chceš zůstat striktně na 1.4.0. Patch se pak odebere, aniž by se cokoli stahovalo.</string>

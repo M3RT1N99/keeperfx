@@ -212,7 +212,6 @@
     <string name="input_gestures">Tocar = clic izquierdo · mantener pulsado = clic derecho · arrastrar = marcar zona · con criaturas en la mano: mantener pulsado o arrastrar = caen bajo el dedo una tras otra · trazo rápido con la mano vacía = da un azote a las criaturas que cruza · dos dedos = desplazar, pellizcar para hacer zoom, girar para rotar · tocar con dos dedos = clic derecho · tocar con tres dedos = atrás (el mapa tiene su propio botón en el panel)\n\nEl botón Atrás del sistema y el gesto de volver también salen de un menú. En pantalla: una flecha para volver.</string>
     <string name="option_back_button">Mostrar los botones en pantalla durante la partida</string>
     <string name="game_back">Atrás</string>
-    <string name="game_right_click">Clic derecho</string>
     <string name="settings_data">Datos del juego</string>
     <string name="option_use_alpha">Instalar también el parche alfa para este motor</string>
     <string name="option_use_alpha_hint">El motor de esta aplicación se compila a partir del código fuente actual, y la versión estable no trae todo lo que necesita, entre otras cosas las fuentes para japonés, chino y coreano. El parche alfa las añade, con una pequeña descarga además de la versión estable. Desactiva esta opción para quedarte estrictamente en la 1.4.0. El parche se retira sin descargar nada.</string>

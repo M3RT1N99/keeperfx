@@ -212,7 +212,6 @@
     <string name="input_gestures">Tocco = clic sinistro · tieni premuto = clic destro · trascina = segna un’area · con creature in mano: tieni premuto o trascina = cadono sotto il dito una dopo l’altra · tratto rapido a mano vuota = schiaffeggia le creature che incrocia · due dita = sposta, pizzica per lo zoom, ruota per girare · tocco con due dita = clic destro · tocco con tre dita = indietro (la mappa ha il suo pulsante sul pannello)\n\nAnche il tasto Indietro del sistema e il gesto Indietro escono da un menu. Sullo schermo: una freccia Indietro.</string>
     <string name="option_back_button">Mostra i pulsanti sullo schermo durante il gioco</string>
     <string name="game_back">Indietro</string>
-    <string name="game_right_click">Clic destro</string>
     <string name="settings_data">Dati di gioco</string>
     <string name="option_use_alpha">Installa anche la patch alpha per questo motore</string>
     <string name="option_use_alpha_hint">Il motore di questa app è compilato dal codice sorgente attuale, e la versione stabile non contiene tutto ciò che si aspetta, compresi i font per giapponese, cinese e coreano. La patch alpha li aggiunge con un piccolo download oltre alla versione stabile. Disattiva questa opzione per restare rigorosamente sulla 1.4.0. La patch viene rimossa senza scaricare nulla.</string>

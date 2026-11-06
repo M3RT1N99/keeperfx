@@ -334,16 +334,6 @@ static void process_event(const SDL_Event *ev)
     {
     case SDL_EVENT_KEY_DOWN:
 #ifdef __ANDROID__
-        // The on screen right click toggle sends this. Android has no key
-        // meaning "the next tap is a right click", so the button borrows one
-        // the game never uses, as the back arrow borrows Escape. It has to be a
-        // key SDL actually delivers: the first attempt used NUM_LOCK, which is
-        // absent from SDL's Android keycode table, so nothing ever arrived.
-        // SDLK_MENU is mapped a few lines above to KC_APPS, which nothing binds.
-        if (ev->key.key == SDLK_MENU) {
-            touch_set_sticky_right_click(!touch_sticky_right_click());
-            return;
-        }
         if (ev->key.key == SDLK_AC_BACK) {
             // Held, it repeats, and every repeat would open or shut a menu again.
             if (ev->key.repeat) {

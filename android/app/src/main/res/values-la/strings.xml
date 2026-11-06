@@ -212,7 +212,6 @@
     <string name="input_gestures">Tange = pressus sinister · tene = pressus dexter · trahe = aream pinge · creaturis in manu: tene aut trahe = sub digito aliae post alias cadunt · ductus celer manu vacua = alapam dat creaturis quas transit · duo digiti = move, contrahe ad amplificandum, torque ad rotandum · tange duobus digitis = pressus dexter · tange tribus digitis = redi (charta suum butonem in pannello habet)\n\nEtiam buto reditus et gestus reditus systematis ex tabula exeunt. In scaena: sagitta reditus.</string>
     <string name="option_back_button">Inter ludendum butones in scaena ostende</string>
     <string name="game_back">Redi</string>
-    <string name="game_right_click">Pressus dexter</string>
     <string name="settings_data">Data ludi</string>
     <string name="option_use_alpha">Etiam supplementum alpha huic machinae installa</string>
     <string name="option_use_alpha_hint">Machina huius programmatis ex codice hodierno aedificatur, et editio stabilis non omnia habet quae exspectat, inter alia formas litterarum Iaponicas, Sinicas et Coreanas. Supplementum alpha haec addit, parva depromptio super editionem. Hoc exstingue, ut stricte in 1.4.0 maneas. Supplementum tum sine ulla depromptione tollitur.</string>

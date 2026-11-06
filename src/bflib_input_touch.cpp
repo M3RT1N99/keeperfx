@@ -171,8 +171,6 @@ static float touch_axis_pan_up, touch_axis_pan_down;
 
 /** Two finger tap: a right click where the first finger landed. */
 static TbBool touch_tapped_right_click = false;
-/** While set, an ordinary tap is a right click. Driven by the on screen toggle. */
-static TbBool touch_sticky_rmb = false;
 
 /* Three finger tap: leaves whatever is open. Emitted as Escape rather than as a
    game key because that is the one the menus themselves listen for, and it is
@@ -244,17 +242,6 @@ static long touch_map_tap_x, touch_map_tap_y;
 static TbBool touch_pointer_settled = false;
 
 /******************************************************************************/
-
-void touch_set_sticky_right_click(TbBool on)
-{
-    touch_sticky_rmb = on;
-    SYNCLOG("Sticky right click %s", on ? "on" : "off");
-}
-
-TbBool touch_sticky_right_click(void)
-{
-    return touch_sticky_rmb;
-}
 
 /**
  * Adjusts one of the gesture constants at run time.
@@ -670,15 +657,6 @@ static void touch_normalized_to_game(float nx, float ny, long *x, long *y)
         *y = game_h - 1;
 }
 
-/** A tap is what the toggle says it is, except on the pause box, which only knows the left button. */
-static void touch_click_as_tapped(void)
-{
-    if (touch_sticky_rmb && !mouse_is_over_paused_message())
-        touch_queue_right_click();
-    else
-        touch_queue_click();
-}
-
 /** The game's idea of what the pointer is over is about the finger on the map right now. */
 static TbBool touch_hand_sees_finger(void)
 {
@@ -707,12 +685,7 @@ static void touch_start_drag_when_due(const struct TouchFinger *finger, Uint64 n
         break;
     }
     touch_gesture = TGest_Drag;
-    // Dragging with the toggle on undesignates an area, which is
-    // what the right button does when held on the desktop.
-    if (touch_sticky_rmb)
-        touch_press_right();
-    else
-        touch_press_left();
+    touch_press_left();
 }
 
 /** The one finger of the gesture, other than the one given. */
@@ -999,7 +972,7 @@ void TEvent(const SDL_Event *ev)
                     else
                     {
                         touch_move_pointer(up_x, up_y);
-                        touch_click_as_tapped();
+                        touch_queue_click();
                     }
                 }
                 break;
@@ -1093,7 +1066,7 @@ static void touch_serve_steering(void)
         touch_panel_click_wanted = false;
         touch_panel_click = true;
         touch_move_pointer(touch_panel_click_x, touch_panel_click_y);
-        touch_click_as_tapped();
+        touch_queue_click();
         return;
     }
     if (panel_has_pointer)
@@ -1103,7 +1076,7 @@ static void touch_serve_steering(void)
     if (touch_attacks_owed > 0)
     {
         touch_attacks_owed--;
-        touch_click_as_tapped();
+        touch_queue_click();
     }
 }
 

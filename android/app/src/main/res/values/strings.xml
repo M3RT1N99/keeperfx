@@ -267,7 +267,6 @@
     <string name="input_gestures">Tap = left click · hold = right click · drag = mark an area · with creatures in the hand: hold or drag = they fall under the finger one by one · quick stroke with an empty hand = slaps the creatures it crosses · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back\n\nThe system back button and the back gesture also leave a menu. On screen: a back arrow.</string>
     <string name="option_back_button">Show the on screen buttons while playing</string>
     <string name="game_back">Back</string>
-    <string name="game_right_click">Right click</string>
 
     <string name="settings_data">Game data</string>
     <string name="option_use_alpha">Also install the alpha patch for this engine</string>

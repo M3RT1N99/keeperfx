@@ -212,7 +212,6 @@
     <string name="input_gestures">点击 = 左键单击 · 长按 = 右键单击 · 拖动 = 标记区域 · 手中有生物时：长按或拖动 = 它们逐个落到手指下方 · 空手快速划过 = 扇划过的生物巴掌 · 双指 = 平移，捏合缩放，扭转旋转 · 双指点击 = 右键单击 · 三指点击 = 返回（地图在面板上有专用按钮）\n\n系统返回键和返回手势也可以退出菜单。屏幕上有返回箭头。</string>
     <string name="option_back_button">游戏时显示屏幕按钮</string>
     <string name="game_back">返回</string>
-    <string name="game_right_click">右键单击</string>
     <string name="settings_data">游戏数据</string>
     <string name="option_use_alpha">同时安装此引擎的 Alpha 补丁</string>
     <string name="option_use_alpha_hint">此应用的引擎由最新源代码构建，而稳定版并未包含它需要的全部内容，其中就有日语、中文和韩语字体。Alpha 补丁会补上这些内容，只需在正式版之外再下载一小部分。如果想严格停留在 1.4.0，请关闭此选项。补丁会被移除，无需下载任何内容。</string>

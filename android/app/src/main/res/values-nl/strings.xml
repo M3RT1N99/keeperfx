@@ -212,7 +212,6 @@
     <string name="input_gestures">Tikken = linksklik · vasthouden = rechtsklik · slepen = gebied markeren · met wezens in de hand: vasthouden of slepen = ze vallen een voor een onder je vinger · snelle veeg met lege hand = deelt een klap uit aan de wezens die hij kruist · twee vingers = schuiven, knijpen om te zoomen, draaien om te roteren · tik met twee vingers = rechtsklik · tik met drie vingers = terug (de kaart heeft een eigen paneelknop)\n\nOok met de terugknop en het teruggebaar van het systeem verlaat je een menu. Op het scherm: een terugpijl.</string>
     <string name="option_back_button">Schermknoppen tonen tijdens het spelen</string>
     <string name="game_back">Terug</string>
-    <string name="game_right_click">Rechtsklik</string>
     <string name="settings_data">Spelgegevens</string>
     <string name="option_use_alpha">Ook de alfapatch voor deze engine installeren</string>
     <string name="option_use_alpha_hint">De engine in deze app is gebouwd uit de actuele broncode, en de stabiele release heeft niet alles wat die engine verwacht, waaronder de lettertypen voor Japans, Chinees en Koreaans. De alfapatch vult dat aan, een kleine download bovenop de release. Zet dit uit om strikt op 1.4.0 te blijven. De patch wordt dan weer verwijderd zonder iets te downloaden.</string>

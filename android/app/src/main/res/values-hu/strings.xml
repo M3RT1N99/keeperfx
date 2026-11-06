@@ -212,7 +212,6 @@
     <string name="input_gestures">Koppintás = bal kattintás · nyomva tartás = jobb kattintás · húzás = terület kijelölése · lényekkel a kézben: nyomva tartás vagy húzás = egymás után az ujj alá esnek · gyors húzás üres kézzel = pofont ad a lényeknek, amelyeken áthalad · két ujj = mozgatás, csippentés = nagyítás, csavarás = forgatás · koppintás két ujjal = jobb kattintás · koppintás három ujjal = vissza (a térképnek saját gombja van a panelen)\n\nA rendszer Vissza gombja és a vissza kézmozdulat is kilép a menüből. A képernyőn: egy vissza nyíl.</string>
     <string name="option_back_button">Képernyőgombok mutatása játék közben</string>
     <string name="game_back">Vissza</string>
-    <string name="game_right_click">Jobb kattintás</string>
     <string name="settings_data">Játékadatok</string>
     <string name="option_use_alpha">Az alfa patch telepítése is ehhez a motorhoz</string>
     <string name="option_use_alpha_hint">Az alkalmazás motorja az aktuális forráskódból készül, és a stabil kiadásban nincs meg minden, amit vár, többek között a japán, kínai és koreai betűtípusok. Az alfa patch ezeket pótolja egy kis letöltéssel a kiadás mellé. Kapcsold ki, ha szigorúan az 1.4.0 verziónál akarsz maradni. A patch ilyenkor letöltés nélkül lekerül.</string>

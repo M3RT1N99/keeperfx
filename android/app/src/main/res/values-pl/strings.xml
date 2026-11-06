@@ -212,7 +212,6 @@
     <string name="input_gestures">Dotknięcie = lewy klik · przytrzymanie = prawy klik · przeciągnięcie = zaznaczenie obszaru · ze stworami w ręce: przytrzymanie lub przeciągnięcie = spadają pod palec jeden po drugim · szybkie pociągnięcie pustą ręką = daje klapsa stworom, które przecina · dwa palce = przesuwanie, zsuwanie i rozsuwanie to zoom, skręt to obrót · dotknięcie dwoma palcami = prawy klik · dotknięcie trzema palcami = wstecz (mapa ma własny przycisk na panelu)\n\nSystemowy przycisk Wstecz i gest cofania też wychodzą z menu. Na ekranie: strzałka Wstecz.</string>
     <string name="option_back_button">Pokazuj przyciski ekranowe podczas gry</string>
     <string name="game_back">Wstecz</string>
-    <string name="game_right_click">Prawy klik</string>
     <string name="settings_data">Dane gry</string>
     <string name="option_use_alpha">Instaluj też łatkę alfa dla tego silnika</string>
     <string name="option_use_alpha_hint">Silnik tej aplikacji jest budowany z aktualnego kodu źródłowego, a stabilne wydanie nie zawiera wszystkiego, czego on oczekuje, między innymi czcionek dla japońskiego, chińskiego i koreańskiego. Łatka alfa je dodaje, to niewielki plik do pobrania oprócz wydania. Wyłącz to, aby pozostać ściśle przy wersji 1.4.0. Łatka zostanie usunięta bez pobierania czegokolwiek.</string>

@@ -212,7 +212,6 @@
     <string name="input_gestures">Tippen = Linksklick · Halten = Rechtsklick · Ziehen = Fläche markieren · mit Kreaturen in der Hand: Halten oder Ziehen = setzt sie unter dem Finger ab, eine nach der anderen · schneller Strich mit leerer Hand = schlägt die Kreaturen, die er kreuzt · zwei Finger = schieben, spreizen zum Zoomen, drehen zum Rotieren · Zwei-Finger-Tipp = Rechtsklick · Drei-Finger-Tipp = zurück (die Karte hat einen eigenen Panel-Knopf)\n\nDie Zurück-Taste und die Zurück-Geste des Systems verlassen ein Menü ebenfalls. Auf dem Bildschirm: ein Zurück-Pfeil.</string>
     <string name="option_back_button">Bildschirmtasten im Spiel anzeigen</string>
     <string name="game_back">Zurück</string>
-    <string name="game_right_click">Rechtsklick</string>
     <string name="settings_data">Spieldaten</string>
     <string name="option_use_alpha">Auch den Alpha-Patch zu dieser Engine installieren</string>
     <string name="option_use_alpha_hint">Die Engine dieser App wird aus dem aktuellen Quellcode gebaut, und die stabile Version bringt nicht alles mit, was sie erwartet, unter anderem die Schriften für Japanisch, Chinesisch und Koreanisch. Der Alpha-Patch ergänzt das, ein kleiner Download zusätzlich zur stabilen Version. Schalte das aus, um genau bei 1.4.0 zu bleiben. Der Patch wird dann ohne Download wieder entfernt.</string>

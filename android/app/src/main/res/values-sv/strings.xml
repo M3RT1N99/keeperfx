@@ -212,7 +212,6 @@
     <string name="input_gestures">Tryck = vänsterklick · håll = högerklick · dra = markera område · med varelser i handen: håll eller dra = de faller under fingret en efter en · snabbt drag med tom hand = slår varelserna det korsar · två fingrar = panorera, nyp för att zooma, vrid för att rotera · tryck med två fingrar = högerklick · tryck med tre fingrar = tillbaka (kartan har en egen panelknapp)\n\nMed systemets bakåtknapp och bakåtgest lämnar du också en meny. På skärmen: en bakåtpil.</string>
     <string name="option_back_button">Visa skärmknapparna under spelet</string>
     <string name="game_back">Tillbaka</string>
-    <string name="game_right_click">Högerklick</string>
     <string name="settings_data">Speldata</string>
     <string name="option_use_alpha">Installera även alfapatchen för den här motorn</string>
     <string name="option_use_alpha_hint">Spelmotorn i den här appen är byggd från den aktuella källkoden, och den stabila utgåvan innehåller inte allt den väntar sig, bland annat typsnitten för japanska, kinesiska och koreanska. Alfapatchen lägger till dem, en liten nedladdning utöver utgåvan. Stäng av det här för att hålla dig strikt till 1.4.0. Patchen tas då bort igen utan att något laddas ner.</string>

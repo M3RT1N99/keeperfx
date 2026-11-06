@@ -212,7 +212,6 @@
     <string name="input_gestures">Toque = clique esquerdo · manter pressionado = clique direito · arrastar = marcar área · com criaturas na mão: manter pressionado ou arrastar = elas caem sob o dedo uma após a outra · traço rápido com a mão vazia = dá um tapa nas criaturas que cruza · dois dedos = mover, pinça = zoom, girar = rotação · toque com dois dedos = clique direito · toque com três dedos = voltar (o mapa tem o próprio botão no painel)\n\nO botão Voltar do sistema e o gesto de voltar também saem de um menu. Botões virtuais: uma seta de voltar.</string>
     <string name="option_back_button">Mostrar os botões virtuais durante o jogo</string>
     <string name="game_back">Voltar</string>
-    <string name="game_right_click">Clique direito</string>
     <string name="settings_data">Dados do jogo</string>
     <string name="option_use_alpha">Instalar também o patch alfa para este motor</string>
     <string name="option_use_alpha_hint">O motor deste app é compilado a partir do código-fonte atual, e a versão estável não traz tudo o que ele espera, como as fontes para japonês, chinês e coreano. O patch alfa adiciona isso, com um pequeno download além da versão estável. Desative esta opção para ficar estritamente na 1.4.0. O patch é removido sem fazer nenhum download.</string>

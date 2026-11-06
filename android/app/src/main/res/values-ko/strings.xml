@@ -212,7 +212,6 @@
     <string name="input_gestures">탭 = 좌클릭 · 길게 누르기 = 우클릭 · 드래그 = 영역 지정 · 손에 크리처가 있을 때: 길게 누르기 또는 드래그 = 손가락 아래로 하나씩 떨어짐 · 빈손으로 빠르게 긋기 = 지나간 크리처를 때림 · 두 손가락 = 화면 이동, 핀치로 확대/축소, 비틀어 회전 · 두 손가락 탭 = 우클릭 · 세 손가락 탭 = 뒤로 (맵은 패널에 전용 버튼이 있습니다)\n\n시스템 뒤로 버튼과 뒤로 제스처로도 메뉴에서 나갈 수 있습니다. 화면에는 뒤로 화살표가 있습니다.</string>
     <string name="option_back_button">플레이 중 화면 버튼 표시</string>
     <string name="game_back">뒤로</string>
-    <string name="game_right_click">우클릭</string>
     <string name="settings_data">게임 데이터</string>
     <string name="option_use_alpha">이 엔진용 알파 패치도 설치</string>
     <string name="option_use_alpha_hint">이 앱의 엔진은 최신 소스로 빌드되었지만, 안정 릴리스에는 일본어, 중국어, 한국어 글꼴을 비롯해 엔진에 필요한 것이 모두 들어 있지는 않습니다. 알파 패치가 이를 추가하며, 릴리스에 더해 소량만 다운로드하면 됩니다. 1.4.0을 그대로 유지하려면 이 옵션을 끄세요. 패치는 아무것도 다운로드하지 않고 제거됩니다.</string>
