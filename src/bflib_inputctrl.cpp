@@ -357,9 +357,6 @@ static void process_event(const SDL_Event *ev)
 
     case SDL_EVENT_KEY_UP:
 #ifdef __ANDROID__
-        if (ev->key.key == SDLK_MENU) {
-            return;
-        }
         if ((ev->key.key == SDLK_AC_BACK) && back_pressed_this_poll) {
             back_release_waiting = true;
             return;
