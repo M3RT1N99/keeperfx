@@ -2613,8 +2613,8 @@ TbBool touch_pointer_place(struct Coord3d *pos, unsigned char *context, ThingInd
     local_state.local_thing_under_hand = kept;
     return valid;
 }
-#endif
 
+#endif
 /**
  * Fill packet structure with non action user input in dungeon view.
  */
