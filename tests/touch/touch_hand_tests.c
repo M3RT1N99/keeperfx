@@ -455,6 +455,20 @@ static void test_a_swipe_counts_what_is_under_way(void)
     sees.creature = CREATURE_A;
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "it goes on as a finger that drops");
     CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "and sends no slap");
+    // A swipe already going when the other hand's click goes out: the same.
+    begin(0, 8);
+    th_stroke_begin(&h, now);
+    th_stroke_moved(&h, now);
+    now += 100;
+    refresh();
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
+    th_note_packet(&h, sees.turn, sees.lag, 0, 1);
+    sees.thing = 1;
+    sees.creature = CREATURE_A;
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "no slap with a pick up on its way");
+    game_turn += 9;
+    refresh();
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Slap, "once that has landed or come to nothing");
     // The hand reads one and that one is on its way out: empty by the time this arrives.
     begin(1, 8);
     th_stroke_begin(&h, now);

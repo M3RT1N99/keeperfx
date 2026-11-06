@@ -185,6 +185,10 @@ void input(void);
 short get_screen_capture_inputs(void);
 int is_game_key_pressed(long key_id, TbBool clear_pressed, TbBool ignore_mods);
 short game_is_busy_doing_gui_string_input(void);
+#ifdef __ANDROID__
+struct Coord3d;
+TbBool touch_pointer_place(struct Coord3d *pos, unsigned char *context, ThingIndex *under);
+#endif
 short get_gui_inputs(short gameplay_on);
 extern unsigned short const zoom_key_room_order[];
 TbBool check_current_gui_layer(long layer_id);

@@ -26,6 +26,9 @@
 #include "bflib_joyst.h"
 #include "bflib_touch.h"
 #include "touch_camera.h"
+#ifdef __ANDROID__
+#include "touch_keeper.h"
+#endif
 #include "touch_possess.h"
 #include "bflib_video.h"
 #include "bflib_keybrd.h"
@@ -2595,6 +2598,23 @@ static TbBool get_player_coords_and_context(struct Coord3d *pos, unsigned char *
   return true;
 }
 
+#ifdef __ANDROID__
+/**
+ * The packet's answer to where the pointer is and what it is over, for the hand's rules to
+ * read ahead of it. The thing it finds on the way is handed over rather than left behind:
+ * it is what the picture highlights.
+ */
+TbBool touch_pointer_place(struct Coord3d *pos, unsigned char *context, ThingIndex *under)
+{
+    const ThingIndex kept = local_state.local_thing_under_hand;
+    local_state.local_thing_under_hand = 0;
+    const TbBool valid = get_player_coords_and_context(pos, context);
+    *under = local_state.local_thing_under_hand;
+    local_state.local_thing_under_hand = kept;
+    return valid;
+}
+#endif
+
 /**
  * Fill packet structure with non action user input in dungeon view.
  */
@@ -3182,6 +3202,9 @@ static short get_inputs(void)
         get_dungeon_control_nonaction_inputs();
         get_player_gui_clicks();
         get_packet_control_mouse_clicks();
+#ifdef __ANDROID__
+        touch_keeper_note_packet(get_local_packet());
+#endif
         return inp_handled;
     case PVT_CreatureContrl:
         if (!inp_handled)
