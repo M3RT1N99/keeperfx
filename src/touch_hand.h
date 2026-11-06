@@ -46,7 +46,8 @@ struct ThSees {
     int known;                 /**< The rest of this is about the pixel under the finger. */
     int hand;                  /**< Things in the hand, as the simulation has it by now. */
     int droppable;             /**< The game would take a drop here. */
-    int wall;                  /**< A left button pressed here is a pick axe or a door key. */
+    int wall;                  /**< A left button pressed here is a pick axe. */
+    int door;                  /**< A left button pressed here locks or unlocks a door. */
     int thing;                 /**< There is something here that the hand can pick up or slap. */
     unsigned long creature;    /**< That is an own creature, and this one; 0 when it is not. */
     long long turn;            /**< The game turn. */

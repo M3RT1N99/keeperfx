@@ -154,7 +154,7 @@ static void test_the_fly_buttons_are_only_there_for_a_flyer(void)
     ts_fly_buttons(&phone_flying, &up_btn, &down_btn);
     CHECK((up_btn.y < 360.0f) && (down_btn.y > 360.0f), "the buttons sit around the centre: %f %f", up_btn.y, down_btn.y);
     CHECK(up_btn.x + up_btn.radius < 1544.0f, "the buttons fit on the screen: %f", up_btn.x + up_btn.radius);
-    CHECK(up_btn.y - up_btn.radius > 232.0f, "the button stays clear of the toggle above it: %f", up_btn.y - up_btn.radius);
+    CHECK(up_btn.y - up_btn.radius > 232.0f, "the button stays clear of the top right corner: %f", up_btn.y - up_btn.radius);
     CHECK(role_of(up_btn.x, up_btn.y, &phone_flying, 0) == TsR_Ascend, "upper button");
     CHECK(role_of(down_btn.x, down_btn.y, &phone_flying, 0) == TsR_Descend, "lower button");
     CHECK(role_of(up_btn.x, up_btn.y, &phone, 0) == TsR_Look, "no flyer, an ordinary look finger");

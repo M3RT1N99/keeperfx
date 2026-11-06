@@ -144,7 +144,7 @@ enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct 
     const int will_hold = s->hand - th_count_flights(h, 0) + th_count_flights(h, 1);
     if (!k->read_start) {
         k->read_start = 1;
-        k->open = (unsigned char)((will_hold > 0) ? s->droppable : !s->wall);
+        k->open = (unsigned char)((will_hold > 0) ? s->droppable : (!s->wall && !s->door));
     }
     if (!k->open) {
         k->phase = ThP_Today;
@@ -168,7 +168,7 @@ enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct 
         k->phase = ThP_Today;
         return ThV_LongPress;
     }
-    if (s->thing || s->wall) {
+    if (s->thing || s->wall || s->door) {
         k->phase = ThP_LongPress;
         return ThV_LongPress;
     }
@@ -214,6 +214,7 @@ enum ThClick th_click_due(struct ThHand *h, const struct ThSees *s, const struct
     }
     if (!k->swipe || (th_count_flights(h, 1) > 0))
         return ThC_None;
+    // Not on a door, which the press itself would lock: only a stroke that starts there means that.
     if (s->wall && !k->crossed) {
         k->phase = ThP_Today;
         return ThC_PressLeft;

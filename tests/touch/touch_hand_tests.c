@@ -365,6 +365,12 @@ static void test_a_long_press_on_a_wall_stays(void)
     run_ms(16);
     refresh();
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "today, and the wiring times the long press");
+    begin(0, 0);
+    sees.door = 1;
+    th_stroke_begin(&h, now);
+    run_ms(16);
+    refresh();
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "a door too");
 }
 
 static void test_a_hold_after_a_rain_is_no_slap(void)
@@ -514,6 +520,16 @@ static void test_a_quick_stroke_reaching_a_wall(void)
     sees.wall = 1;
     now += 16;
     CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "no left button on the wall after it");
+    // A door on the way is no wall: the press would lock it.
+    begin(0, 0);
+    th_stroke_begin(&h, now);
+    th_stroke_moved(&h, now + 30);
+    now += 100;
+    refresh();
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
+    sees.door = 1;
+    now += 16;
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "over a door");
 }
 
 static void test_a_swipe_that_gets_something_drops(void)

@@ -42,7 +42,6 @@
 #include "bflib_video.h"
 #include "front_input.h"
 #include "frontend.h"
-#include "frontmenu_ingame_evnt.h"
 #include "game_legacy.h"
 #include "kjm_input.h"
 #include "kfx/platform/WindowSystemSDL.h"

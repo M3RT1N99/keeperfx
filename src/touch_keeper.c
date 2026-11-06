@@ -147,7 +147,8 @@ static void what_is_seen(long x, long y, TbBool settled, struct ThSees *sees)
     const struct Dungeon *dungeon = get_my_dungeon();
     sees->known = 1;
     sees->hand = dungeon->num_things_in_hand;
-    sees->wall = (context == CSt_PickAxe) || (context == CSt_DoorKey);
+    sees->wall = (context == CSt_PickAxe);
+    sees->door = (context == CSt_DoorKey);
     // With nothing in the hand yet this only asks about a place to wait at, so the generous answer.
     const TbBool on_path = (sees->hand > 0) ? is_creature_droppable_on_path(thing_get(dungeon->things_in_hand[0])) : true;
     sees->droppable = can_drop_thing_here(coord_subtile(pos.x.val), coord_subtile(pos.y.val), my_player_number, on_path);
