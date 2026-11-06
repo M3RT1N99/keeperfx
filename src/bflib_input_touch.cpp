@@ -901,10 +901,11 @@ void TEvent(const SDL_Event *ev)
         if ((labs(travel_x) >= threshold) || (labs(travel_y) >= threshold))
         {
             finger->moved = true;
-            if (finger->beside)
-                break;
-            touch_contact_moved = true;
-            touch_keeper_stroke_moved((long long)touch_event_ms(ev));
+            if (!finger->beside)
+            {
+                touch_contact_moved = true;
+                touch_keeper_stroke_moved((long long)touch_event_ms(ev));
+            }
         }
         if (finger->beside)
             break;
