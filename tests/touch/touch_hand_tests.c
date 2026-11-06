@@ -171,6 +171,20 @@ static void test_a_held_finger_drops_at_the_rate_asked(void)
         CHECK((click_turns[i] - click_turns[i - 1]) == 2, "two turns each time, %lld at click %d", click_turns[i] - click_turns[i - 1], i);
 }
 
+static void test_a_hold_time_past_the_long_press_time(void)
+{
+    const struct ThTuning long_hold = {800.0f, 100.0f, 150.0f, 420.0f, 4, 50.0f};
+    begin(3, 0);
+    th_stroke_begin(&h, now);
+    refresh();
+    for (int t = 0; t < 780; t += 20) {
+        now += 20;
+        CHECK(th_decide(&h, &sees, &long_hold, now) == ThV_Wait, "still waiting at %d ms", t);
+    }
+    now += 40;
+    CHECK(th_decide(&h, &sees, &long_hold, now) == ThV_Hand, "at the hold time");
+}
+
 static void test_a_rate_between_turns_keeps_to_it(void)
 {
     const struct ThTuning between = {250.0f, 75.0f, 150.0f, 420.0f, 4, 50.0f};
@@ -654,6 +668,7 @@ int touch_hand_tests(int *total_checks)
 {
     test_a_tap_stays_a_tap();
     test_a_held_finger_drops_at_the_rate_asked();
+    test_a_hold_time_past_the_long_press_time();
     test_a_rate_between_turns_keeps_to_it();
     test_no_slap_after_a_rain_at_any_lag();
     test_a_rain_goes_as_fast_as_the_lag_allows();

@@ -166,8 +166,9 @@ enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct 
         return ThV_Today;
     }
     const long long held = now - k->down_ms;
-    if ((will_hold > 0) && s->droppable && ((float)held >= t->hold_ms))
-        return th_arm(k, 0, (double)th_packet_turn(h, s));
+    // The hold time on its own, since its knob goes past the long press time.
+    if ((will_hold > 0) && s->droppable)
+        return ((float)held >= t->hold_ms) ? th_arm(k, 0, (double)th_packet_turn(h, s)) : ThV_Wait;
     if ((float)held < t->longpress_ms)
         return ThV_Wait;
     if (will_hold > 0) {
