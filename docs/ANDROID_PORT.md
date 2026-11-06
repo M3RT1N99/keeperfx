@@ -244,14 +244,15 @@ into one synthetic mouse. `src/android.cpp` turns it off, and
 | Tap | Left click at the touched point |
 | Hold about 0.42 s | Right click |
 | Drag one finger | Left button held: tag or paint |
-| Two fingers | Hold the map: move, pinch and twist together |
+| Hold or drag with something in the hand | It falls under the finger, one thing at a time |
+| Quick stroke with an empty hand | Slaps the creatures it crosses |
+| Two fingers on the map | Hold the map: move, pinch and twist together |
 | Release with speed | The map rolls on; a touch catches it |
 | Two finger tap | Right click where the first finger landed |
 | Three finger tap | Escape |
 | System back, back arrow | Escape |
 
-The back arrow and a right click toggle sit in the top right corner, added by
-`GameActivity` and on by default; while the toggle is on a plain tap is a right click.
+The back arrow sits in the top right corner, added by `GameActivity` and on by default.
 The back key is trapped with `SDL_HINT_ANDROID_TRAP_BACK_BUTTON` and mapped to `KC_ESCAPE`
 in `bflib_inputctrl.cpp`, which also keeps a press alive until the next look at the
 keyboard, since a level only looks once per game turn.
@@ -268,7 +269,8 @@ dragging there (`touch_allows_edge_scroll()`), since a pointer stays where the l
 finger left it.
 
 The launcher's touch tuning screen and `-touchtune name=value,...` adjust `longpress`,
-`dragslop`, `panslop`, `zoomgate`, `rotategate`, `flickdecay`, `looksens` and `stickradius`.
+`dragslop`, `panslop`, `zoomgate`, `rotategate`, `flickdecay`, `looksens`, `stickradius`,
+`handhold`, `handrain` and `slaprate`.
 
 ### Two fingers hold the map
 
@@ -285,6 +287,56 @@ app, and a point stays under the finger at every zoom and rotated.
 
 The land view and the parchment map have no such camera and still go through the game
 key lane, `touch_game_key_axis_value()` on `Gkey_MoveUp` and friends.
+
+### The hand
+
+`src/touch_hand.c` holds the rules, without SDL or engine, `src/touch_keeper.c` reads the
+game for them, and `touch_serve_hand()` in `bflib_input_touch.cpp` makes the clicks. They
+apply in the dungeon view with the plain hand only: no spell, room, trap or door selected,
+no menu open, not paused, on neither the panel nor a menu nor close enough to one that
+the finger assist would take the pointer. Everywhere else a finger does what the table
+above says. Android only: the hooks that feed them are inside `#ifdef __ANDROID__`.
+
+| What the finger does | Hand empty | Something in the hand |
+|---|---|---|
+| Tap | Left click | Left click, so gathering loses nothing |
+| Rests on a place to drop | Waits; on a creature or a wall a right click after 0.42 s | First drop after `handhold` (0.25 s), then one every `handrain` (0.1 s), on an own creature too |
+| Rests where nothing can drop | Right click after 0.42 s | Right click after 0.42 s, which the game refuses as it always did |
+| Stroke from a place to drop | Over 30 px within 0.25 s: a swipe. Slower: the left button | Drops along the finger, at once, at the same rate. The left button is not pressed |
+| Stroke from a wall | The left button: tags and untags | The left button: tags and untags |
+
+A swipe slaps every own creature under the finger, again and again for as long as the
+finger stays down, at most once per creature every `slaprate` (0.15 s), and presses no left
+button. It reaches a wall with nothing crossed yet and it turns into the ordinary drag, which
+tags from there. A stroke with something in the hand that starts on a floor does not tag
+any more, one that starts on the wall does, and with an empty hand a drag whose press lands
+on the floor never tagged. Second fingers on the map are the grip and end all of this.
+
+A drop and a slap are the same click: a right release drops while the hand holds something
+and slaps when it does not (`process_dungeon_control_packet_dungeon_control()`). Under input
+lag the count a client reads is behind what it has sent, so `touch_hand.c` counts what is in
+the turn's packets through the lag, as `touch_camera.c` counts zoom flags: a drop goes out
+only for something that will still be there, a slap only when nothing will be, and a pick up
+on its way holds a slap back but is never relied on for a drop, because it can come to
+nothing. The click itself is a mouse's. Pressed and released before the game's next look it
+goes out as both flags in one packet, as a mouse clicked within one turn does, so the game can
+take one a turn.
+
+What the pointer is over comes from drawing and goes into the packet, so a click after a jump
+of the pointer waits for a drawn frame. There is one pointer: a finger on the panel beside a
+finger on the map stays out of the gesture, clicks where it lifts, and gets the pointer for its
+press and release, as on a steered creature, with the drops waiting meanwhile. A two finger tap
+that straddles the panel's edge is therefore no two finger tap; on the map or on the panel it
+is, and that with a long press is the panel's right click.
+
+A slap takes the game 4 turns, and it ignores another one meanwhile or within 10 turns of a
+drop (`magic_use_power_slap_thing()`). So 0.2 s is the most a swipe gets, whatever `slaprate`
+says, and the rules leave the turns of the whip free so that a click is not wasted on one.
+
+All of this rests on x86_64 emulators at API 36 with the arm64 libraries under translation,
+scripted fingers, one player and two on the LAN bed. No phone has run it and nobody has
+said how it feels. The rate is in turns, 2 at the default, so it stretches with the game when
+a phone cannot keep up its 20 turns a second.
 
 ### A possessed creature
 
@@ -315,8 +367,7 @@ The key to finish a level is Space, which a touch screen does not have.
   on the panel, a menu or the minimap. Nothing is at stake there.
 - **A paused game** goes on from a tap on the pause box at the top, which is upstream's
   `get_paused_message_inputs()`. While a creature is steered a finger on the box gets the
-  pointer role, and on the box a tap is a left click whatever the right click toggle says.
-  A joiner that times out pauses the game this way.
+  pointer role. A joiner that times out pauses the game this way.
 
 ### The lobby keyboard
 
@@ -509,7 +560,9 @@ src/
 ├── touch_gesture.[ch]              the maths of holding the map
 ├── touch_camera.[ch]               what that does to the cameras
 ├── touch_steer.[ch]                the rules of steering a creature
-└── touch_possess.[ch]              what those do to the game
+├── touch_possess.[ch]              what those do to the game
+├── touch_hand.[ch]                 the rules of the hand under a finger
+└── touch_keeper.[ch]               what those read from the game
 
 tests/touch/                        host tests of the pure modules
 ```

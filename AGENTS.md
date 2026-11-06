@@ -146,7 +146,7 @@ happens on other branches.
   `GameLanguage.localized()` in `attachBaseContext`. The game's own window keeps the phone's
   configuration, and does not mirror: its overlay asks for the right, not the end.
 - What decides something goes in code a host can test. `src/touch_gesture.c`,
-  `src/touch_steer.c` and `src/android_lan_rules.h` include neither SDL nor the
+  `src/touch_steer.c`, `src/touch_hand.c` and `src/android_lan_rules.h` include neither SDL nor the
   engine and are pinned by `tests/touch`, and the launcher's decisions by the JVM
   tests under `android/app/src/test`.
 - `Prefs.TOUCH_TUNABLES` mirrors the table in `touch_tune()`: same names, defaults
