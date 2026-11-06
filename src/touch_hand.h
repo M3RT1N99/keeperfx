@@ -38,6 +38,7 @@ struct ThTuning {
     float slap_ms;       /**< From one slap of a creature to its next. */
     float longpress_ms;  /**< The ordinary long press, which still is one where nothing can fall. */
     int whip_turns;      /**< A slap takes this long, and the game ignores another one meanwhile. */
+    float turn_ms;       /**< How long a game turn is meant to take. */
 };
 
 /** What the game says at this moment, about the hand and the place under the finger. */
@@ -92,7 +93,7 @@ struct ThStroke {
     unsigned char crossed;       /**< A swipe that has met a creature, so a wall does not turn it into a drag. */
     long long down_ms;
     long long moved_ms;
-    long long next_drop_ms;
+    double next_drop_turn;       /**< The packet the next drop is due in, with what a rate between turns carries over. */
     struct ThSlapped slapped[TH_SLAP_MEMORY];
 };
 
@@ -100,6 +101,7 @@ struct ThHand {
     struct ThFlight flights[TH_MAX_FLIGHTS];
     int flights_count;
     long long last_right_turn;   /**< The turn of the last right release in a packet; negative before any. */
+    long long last_packet_turn;  /**< The last turn whose packet has been made, so what a click made now goes out in. */
     struct ThStroke stroke;
 };
 
@@ -139,10 +141,10 @@ enum ThClick th_click_due(struct ThHand *h, const struct ThSees *s, const struct
  * lift. When the hand gets something meanwhile, that button has to give way or nothing
  * could fall. @return true when the button is to be released now, which is the first drop.
  */
-int th_long_press_gives_way(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t, long long now);
+int th_long_press_gives_way(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t);
 
 /** The button was released for another reason: from here on the finger drops, if it can. */
-void th_long_press_ended(struct ThHand *h, const struct ThTuning *t, long long now);
+void th_long_press_ended(struct ThHand *h, const struct ThTuning *t);
 
 /******************************************************************************/
 #ifdef __cplusplus

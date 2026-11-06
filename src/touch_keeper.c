@@ -128,6 +128,7 @@ static void current_tuning(float longpress_ms, struct ThTuning *tuning)
     tuning->slap_ms = touch_hand_slap_ms;
     tuning->longpress_ms = longpress_ms;
     tuning->whip_turns = player_instance_info[PI_Whip].length_turns;
+    tuning->turn_ms = 1000.0f / (float)max(turns_per_second, 1);
 }
 
 static void what_is_seen(long x, long y, TbBool settled, struct ThSees *sees)
@@ -177,20 +178,20 @@ enum ThClick touch_keeper_click_due(long x, long y, TbBool settled, float longpr
     return th_click_due(the_hand(), &sees, &tuning, now);
 }
 
-TbBool touch_keeper_long_press_gives_way(long x, long y, TbBool settled, float longpress_ms, long long now)
+TbBool touch_keeper_long_press_gives_way(long x, long y, TbBool settled, float longpress_ms)
 {
     struct ThSees sees;
     struct ThTuning tuning;
     what_is_seen(x, y, settled, &sees);
     current_tuning(longpress_ms, &tuning);
-    return th_long_press_gives_way(the_hand(), &sees, &tuning, now);
+    return th_long_press_gives_way(the_hand(), &sees, &tuning);
 }
 
-void touch_keeper_long_press_ended(float longpress_ms, long long now)
+void touch_keeper_long_press_ended(float longpress_ms)
 {
     struct ThTuning tuning;
     current_tuning(longpress_ms, &tuning);
-    th_long_press_ended(the_hand(), &tuning, now);
+    th_long_press_ended(the_hand(), &tuning);
 }
 
 void touch_keeper_note_packet(const struct Packet *pckt)

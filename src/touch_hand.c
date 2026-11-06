@@ -69,6 +69,7 @@ static void th_add_flight(struct ThHand *h, long long turn, int is_pick)
 void th_note_packet(struct ThHand *h, long long turn, int lag, int right_released, int picking)
 {
     th_age_flights(h, turn, lag);
+    h->last_packet_turn = turn;
     if (right_released) {
         th_add_flight(h, turn, 0);
         h->last_right_turn = turn;
@@ -119,11 +120,17 @@ void th_stroke_end(struct ThHand *h)
     memset(&h->stroke, 0, sizeof(h->stroke));
 }
 
-static enum ThVerdict th_arm(struct ThStroke *k, int swipe, long long first_drop_ms)
+/** The turn whose packet a click made now goes out in: this one, unless that packet is made already. */
+static long long th_packet_turn(const struct ThHand *h, const struct ThSees *s)
+{
+    return (h->last_packet_turn == s->turn) ? (s->turn + 1) : s->turn;
+}
+
+static enum ThVerdict th_arm(struct ThStroke *k, int swipe, double first_drop_turn)
 {
     k->phase = ThP_Armed;
     k->swipe = (unsigned char)swipe;
-    k->next_drop_ms = first_drop_ms;
+    k->next_drop_turn = first_drop_turn;
     return ThV_Hand;
 }
 
@@ -152,15 +159,15 @@ enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct 
     }
     if (k->moved) {
         if (will_hold > 0)
-            return th_arm(k, 0, now);
+            return th_arm(k, 0, (double)th_packet_turn(h, s));
         if ((k->moved_ms - k->down_ms) < TH_SWIPE_MS)
-            return th_arm(k, 1, now);
+            return th_arm(k, 1, (double)th_packet_turn(h, s));
         k->phase = ThP_Today;
         return ThV_Today;
     }
     const long long held = now - k->down_ms;
     if ((will_hold > 0) && s->droppable && ((float)held >= t->hold_ms))
-        return th_arm(k, 0, now);
+        return th_arm(k, 0, (double)th_packet_turn(h, s));
     if ((float)held < t->longpress_ms)
         return ThV_Wait;
     if (will_hold > 0) {
@@ -174,7 +181,7 @@ enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct 
     }
     // Bare floor and an empty hand: a right click would do nothing at all. Held like this the
     // finger is waiting for what the other hand takes from the panel.
-    return th_arm(k, 0, now);
+    return th_arm(k, 0, (double)th_packet_turn(h, s));
 }
 
 static int th_slap_is_due(struct ThStroke *k, unsigned long creature, float slap_ms, long long now)
@@ -202,14 +209,16 @@ enum ThClick th_click_due(struct ThHand *h, const struct ThSees *s, const struct
     if ((k->phase != ThP_Armed) || !s->in_force || !s->known)
         return ThC_None;
     th_age_flights(h, s->turn, s->lag);
+    const long long packet_turn = th_packet_turn(h, s);
     if ((s->hand - th_count_flights(h, 0)) > 0) {
-        if (!s->droppable || (now < k->next_drop_ms))
+        if (!s->droppable || ((double)packet_turn < k->next_drop_turn))
             return ThC_None;
-        // Kept to the clock, so that lateness does not add up, but a long wait does not come
-        // out as a burst.
-        k->next_drop_ms += (long long)t->rain_ms;
-        if (k->next_drop_ms <= now)
-            k->next_drop_ms = now + (long long)t->rain_ms;
+        // In turns, because that is what the game takes clicks in: a rate of two turns is two
+        // turns each time, where a clock falls on either side of a look of the game's. Lateness
+        // does not add up, but a long wait does not come out as a burst.
+        k->next_drop_turn += (double)(t->rain_ms / t->turn_ms);
+        if (k->next_drop_turn <= (double)packet_turn)
+            k->next_drop_turn = (double)packet_turn + (double)(t->rain_ms / t->turn_ms);
         return ThC_Drop;
     }
     if (!k->swipe || (th_count_flights(h, 1) > 0))
@@ -222,7 +231,7 @@ enum ThClick th_click_due(struct ThHand *h, const struct ThSees *s, const struct
     if (s->creature == 0)
         return ThC_None;
     k->crossed = 1;
-    const long long since_right = s->turn - h->last_right_turn;
+    const long long since_right = packet_turn - h->last_right_turn;
     if ((h->last_right_turn >= 0) && (since_right >= 0) && (since_right < t->whip_turns))
         return ThC_None;
     if (!th_slap_is_due(k, s->creature, t->slap_ms, now))
@@ -230,7 +239,7 @@ enum ThClick th_click_due(struct ThHand *h, const struct ThSees *s, const struct
     return ThC_Slap;
 }
 
-int th_long_press_gives_way(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t, long long now)
+int th_long_press_gives_way(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t)
 {
     struct ThStroke *k = &h->stroke;
     if ((k->phase != ThP_LongPress) || !s->in_force || !s->known || !s->droppable)
@@ -238,14 +247,14 @@ int th_long_press_gives_way(struct ThHand *h, const struct ThSees *s, const stru
     th_age_flights(h, s->turn, s->lag);
     if ((s->hand - th_count_flights(h, 0)) <= 0)
         return 0;
-    th_arm(k, 0, now + (long long)t->rain_ms);
+    th_arm(k, 0, (double)th_packet_turn(h, s) + (double)(t->rain_ms / t->turn_ms));
     return 1;
 }
 
-void th_long_press_ended(struct ThHand *h, const struct ThTuning *t, long long now)
+void th_long_press_ended(struct ThHand *h, const struct ThTuning *t)
 {
     if (h->stroke.phase == ThP_LongPress)
-        th_arm(&h->stroke, 0, now + (long long)t->rain_ms);
+        th_arm(&h->stroke, 0, (double)(h->last_packet_turn + 1) + (double)(t->rain_ms / t->turn_ms));
 }
 
 /******************************************************************************/

@@ -41,7 +41,7 @@ static int checks = 0;
 #define CREATURE_A 21UL
 #define CREATURE_B 22UL
 
-static const struct ThTuning tuning = {250.0f, 100.0f, 150.0f, 420.0f, 4};
+static const struct ThTuning tuning = {250.0f, 100.0f, 150.0f, 420.0f, 4, 50.0f};
 
 static struct ThHand h;
 static struct ThSees sees;
@@ -58,6 +58,8 @@ static int pick_waiting;
 static int pick_fails;
 static unsigned char sent_right[PACKETS];
 static unsigned char sent_pick[PACKETS];
+static long long click_turns[64];
+static int clicks;
 
 /* The hand as the game has it, and the place under the finger: bare floor where things can drop. */
 static void begin(int hand, int lag)
@@ -73,6 +75,7 @@ static void begin(int hand, int lag)
     game_hand = hand;
     drops = slaps = picks_landed = 0;
     right_click_waiting = pick_waiting = pick_fails = 0;
+    clicks = 0;
     memset(sent_right, 0, sizeof(sent_right));
     memset(sent_pick, 0, sizeof(sent_pick));
 }
@@ -88,6 +91,8 @@ static void refresh(void)
 static void end_of_turn(void)
 {
     th_note_packet(&h, game_turn, game_lag, right_click_waiting, pick_waiting);
+    if (right_click_waiting && (clicks < 64))
+        click_turns[clicks++] = game_turn;
     sent_right[game_turn % PACKETS] = (unsigned char)right_click_waiting;
     sent_pick[game_turn % PACKETS] = (unsigned char)pick_waiting;
     right_click_waiting = 0;
@@ -155,13 +160,69 @@ static void test_a_held_finger_drops_at_the_rate_asked(void)
     th_stroke_begin(&h, now);
     run_ms(240);
     CHECK(drops == 0, "nothing before the hold time, %d", drops);
-    run_ms(120);
+    run_ms(70);
     CHECK(drops == 1, "the first after the hold time, %d", drops);
     run_ms(300);
     CHECK((drops >= 3) && (drops <= 5), "one every 100 ms, %d after 300 ms more", drops);
     run_ms(3000);
     CHECK((drops == 8) && (game_hand == 0), "the whole hand, %d", drops);
     CHECK(slaps == 0, "and no slap, %d", slaps);
+    for (int i = 1; i < clicks; i++)
+        CHECK((click_turns[i] - click_turns[i - 1]) == 2, "two turns each time, %lld at click %d", click_turns[i] - click_turns[i - 1], i);
+}
+
+static void test_a_rate_between_turns_keeps_to_it(void)
+{
+    const struct ThTuning between = {250.0f, 75.0f, 150.0f, 420.0f, 4, 50.0f};
+    begin(0, 0);
+    game_hand = 40;
+    th_stroke_begin(&h, now);
+    for (int t = 0; t < 2000; t += 16) {
+        now += 16;
+        refresh();
+        if ((th_decide(&h, &sees, &between, now) == ThV_Hand) && !right_click_waiting
+         && (th_click_due(&h, &sees, &between, now) == ThC_Drop))
+            right_click_waiting = 1;
+        if ((now % TURN_MS) < 16)
+            end_of_turn();
+    }
+    CHECK((clicks >= 20) && (clicks <= 24), "1.75 s at 75 ms, %d", clicks);
+    for (int i = 1; i < clicks; i++) {
+        const long long gap = click_turns[i] - click_turns[i - 1];
+        CHECK((gap == 1) || (gap == 2), "a turn or two, %lld", gap);
+    }
+    // At the fastest the knob allows, one click per turn.
+    const struct ThTuning fastest = {250.0f, 50.0f, 150.0f, 420.0f, 4, 50.0f};
+    begin(0, 0);
+    game_hand = 40;
+    th_stroke_begin(&h, now);
+    for (int t = 0; t < 1000; t += 16) {
+        now += 16;
+        refresh();
+        if ((th_decide(&h, &sees, &fastest, now) == ThV_Hand) && !right_click_waiting
+         && (th_click_due(&h, &sees, &fastest, now) == ThC_Drop))
+            right_click_waiting = 1;
+        if ((now % TURN_MS) < 16)
+            end_of_turn();
+    }
+    for (int i = 1; i < clicks; i++)
+        CHECK((click_turns[i] - click_turns[i - 1]) == 1, "every turn, %lld", click_turns[i] - click_turns[i - 1]);
+    // A click made after the turn's packet goes out in the next one, and the rate counts from there.
+    begin(5, 0);
+    th_stroke_begin(&h, now);
+    now += 300;
+    refresh();
+    th_note_packet(&h, game_turn, 0, 0, 0);
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "armed");
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "the first, for the next packet");
+    game_turn += 1;
+    refresh();
+    th_note_packet(&h, game_turn, 0, 1, 0);
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "the next packet would be one turn on");
+    game_turn += 1;
+    refresh();
+    th_note_packet(&h, game_turn, 0, 0, 0);
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "after this turn's packet: two turns on");
 }
 
 static void test_no_slap_after_a_rain_at_any_lag(void)
@@ -347,13 +408,14 @@ static void test_a_long_press_on_a_creature_with_an_empty_hand(void)
     CHECK(verdict == ThV_LongPress, "the ordinary long press, %d", (int)verdict);
     CHECK((now - 100000) >= 420, "at the long press time, %lld", now - 100000);
     // Then the hand gets something: the button gives way, and it drops from there.
-    CHECK(!th_long_press_gives_way(&h, &sees, &tuning, now), "nothing in the hand yet");
+    CHECK(!th_long_press_gives_way(&h, &sees, &tuning), "nothing in the hand yet");
     game_hand = 2;
     refresh();
-    CHECK(th_long_press_gives_way(&h, &sees, &tuning, now), "it gives way");
+    CHECK(th_long_press_gives_way(&h, &sees, &tuning), "it gives way");
     now += 16;
     CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "the release was the first drop");
-    now += 100;
+    game_turn += 2;
+    refresh();
     CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "then at the rate");
 }
 
@@ -405,7 +467,7 @@ static void test_a_quick_stroke_with_an_empty_hand_slaps(void)
 
 static void test_the_slap_rate_keeps_a_creature_waiting(void)
 {
-    const struct ThTuning slow = {250.0f, 100.0f, 500.0f, 420.0f, 4};
+    const struct ThTuning slow = {250.0f, 100.0f, 500.0f, 420.0f, 4, 50.0f};
     begin(0, 0);
     th_stroke_begin(&h, now);
     th_stroke_moved(&h, now);
@@ -592,6 +654,7 @@ int touch_hand_tests(int *total_checks)
 {
     test_a_tap_stays_a_tap();
     test_a_held_finger_drops_at_the_rate_asked();
+    test_a_rate_between_turns_keeps_to_it();
     test_no_slap_after_a_rain_at_any_lag();
     test_a_rain_goes_as_fast_as_the_lag_allows();
     test_the_lag_may_change_under_way();

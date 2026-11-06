@@ -53,8 +53,8 @@ void touch_keeper_stroke_end(void);
  */
 enum ThVerdict touch_keeper_verdict(long x, long y, TbBool settled, float longpress_ms, long long now);
 enum ThClick touch_keeper_click_due(long x, long y, TbBool settled, float longpress_ms, long long now);
-TbBool touch_keeper_long_press_gives_way(long x, long y, TbBool settled, float longpress_ms, long long now);
-void touch_keeper_long_press_ended(float longpress_ms, long long now);
+TbBool touch_keeper_long_press_gives_way(long x, long y, TbBool settled, float longpress_ms);
+void touch_keeper_long_press_ended(float longpress_ms);
 
 /** Takes note of what the turn's packet carries. */
 void touch_keeper_note_packet(const struct Packet *pckt);

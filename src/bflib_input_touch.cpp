@@ -1094,10 +1094,10 @@ static void touch_serve_hand(void)
         if (touch_panel_click_wanted)
         {
             touch_release_buttons();
-            touch_keeper_long_press_ended(touch_longpress_ms, (long long)now);
+            touch_keeper_long_press_ended(touch_longpress_ms);
             touch_gesture = TGest_Hand;
         }
-        else if ((finger != NULL) && touch_keeper_long_press_gives_way(finger->x, finger->y, touch_hand_sees_finger(), touch_longpress_ms, (long long)now))
+        else if ((finger != NULL) && touch_keeper_long_press_gives_way(finger->x, finger->y, touch_hand_sees_finger(), touch_longpress_ms))
         {
             touch_release_buttons();
             touch_gesture = TGest_Hand;
@@ -1341,9 +1341,9 @@ TbBool touch_allows_edge_scroll(void)
 {
     // A pointer on a touch screen stays where the last finger left it, or at the corner
     // it started in, and an edge scroll from there would run for ever. Only a finger
-    // dragging a paint to the edge means it.
+    // dragging a paint or a drop to the edge means it.
     if (touch_controls_active())
-        return (touch_gesture == TGest_Drag);
+        return (touch_gesture == TGest_Drag) || ((touch_gesture == TGest_Hand) && touch_contact_moved);
     // Automatic mode before the first touch: only a real mouse says it is at the edge.
     if (touch_control_mode == TCMode_Auto)
         return (last_used_input_device == ID_Keyboard_Mouse);
