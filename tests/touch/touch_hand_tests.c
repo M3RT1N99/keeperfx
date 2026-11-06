@@ -224,6 +224,23 @@ static void test_a_rate_between_turns_keeps_to_it(void)
     }
     for (int i = 1; i < clicks; i++)
         CHECK((click_turns[i] - click_turns[i - 1]) == 1, "every turn, %lld", click_turns[i] - click_turns[i - 1]);
+    // A first click that was a turn late does not make the second one a turn early.
+    begin(5, 0);
+    th_stroke_begin(&h, now);
+    now += 300;
+    refresh();
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "armed before this turn's packet");
+    th_note_packet(&h, game_turn, 0, 0, 0);
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "the first goes out one packet later");
+    game_turn += 1;
+    refresh();
+    th_note_packet(&h, game_turn, 0, 1, 0);
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "not in the next packet");
+    game_turn += 1;
+    refresh();
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "nor in this one");
+    th_note_packet(&h, game_turn, 0, 0, 0);
+    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "two packets on from the first");
     // A click made after the turn's packet goes out in the next one, and the rate counts from there.
     begin(5, 0);
     th_stroke_begin(&h, now);

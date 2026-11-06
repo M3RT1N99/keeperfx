@@ -216,11 +216,14 @@ enum ThClick th_click_due(struct ThHand *h, const struct ThSees *s, const struct
         if (!s->droppable || ((double)packet_turn < k->next_drop_turn))
             return ThC_None;
         // In turns, because that is what the game takes clicks in: a rate of two turns is two
-        // turns each time, where a clock falls on either side of a look of the game's. Lateness
-        // does not add up, but a long wait does not come out as a burst.
-        k->next_drop_turn += (double)(t->rain_ms / t->turn_ms);
-        if (k->next_drop_turn <= (double)packet_turn)
-            k->next_drop_turn = (double)packet_turn + (double)(t->rain_ms / t->turn_ms);
+        // turns each time, where a clock falls on either side of a look of the game's. What a
+        // rate between turns carries over stays, but nothing that was late comes out as two
+        // clicks too close together.
+        const double period = (double)(t->rain_ms / t->turn_ms);
+        const double soonest = (double)packet_turn + floor(period);
+        k->next_drop_turn += period;
+        if (k->next_drop_turn < soonest)
+            k->next_drop_turn = soonest;
         return ThC_Drop;
     }
     if (!k->swipe || (th_count_flights(h, 1) > 0))
