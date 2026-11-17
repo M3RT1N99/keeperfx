@@ -96,7 +96,7 @@ struct ThStroke {
     unsigned char open;          /**< It landed where the rules apply. */
     unsigned char moved;         /**< It has travelled further than a tap may. */
     unsigned char swipe;         /**< It was quick, with an empty hand: it slaps what it crosses. */
-    unsigned char crossed;       /**< With an empty hand its path has gone over an own creature. */
+    unsigned char crossed;       /**< With an empty hand its path has gone over an own creature itself. */
     long long down_ms;
     long long moved_ms;
     double next_drop_turn;       /**< The packet the next drop is due in, with what a rate between turns carries over. */
@@ -172,11 +172,13 @@ int th_path_samples(float x0, float y0, float x1, float y1, float step, float *x
 int th_stroke_looks_for_crossings(const struct ThHand *h);
 
 /**
- * The finger's path went over an own creature that a slap can reach from (x, y), with the finger
- * at s->x, s->y by now. @return true when that creature is to be slapped there: see th_slap_aim().
+ * The finger's path came within a slap's reach of an own creature, to be aimed at (x, y), with the
+ * finger at s->x, s->y by now. @param over It went over the creature itself, not just near it:
+ *     only that makes a stroke from a wall a swipe, since zoomed in the reach spans a hundred pixels.
+ * @return true when that creature is to be slapped there: see th_slap_aim().
  */
 int th_stroke_crossed(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t,
-    unsigned long creature, float x, float y, long long now);
+    unsigned long creature, float x, float y, int over, long long now);
 
 /**
  * Where a slap waits to go out, once the pointer is free: a swipe's, or a flick's after the lift.

@@ -76,6 +76,9 @@ TbBool touch_camera_owns_view(void);
  */
 TbBool touch_camera_floor_at(float sx, float sy, MapCoord *x, MapCoord *y);
 
+/** Where a place on the map is on the screen in the dungeon view as it is shown. @return false in any other view. */
+TbBool touch_camera_screen_at(const struct Coord3d *pos, float *sx, float *sy);
+
 /**
  * The longest step on the screen that stays within half a subtile on the floor, in any direction;
  * 0 when there is no dungeon view to step in.

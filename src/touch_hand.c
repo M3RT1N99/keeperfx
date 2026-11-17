@@ -341,12 +341,13 @@ int th_stroke_looks_for_crossings(const struct ThHand *h)
 }
 
 int th_stroke_crossed(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t,
-    unsigned long creature, float x, float y, long long now)
+    unsigned long creature, float x, float y, int over, long long now)
 {
     struct ThStroke *k = &h->stroke;
     if (!th_stroke_looks_for_crossings(h) || !s->in_force || (creature == 0) || !th_stays_empty(h, s))
         return 0;
-    k->crossed = 1;
+    if (over)
+        k->crossed = 1;
     // One slap at a time, and none the game would ignore.
     if ((h->aim.creature != 0) || !th_whip_over(h, s, t))
         return 0;

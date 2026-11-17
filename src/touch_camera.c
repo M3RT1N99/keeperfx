@@ -196,6 +196,16 @@ TbBool touch_camera_floor_at(float sx, float sy, MapCoord *x, MapCoord *y)
     return true;
 }
 
+TbBool touch_camera_screen_at(const struct Coord3d *pos, float *sx, float *sy)
+{
+    struct TgView view;
+    struct TgCamera pose;
+    if (shown_floor_camera(&view, &pose) == NULL)
+        return false;
+    tg_ground_to_screen(&view, &pose, (float)pos->z.val, (float)pos->x.val, (float)pos->y.val, sx, sy);
+    return true;
+}
+
 float touch_camera_floor_step_px(void)
 {
     struct TgView view;

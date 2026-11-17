@@ -128,7 +128,7 @@ static void end_of_turn(void)
 static int slap_with(const struct ThTuning *t)
 {
     if (sees.creature != 0)
-        th_stroke_crossed(&h, &sees, t, sees.creature, sees.x, sees.y, now);
+        th_stroke_crossed(&h, &sees, t, sees.creature, sees.x, sees.y, 1, now);
     float aim_x;
     float aim_y;
     if (!th_slap_aim(&h, &aim_x, &aim_y))
@@ -636,7 +636,7 @@ static void test_a_swipe_counts_what_is_under_way(void)
     now += 100;
     refresh();
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
-    CHECK(th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 50.0f, 60.0f, now), "crossed");
+    CHECK(th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 50.0f, 60.0f, 1, now), "crossed");
     th_note_packet(&h, sees.turn, sees.lag, 0, 1);
     sees.creature = CREATURE_A;
     CHECK(!th_slap_now(&h, &sees, &tuning), "not with the pick up on its way");
@@ -682,7 +682,7 @@ static void test_a_stroke_from_a_wall(void)
     th_stroke_moved(&h, now + 40);
     now += 60;
     refresh();
-    CHECK(th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, now), "crossed, and kept for later");
+    CHECK(th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, 1, now), "crossed, and kept for later");
     float aim_x;
     float aim_y;
     CHECK(!th_slap_aim(&h, &aim_x, &aim_y), "no slap before it is decided");
@@ -698,11 +698,24 @@ static void test_a_stroke_from_a_wall(void)
     refresh();
     th_stroke_look(&h, &sees);
     sees.wall = 0;
-    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, now + 100);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, 1, now + 100);
     th_stroke_moved(&h, now + 300);
     now += 310;
     refresh();
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "slow: it marks");
+    CHECK(!th_slap_aim(&h, &aim_x, &aim_y), "and slaps nothing");
+    // Quick, and only near one, within the hand's reach: it marks.
+    begin(0, 0);
+    sees.wall = 1;
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    sees.wall = 0;
+    CHECK(th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, 0, now + 30), "near enough to slap");
+    th_stroke_moved(&h, now + 40);
+    now += 100;
+    refresh();
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "near is not over: it marks");
     CHECK(!th_slap_aim(&h, &aim_x, &aim_y), "and slaps nothing");
     // With a hand, or from a door: as it always was.
     begin(2, 0);
@@ -711,7 +724,7 @@ static void test_a_stroke_from_a_wall(void)
     th_stroke_begin(&h, now);
     refresh();
     th_stroke_look(&h, &sees);
-    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, now);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, 1, now);
     th_stroke_moved(&h, now + 40);
     now += 100;
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "with a hand it marks");
@@ -721,7 +734,7 @@ static void test_a_stroke_from_a_wall(void)
     refresh();
     th_stroke_look(&h, &sees);
     sees.door = 0;
-    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, now);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, 1, now);
     th_stroke_moved(&h, now + 40);
     now += 100;
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "from a door: today");
@@ -737,7 +750,7 @@ static void test_a_flick(void)
     refresh();
     th_stroke_look(&h, &sees);
     sees.x = 140.0f;
-    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, 1, now + 30);
     th_stroke_moved(&h, now + 40);
     now += 70;
     refresh();
@@ -751,7 +764,7 @@ static void test_a_flick(void)
     th_stroke_begin(&h, now);
     refresh();
     th_stroke_look(&h, &sees);
-    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, 1, now + 30);
     th_stroke_moved(&h, now + 40);
     CHECK(th_stroke_lift(&h, 1) == ThL_Flick, "a flick");
     sees.wall = 1;
@@ -772,20 +785,20 @@ static void test_a_flick(void)
     refresh();
     th_stroke_look(&h, &sees);
     sees.wall = 0;
-    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, 1, now + 30);
     th_stroke_moved(&h, now + 40);
     CHECK((th_stroke_lift(&h, 1) == ThL_Flick) && !th_slap_aim(&h, &aim_x, &aim_y), "from a wall");
     begin(3, 0);
     th_stroke_begin(&h, now);
     refresh();
     th_stroke_look(&h, &sees);
-    CHECK(!th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30), "a hand crosses nothing");
+    CHECK(!th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, 1, now + 30), "a hand crosses nothing");
     th_stroke_moved(&h, now + 40);
     CHECK((th_stroke_lift(&h, 1) == ThL_Flick) && !th_slap_aim(&h, &aim_x, &aim_y), "with a hand");
     // Before anything showed where it landed: nothing.
     begin(0, 0);
     th_stroke_begin(&h, now);
-    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 10);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, 1, now + 10);
     th_stroke_moved(&h, now + 20);
     CHECK((th_stroke_lift(&h, 1) == ThL_Flick) && !th_slap_aim(&h, &aim_x, &aim_y), "start unknown");
     // A finger that did not travel stays a tap, even one that landed on a creature.
@@ -793,7 +806,7 @@ static void test_a_flick(void)
     th_stroke_begin(&h, now);
     refresh();
     th_stroke_look(&h, &sees);
-    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, 1, now);
     CHECK((th_stroke_lift(&h, 1) == ThL_Tap) && !th_slap_aim(&h, &aim_x, &aim_y), "a tap");
     // Where the rules are not in force, a stroke over before the grace is the press it always was.
     begin(0, 0);
@@ -805,7 +818,7 @@ static void test_a_flick(void)
     th_stroke_begin(&h, now);
     refresh();
     th_stroke_look(&h, &sees);
-    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, 1, now + 30);
     th_stroke_moved(&h, now + 40);
     th_stroke_cancel(&h);
     CHECK(!th_slap_aim(&h, &aim_x, &aim_y), "a grip");

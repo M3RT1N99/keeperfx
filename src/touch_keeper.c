@@ -158,6 +158,20 @@ static void current_tuning(float longpress_ms, struct ThTuning *tuning)
 }
 
 #ifdef __ANDROID__
+/** How far a point is from a piece of a finger's path, on the screen. */
+static float distance_to_path(float x0, float y0, float x1, float y1, float px, float py)
+{
+    const float dx = x1 - x0;
+    const float dy = y1 - y0;
+    const float length2 = dx * dx + dy * dy;
+    float share = (length2 > 0.0f) ? (((px - x0) * dx + (py - y0) * dy) / length2) : 0.0f;
+    if (share < 0.0f)
+        share = 0.0f;
+    if (share > 1.0f)
+        share = 1.0f;
+    return hypotf(px - (x0 + dx * share), py - (y0 + dy * share));
+}
+
 /** An own creature a right click with an empty hand would slap. */
 static TbBool own_slappable(const struct Thing *thing)
 {
@@ -250,7 +264,23 @@ void touch_keeper_stroke_path(long x0, long y0, long x1, long y1, long long now)
             continue;
         // The same search the game makes for the thing under the hand, from the floor under this point.
         const struct Thing *thing = get_nearest_thing_for_hand_or_slap(my_player_number, pos_x, pos_y);
-        if (own_slappable(thing) && th_stroke_crossed(h, &sees, &tuning, thing->index, xs[i], ys[i], now))
+        if (!own_slappable(thing))
+            continue;
+        // Aimed at the creature itself, where the game's own search cannot miss it: the point of the
+        // path that found it can be at the far edge of the hand's reach, and the creature walks on.
+        float aim_x;
+        float aim_y;
+        const TbBool shown = touch_camera_screen_at(&thing->mappos, &aim_x, &aim_y) && (aim_x >= 0.0f) && (aim_y >= 0.0f)
+            && (aim_x < (float)MyScreenWidth) && (aim_y < (float)MyScreenHeight) && !touch_keeper_over_gui((long)aim_x, (long)aim_y);
+        if (!shown)
+        {
+            aim_x = xs[i];
+            aim_y = ys[i];
+        }
+        // Gone over, and not only within the hand's reach, when the creature's place is within a
+        // finger of the path.
+        const TbBool over = shown && (distance_to_path((float)x0, (float)y0, (float)x1, (float)y1, aim_x, aim_y) <= (float)(2 * finger_reach()));
+        if (th_stroke_crossed(h, &sees, &tuning, thing->index, aim_x, aim_y, over, now))
             return;
     }
 #endif
