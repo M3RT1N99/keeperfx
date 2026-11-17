@@ -196,13 +196,19 @@ TbBool touch_camera_floor_at(float sx, float sy, MapCoord *x, MapCoord *y)
     return true;
 }
 
-TbBool touch_camera_screen_at(const struct Coord3d *pos, float *sx, float *sy)
+TbBool touch_camera_floor_screen_at(MapCoord x, MapCoord y, float *sx, float *sy)
 {
     struct TgView view;
     struct TgCamera pose;
     if (shown_floor_camera(&view, &pose) == NULL)
         return false;
-    tg_ground_to_screen(&view, &pose, (float)pos->z.val, (float)pos->x.val, (float)pos->y.val, sx, sy);
+    // The game finds the thing under the hand from where the pointer meets the top of the column
+    // there, so that is the height to come back from, not the height of what stands or flies on it.
+    const struct Map *mapblk = get_map_block_at(coord_subtile(x), coord_subtile(y));
+    if (map_block_invalid(mapblk))
+        return false;
+    const float height = (float)(get_mapblk_filled_subtiles(mapblk) * COORD_PER_STL);
+    tg_ground_to_screen(&view, &pose, height, (float)x, (float)y, sx, sy);
     return true;
 }
 

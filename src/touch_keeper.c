@@ -266,11 +266,12 @@ void touch_keeper_stroke_path(long x0, long y0, long x1, long y1, long long now)
         const struct Thing *thing = get_nearest_thing_for_hand_or_slap(my_player_number, pos_x, pos_y);
         if (!own_slappable(thing))
             continue;
-        // Aimed at the creature itself, where the game's own search cannot miss it: the point of the
-        // path that found it can be at the far edge of the hand's reach, and the creature walks on.
+        // Aimed at the floor under the creature itself, where the game's own search cannot miss it:
+        // the point of the path that found it can be at the far edge of the hand's reach, and the
+        // creature walks on. Its own height would put a flying one's aim over another place's floor.
         float aim_x;
         float aim_y;
-        const TbBool shown = touch_camera_screen_at(&thing->mappos, &aim_x, &aim_y) && (aim_x >= 0.0f) && (aim_y >= 0.0f)
+        const TbBool shown = touch_camera_floor_screen_at(thing->mappos.x.val, thing->mappos.y.val, &aim_x, &aim_y) && (aim_x >= 0.0f) && (aim_y >= 0.0f)
             && (aim_x < (float)MyScreenWidth) && (aim_y < (float)MyScreenHeight) && !touch_keeper_over_gui((long)aim_x, (long)aim_y);
         if (!shown)
         {
