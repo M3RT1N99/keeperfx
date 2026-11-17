@@ -8,7 +8,8 @@
  *     travels lets it fall, one thing at a time; with an empty hand a quick stroke
  *     slaps the creatures it crosses, and no stroke from the floor presses the left
  *     button, so none of them marks a wall for digging. Drops and slaps are right
- *     clicks at the pointer.
+ *     clicks at the pointer. A finger resting on a wall it could mark, to the long press
+ *     time, selects an area of them the way Shift and a left button drag do on a computer.
  * @par Comment:
  *     A right click drops while the hand holds something and slaps when it does not,
  *     and in a game of two players the count the client can read is behind what it has
@@ -44,6 +45,29 @@ enum ThPhase {
     ThP_Today,       /**< The ordinary gestures have it. */
     ThP_LongPress,   /**< An ordinary long press that gives way to a drop. */
     ThP_Armed,       /**< It drops, and a swipe slaps. */
+    ThP_Area,        /**< It selects an area of walls, see enum ThAreaPhase. */
+};
+
+/**
+ * The area of walls is the game's own: the key bound to Gkey_BestRoomSpace held turns a left button
+ * drag from a wall into one, which the release applies to every slab in it, or a right click while
+ * the button is down cancels. A packet carries one action and applies as many turns later as the
+ * input lag says, so every step waits for a packet that has carried the one before: the press for
+ * the key's action, which a press in the same packet could miss when another action took the
+ * packet; the key, held on until a packet has carried the release, since a release read without
+ * it would be a plain one and apply nothing; and the release after a cancel for the packet that
+ * carried the right click with the left button still down, which is what cancels.
+ */
+enum ThAreaPhase {
+    ThA_None = 0,
+    ThA_Key,         /**< The key is held, and the press waits for a packet that has carried it. */
+    ThA_PressDue,
+    ThA_Pressing,    /**< The left button is down where the finger rested, until a packet has carried it. */
+    ThA_Drag,        /**< The game drags the area from there to the pointer. */
+    ThA_CancelDue,
+    ThA_Cancel,      /**< The right button is down beside it, until a packet has carried both. */
+    ThA_ReleaseDue,
+    ThA_Release,     /**< The buttons are up, and the key waits for a packet without the left button held. */
 };
 
 void th_reset(struct ThHand *h)
@@ -137,8 +161,19 @@ void th_stroke_moved(struct ThHand *h, long long ms)
     h->stroke.moved_ms = ms;
 }
 
+/** The finger is gone or part of something else: nothing it selected applies. */
+static void th_area_abandon(struct ThHand *h)
+{
+    if ((h->area == ThA_Key) || (h->area == ThA_PressDue))
+        h->area = ThA_None;
+    else if ((h->area == ThA_Pressing) || (h->area == ThA_Drag))
+        h->area = ThA_CancelDue;
+}
+
 void th_stroke_cancel(struct ThHand *h)
 {
+    if (h->stroke.phase == ThP_Area)
+        th_area_abandon(h);
     memset(&h->stroke, 0, sizeof(h->stroke));
     th_drop_aim(h);
 }
@@ -155,6 +190,17 @@ enum ThLift th_stroke_lift(struct ThHand *h, int in_force)
         lift = ThL_Flick;
         if (!k->read_start || !k->start_empty || k->start_wall)
             th_drop_aim(h);
+    } else if (k->phase == ThP_Area) {
+        // Lifted where it rested, the area is the one slab, which is a tap's; and a finger held on
+        // a creature drawn over the top of a wall has not asked for that wall.
+        lift = ThL_Hand;
+        if (k->moved && (h->area == ThA_Drag)) {
+            lift = ThL_Area;
+            h->area = ThA_ReleaseDue;
+        } else {
+            th_area_abandon(h);
+        }
+        th_drop_aim(h);
     } else {
         if ((k->phase == ThP_Armed) || (k->phase == ThP_LongPress))
             lift = ThL_Hand;
@@ -235,6 +281,8 @@ enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct 
     struct ThStroke *k = &h->stroke;
     if (k->phase == ThP_Armed)
         return ThV_Hand;
+    if (k->phase == ThP_Area)
+        return ThV_Area;
     if (k->phase != ThP_Deciding)
         return ThV_Today;
     // Where it landed out of force the ordinary gestures have it. A start read in force is the
@@ -257,6 +305,19 @@ enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct 
         // meanwhile is one: it clicks nothing where it lifted.
         if (!k->moved && ((float)held < t->longpress_ms))
             return ThV_Wait;
+        // Resting on a wall it could mark, as the game says by now, it selects an area of them. One
+        // still on its way out keeps its key until the game has the release, and a finger meanwhile
+        // has the ordinary long press.
+        if (!k->moved && k->start_wall && s->in_force) {
+            if (!s->known)
+                return ThV_Wait;
+            if (s->wall && (h->area == ThA_None)) {
+                k->phase = ThP_Area;
+                h->area = ThA_Key;
+                th_drop_aim(h);
+                return ThV_Area;
+            }
+        }
         return th_today(h);
     }
     if (k->moved) {
@@ -412,6 +473,77 @@ void th_long_press_ended(struct ThHand *h, const struct ThTuning *t)
 {
     if (h->stroke.phase == ThP_LongPress)
         th_arm(h, 0, (double)(h->last_packet_turn + 1) + (double)(t->rain_ms / t->turn_ms));
+}
+
+int th_area_key(const struct ThHand *h)
+{
+    return h->area != ThA_None;
+}
+
+int th_area_owns_buttons(const struct ThHand *h)
+{
+    return (h->area >= ThA_Pressing) && (h->area <= ThA_ReleaseDue);
+}
+
+int th_area_anchoring(const struct ThHand *h)
+{
+    return (h->area == ThA_Key) || (h->area == ThA_PressDue) || (h->area == ThA_Pressing);
+}
+
+enum ThAreaStep th_area_step(struct ThHand *h, long long now, float overdue_ms)
+{
+    switch (h->area)
+    {
+    case ThA_PressDue:
+        h->area = ThA_Pressing;
+        return ThAS_PressLeft;
+    case ThA_CancelDue:
+        h->area = ThA_Cancel;
+        h->area_ms = now;
+        return ThAS_PressRight;
+    case ThA_Cancel:
+        if ((float)(now - h->area_ms) <= overdue_ms)
+            return ThAS_None;
+        // fall through
+    case ThA_ReleaseDue:
+        h->area = ThA_Release;
+        return ThAS_Release;
+    default:
+        return ThAS_None;
+    }
+}
+
+void th_note_area_packet(struct ThHand *h, int area_mode, int left_held, int right_click)
+{
+    switch (h->area)
+    {
+    case ThA_Key:
+        if (area_mode)
+            h->area = ThA_PressDue;
+        break;
+    case ThA_Pressing:
+        if (left_held)
+            h->area = ThA_Drag;
+        break;
+    case ThA_Cancel:
+        if (right_click && left_held)
+            h->area = ThA_ReleaseDue;
+        break;
+    case ThA_Release:
+        if (!left_held)
+            h->area = ThA_None;
+        break;
+    default:
+        break;
+    }
+}
+
+void th_area_buttons_released(struct ThHand *h)
+{
+    if ((h->area == ThA_Key) || (h->area == ThA_PressDue))
+        h->area = ThA_None;
+    else if (h->area != ThA_None)
+        h->area = ThA_Release;
 }
 
 /******************************************************************************/

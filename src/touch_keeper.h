@@ -80,6 +80,17 @@ void touch_keeper_long_press_ended(float longpress_ms);
 /** Takes note of what the turn's packet carries. */
 void touch_keeper_note_packet(const struct Packet *pckt);
 
+/** The game key that makes a left button drag an area of walls is to be held now, see th_area_key(). */
+TbBool touch_keeper_area_key(void);
+/** See th_area_owns_buttons(). */
+TbBool touch_keeper_area_owns_buttons(void);
+/** See th_area_anchoring(). */
+TbBool touch_keeper_area_anchoring(void);
+/** See th_area_step(). */
+enum ThAreaStep touch_keeper_area_step(long long now, float overdue_ms);
+/** The buttons were let go of for another reason. */
+void touch_keeper_area_buttons_released(void);
+
 /******************************************************************************/
 #ifdef __cplusplus
 }

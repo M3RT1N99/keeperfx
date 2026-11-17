@@ -30,6 +30,7 @@
 
 #include "bflib_touch.h"
 #include "bflib_video.h"
+#include "config_settings.h"
 #include "dungeon_data.h"
 #include "front_input.h"
 #include "frontend.h"
@@ -47,6 +48,7 @@
 #include "player_instances.h"
 #include "power_hand.h"
 #include "replay.h"
+#include "roomspace.h"
 #include "thing_creature.h"
 #include "thing_data.h"
 #include "touch_camera.h"
@@ -227,7 +229,10 @@ static void what_is_seen(long x, long y, TbBool settled, struct ThSees *sees)
     if (!touch_pointer_place(&pos, &context, &under))
         return;
     sees->known = 1;
-    sees->wall = (context == CSt_PickAxe);
+    // A hand over a wall keeps its own pointer, and a left button there marks as the pick axe does
+    // when the wall can be dug: what update_dig_highlight() asks.
+    sees->wall = (context == CSt_PickAxe) || ((sees->hand > 0) && (context == CSt_PowerHand)
+        && can_dig_here(coord_subtile(pos.x.val), coord_subtile(pos.y.val), my_player_number, true));
     sees->door = (context == CSt_DoorKey);
     // With nothing in the hand yet this only asks about a place to wait at, so the generous answer.
     const TbBool on_path = (sees->hand > 0) ? is_creature_droppable_on_path(thing_get(dungeon->things_in_hand[0])) : true;
@@ -359,6 +364,38 @@ void touch_keeper_note_packet(const struct Packet *pckt)
     const TbBool right_released = !gui && ((pckt->control_flags & PCtr_RBtnRelease) != 0);
     const TbBool picking = (pckt->action == PckA_UsePwrHandPick) || (!gui && ((pckt->control_flags & PCtr_LBtnRelease) != 0));
     th_note_packet(the_hand(), (long long)get_gameturn(), game.input_lag_turns, right_released, picking);
+    // From the default single mode the key's action turns the drag into an area, and from the drag
+    // mode as a default the game does that by itself: process_highlight_roomspace_inputs().
+    const TbBool area_mode = ((pckt->action == PckA_SetRoomspaceHighlight) && (pckt->actn_par1 == drag_placement_mode))
+        || (settings.highlight_mode == drag_placement_mode);
+    th_note_area_packet(the_hand(), area_mode, (pckt->control_flags & PCtr_LBtnHeld) != 0, (pckt->control_flags & PCtr_RBtnClick) != 0);
+}
+
+TbBool touch_keeper_area_key(void)
+{
+    // The key turns the default mode into the other one, so from the drag mode it would make the
+    // drag paint: there the area needs no key.
+    return th_area_key(the_hand()) && ((settings.highlight_mode ^ 1) == drag_placement_mode) && touch_keeper_in_force();
+}
+
+TbBool touch_keeper_area_owns_buttons(void)
+{
+    return th_area_owns_buttons(the_hand());
+}
+
+TbBool touch_keeper_area_anchoring(void)
+{
+    return th_area_anchoring(the_hand());
+}
+
+enum ThAreaStep touch_keeper_area_step(long long now, float overdue_ms)
+{
+    return th_area_step(the_hand(), now, overdue_ms);
+}
+
+void touch_keeper_area_buttons_released(void)
+{
+    th_area_buttons_released(the_hand());
 }
 
 /******************************************************************************/

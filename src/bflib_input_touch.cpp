@@ -153,6 +153,7 @@ enum TouchGestureKind {
     TGest_Drag,    /**< One finger, left button held down. */
     TGest_LongTap, /**< One finger held still, right button held down. */
     TGest_Hand,    /**< One finger the hand's rules have taken: it drops and slaps, no button stays down. */
+    TGest_Area,    /**< One finger that rested on a wall: it selects an area of walls, see touch_serve_area(). */
     TGest_Camera,  /**< Two fingers: pan, pinch and twist. */
     TGest_Blocked, /**< Extra fingers landed; wait until all are lifted. */
 };
@@ -381,6 +382,9 @@ static void touch_release_buttons(void)
 static void touch_reset_state(void)
 {
     touch_release_buttons();
+    // An area whose button has gone up this way is applied as a lift would, and its key lasts until
+    // the game has had that release.
+    touch_keeper_area_buttons_released();
     memset(touch_fingers, 0, sizeof(touch_fingers));
     touch_finger_count = 0;
     touch_beside_fingers = 0;
@@ -686,7 +690,7 @@ static TbBool touch_hand_sees_finger(void)
  */
 static TbBool touch_pointer_follows_finger(void)
 {
-    return !touch_panel_click && !touch_slap_click && !touch_keeper_start_unseen();
+    return !touch_panel_click && !touch_slap_click && !touch_keeper_start_unseen() && !touch_keeper_area_anchoring();
 }
 
 /**
@@ -756,7 +760,8 @@ static TbBool touch_keep_panel_finger_aside(struct TouchFinger *finger)
     if (other == NULL)
         return false;
     if (finger->on_panel && !other->on_gui
-     && ((touch_gesture == TGest_Point) || (touch_gesture == TGest_Hand) || (touch_gesture == TGest_LongTap) || (touch_gesture == TGest_Drag)))
+     && ((touch_gesture == TGest_Point) || (touch_gesture == TGest_Hand) || (touch_gesture == TGest_LongTap)
+      || (touch_gesture == TGest_Drag) || (touch_gesture == TGest_Area)))
     {
         finger->beside = true;
         touch_beside_fingers++;
@@ -901,15 +906,19 @@ void TEvent(const SDL_Event *ev)
         }
         else if (touch_finger_count == 2)
         {
-            // A second finger cancels whatever the first one started.
-            touch_release_buttons();
+            // A second finger cancels whatever the first one started. An area is cancelled the way a
+            // computer does it, by a right click while the left button is still down, since letting
+            // go of that button first would apply it: touch_serve_area() does that.
+            if (!touch_keeper_area_owns_buttons())
+                touch_release_buttons();
             touch_keeper_stroke_cancel();
             touch_spoil_beside_fingers();
             touch_begin_camera_gesture();
         }
         else
         {
-            touch_release_buttons();
+            if (!touch_keeper_area_owns_buttons())
+                touch_release_buttons();
             touch_keeper_stroke_cancel();
             touch_spoil_beside_fingers();
             touch_reset_gesture_axes();
@@ -982,7 +991,7 @@ void TEvent(const SDL_Event *ev)
             // A left button held down by a drag leaves nothing to click with, and saving the
             // click up would fire it long after the thumb has gone.
             touch_beside_fingers--;
-            if (!canceled && !moved && !finger->spoiled && (touch_gesture != TGest_Drag))
+            if (!canceled && !moved && !finger->spoiled && (touch_gesture != TGest_Drag) && (touch_gesture != TGest_Area))
             {
                 touch_panel_click_wanted = true;
                 touch_panel_click_x = up_x;
@@ -1026,6 +1035,9 @@ void TEvent(const SDL_Event *ev)
             case TGest_Drag:
             case TGest_LongTap:
                 touch_release_buttons();
+                break;
+            case TGest_Area:
+                // The lift said what becomes of it, and touch_serve_area() lets go of the buttons.
                 break;
             case TGest_Camera:
             case TGest_Blocked:
@@ -1088,6 +1100,40 @@ void TEvent(const SDL_Event *ev)
 /******************************************************************************/
 
 static void touch_apply_pan_accumulator(void);
+
+/**
+ * The area of walls a resting finger selects, see touch_hand.c: the left button goes down where it
+ * rested once the game has had the key, and a cancel is a right click beside it, as on a computer.
+ * Both go up together, on the area's own lift or after the game has had that right click.
+ */
+static void touch_serve_area(void)
+{
+    // The rules going out of force under it, a pause, a menu or the level's end, cancel it as a
+    // second finger would, and the finger does nothing more until it lifts.
+    if ((touch_gesture == TGest_Area) && !touch_keeper_in_force())
+    {
+        touch_keeper_stroke_cancel();
+        touch_gesture = TGest_Blocked;
+    }
+    switch (touch_keeper_area_step((long long)SDL_GetTicks(), (float)TOUCH_CLICK_MAX_HOLD_MS))
+    {
+    case ThAS_PressLeft:
+        touch_press_left();
+        break;
+    case ThAS_PressRight:
+        touch_press_right();
+        break;
+    case ThAS_Release:
+        touch_release_buttons();
+        break;
+    default:
+        break;
+    }
+    // Once the game has the press where it rested, the pointer catches up with the finger.
+    struct TouchFinger *finger = (touch_finger_count == 1) ? touch_gesture_finger(NULL) : NULL;
+    if ((touch_gesture == TGest_Area) && (finger != NULL) && !touch_keeper_area_anchoring())
+        touch_move_pointer(finger->x, finger->y);
+}
 
 /** Turns what the fingers asked for into clicks, one at a time. */
 static void touch_serve_steering(void)
@@ -1295,6 +1341,7 @@ void update_touch_inputs(void)
             touch_release_buttons();
         }
     }
+    touch_serve_area();
     if (touch_possess_steering())
         touch_serve_steering();
     else
@@ -1329,6 +1376,10 @@ void update_touch_inputs(void)
             if (verdict == ThV_Hand)
             {
                 touch_gesture = TGest_Hand;
+            }
+            else if (verdict == ThV_Area)
+            {
+                touch_gesture = TGest_Area;
             }
             else if ((verdict == ThV_LongPress)
                   || ((verdict == ThV_Today) && ((SDL_GetTicks() - finger->down_ticks) >= touch_longpress_ms)))
@@ -1434,7 +1485,7 @@ TbBool touch_allows_edge_scroll(void)
     // it started in, and an edge scroll from there would run for ever. Only a finger
     // dragging a paint or a drop to the edge means it.
     if (touch_controls_active())
-        return (touch_gesture == TGest_Drag) || ((touch_gesture == TGest_Hand) && touch_contact_moved);
+        return (touch_gesture == TGest_Drag) || (((touch_gesture == TGest_Hand) || (touch_gesture == TGest_Area)) && touch_contact_moved);
     // Automatic mode before the first touch: only a real mouse says it is at the edge.
     if (touch_control_mode == TCMode_Auto)
         return (last_used_input_device == ID_Keyboard_Mouse);
@@ -1455,6 +1506,9 @@ int touch_game_key_pressed(long key_id, TbBool clear_pressed)
 {
     if (!touch_controls_active())
         return 0;
+    // An area of walls holds the key that makes a left button drag one, as a computer's Shift does.
+    if ((key_id == Gkey_BestRoomSpace) && touch_keeper_area_key())
+        return 1;
 
     return (touch_game_key_axis_value(key_id) > 0.0f) ? 1 : 0;
 }
