@@ -295,19 +295,24 @@ game for them, and `touch_serve_hand()` in `bflib_input_touch.cpp` makes the cli
 apply in the dungeon view with the plain hand only: no spell, room, trap or door selected,
 no menu open, not paused, on neither the panel nor a menu nor close enough to one that
 the finger assist would take the pointer. Everywhere else a finger does what the table
-above says. Android only: the hooks that feed them are inside `#ifdef __ANDROID__`.
+above says. A finger that landed where they apply stays theirs when it reaches such a
+margin before it is decided. Android only: the hooks that feed them are inside `#ifdef __ANDROID__`.
 
 | What the finger does | Hand empty | Something in the hand |
 |---|---|---|
 | Tap | Left click | Left click, so gathering loses nothing |
 | Rests on a place to drop | Waits; on a creature or a wall a right click after 0.42 s | First drop after `handhold` (0.25 s), then one every `handrain` (0.1 s), on an own creature too |
 | Rests where nothing can drop | Right click after 0.42 s | Right click after 0.42 s, which the game refuses as it always did |
-| Stroke from the floor or a creature | Over 30 px within 0.25 s: a swipe. Slower: nothing, until something falls. Never the left button | Drops along the finger, at once, at the same rate. The left button is not pressed |
-| Stroke from a wall | The left button: tags and untags. A quick start that goes over an own creature before that press is a swipe | The left button: tags and untags |
-| Flick: over 30 px and lifted within the second finger's grace (0.1 s) | From the floor it slaps an own creature it crossed; from a wall nothing. Never a click where it lifted | Nothing |
+| Stroke from the floor, a creature or an own door | Over 30 px within 0.25 s: a swipe. Slower: nothing, until something falls. Never the left button | Drops along the finger, at once, at the same rate. The left button is not pressed |
+| Stroke from a wall | The left button: tags and untags. A quick start that goes over an own creature before that press is a swipe; landing beside one is not going over it | The left button: tags and untags |
+| Flick: over 30 px and lifted within the second finger's grace (0.1 s) | From the floor or an own door it slaps an own creature it crossed; from a wall nothing. Never a click where it lifted | Nothing |
 
 What a finger landed on decides, so the pointer waits where it landed until one frame has
-been drawn there, and that frame's answer is the start.
+been drawn there, and that frame's answer is the start. A finger that lands while a slap's
+or the panel's click has the pointer gets it where it landed once that click is over, and a
+two finger tap made meanwhile clicks there too. A tap on an own door still locks or unlocks
+it; a stroke from one is a stroke from the floor, which is also what the game reports under a
+creature walking through a door.
 
 A swipe slaps the own creatures it goes over, again and again for as long as the finger
 stays down and goes on moving, however slowly, at most once per creature every `slaprate`
@@ -323,10 +328,14 @@ thing under the hand (`get_nearest_thing_for_hand_or_slap()`), which only reads.
 found there gets its slap at its own place on the screen, since the point of the path that
 found it can be at the far edge of the hand's reach: the pointer goes there, and once a frame
 has been drawn with it there the right click goes out, but only when the game then reports an
-own creature to slap under the hand. A right click with an empty hand also takes a dig mark off
-a wall, and the top of a wall beside a creature is where a pointer aimed at it can land. Zoomed
-in, that reach spans about a hundred pixels, so for a stroke from a wall to become a swipe its
-path has to pass within a fifteenth of the screen height of the creature itself.
+own creature to slap under the hand. The top of a wall beside a creature is where a pointer
+aimed at it can land, and a right click there slaps nothing: the pick axe ignores it, or with
+`TAG_MODE_TOGGLING` on it switches the dig highlight mode. Zoomed in, the hand's reach spans
+about a hundred pixels, so for a stroke from a wall to become a swipe its path has to pass
+within a fifteenth of the screen height of the creature's feet, nearer than where it landed by
+half that again, and where the picture shows the creature: one with a wall drawn in front of it,
+found by asking the columns under that point the way the game finds what the pointer is over,
+is not gone over.
 
 A drop and a slap are the same click: a right release drops while the hand holds something
 and slaps when it does not (`process_dungeon_control_packet_dungeon_control()`). Under input
