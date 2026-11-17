@@ -303,7 +303,7 @@ above says. Android only: the hooks that feed them are inside `#ifdef __ANDROID_
 | Rests on a place to drop | Waits; on a creature or a wall a right click after 0.42 s | First drop after `handhold` (0.25 s), then one every `handrain` (0.1 s), on an own creature too |
 | Rests where nothing can drop | Right click after 0.42 s | Right click after 0.42 s, which the game refuses as it always did |
 | Stroke from the floor or a creature | Over 30 px within 0.25 s: a swipe. Slower: nothing, until something falls. Never the left button | Drops along the finger, at once, at the same rate. The left button is not pressed |
-| Stroke from a wall | The left button: tags and untags. A quick start that crosses an own creature before that press is a swipe | The left button: tags and untags |
+| Stroke from a wall | The left button: tags and untags. A quick start that goes over an own creature before that press is a swipe | The left button: tags and untags |
 | Flick: over 30 px and lifted within the second finger's grace (0.1 s) | From the floor it slaps an own creature it crossed; from a wall nothing. Never a click where it lifted | Nothing |
 
 What a finger landed on decides, so the pointer waits where it landed until one frame has
@@ -320,10 +320,13 @@ a quick finger crosses a creature between two frames. So `touch_keeper_stroke_pa
 the finger's path itself: points no further apart than half a subtile on the floor, each
 mapped to the floor the way the grip maps fingers, each asked the game's own question for the
 thing under the hand (`get_nearest_thing_for_hand_or_slap()`), which only reads. A creature
-found there gets its slap where it was found: the pointer goes there, and once a frame has
-been drawn with it there the right click goes out, but only when the game then reports an own
-creature to slap under the hand. A right click with an empty hand also takes a dig mark off a
-wall, and the top of a wall beside a creature is where a pointer aimed at it can land.
+found there gets its slap at its own place on the screen, since the point of the path that
+found it can be at the far edge of the hand's reach: the pointer goes there, and once a frame
+has been drawn with it there the right click goes out, but only when the game then reports an
+own creature to slap under the hand. A right click with an empty hand also takes a dig mark off
+a wall, and the top of a wall beside a creature is where a pointer aimed at it can land. Zoomed
+in, that reach spans about a hundred pixels, so for a stroke from a wall to become a swipe its
+path has to pass within a fifteenth of the screen height of the creature itself.
 
 A drop and a slap are the same click: a right release drops while the hand holds something
 and slaps when it does not (`process_dungeon_control_packet_dungeon_control()`). Under input
