@@ -47,7 +47,24 @@ TbBool touch_keeper_over_panel(long x);
 
 void touch_keeper_stroke_begin(long long ms);
 void touch_keeper_stroke_moved(long long ms);
-void touch_keeper_stroke_end(void);
+void touch_keeper_stroke_cancel(void);
+/** The finger lifted, see th_stroke_lift(). */
+enum ThLift touch_keeper_stroke_lift(void);
+
+/** The pointer is to stay where the finger landed, until a frame has shown what is there. */
+TbBool touch_keeper_start_unseen(void);
+/** A frame has been drawn with the pointer where the finger landed, at x, y. */
+void touch_keeper_look_at_start(long x, long y);
+
+/**
+ * The finger went from x0, y0 to x1, y1. Looks along the way for own creatures to slap,
+ * by the game's own search for a thing under the hand, and reads nothing else.
+ */
+void touch_keeper_stroke_path(long x0, long y0, long x1, long y1, long long now);
+/** Where the slap of a creature crossed is to be aimed, once the pointer is free. */
+TbBool touch_keeper_slap_aim(long *x, long *y);
+/** The pointer has been at the aim for a drawn frame: whether the right click goes out now. */
+TbBool touch_keeper_slap_now(long x, long y);
 
 /**
  * @param x,y Where the finger is.
@@ -55,7 +72,7 @@ void touch_keeper_stroke_end(void);
  *     idea of what the pointer is over is about this place.
  */
 enum ThVerdict touch_keeper_verdict(long x, long y, TbBool settled, float longpress_ms, long long now);
-enum ThClick touch_keeper_click_due(long x, long y, TbBool settled, float longpress_ms, long long now);
+TbBool touch_keeper_drop_due(long x, long y, TbBool settled, float longpress_ms);
 TbBool touch_keeper_long_press_gives_way(long x, long y, TbBool settled, float longpress_ms);
 void touch_keeper_long_press_ended(float longpress_ms);
 

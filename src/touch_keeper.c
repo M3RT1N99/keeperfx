@@ -24,6 +24,7 @@
 #include "pre_inc.h"
 #include "touch_keeper.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "bflib_touch.h"
@@ -46,6 +47,7 @@
 #include "replay.h"
 #include "thing_creature.h"
 #include "thing_data.h"
+#include "touch_camera.h"
 #include "post_inc.h"
 
 #ifdef __cplusplus
@@ -129,9 +131,19 @@ void touch_keeper_stroke_moved(long long ms)
     th_stroke_moved(the_hand(), ms);
 }
 
-void touch_keeper_stroke_end(void)
+void touch_keeper_stroke_cancel(void)
 {
-    th_stroke_end(the_hand());
+    th_stroke_cancel(the_hand());
+}
+
+enum ThLift touch_keeper_stroke_lift(void)
+{
+    return th_stroke_lift(the_hand(), touch_keeper_in_force());
+}
+
+TbBool touch_keeper_start_unseen(void)
+{
+    return th_stroke_start_unseen(the_hand()) && touch_keeper_in_force();
 }
 
 static void current_tuning(float longpress_ms, struct ThTuning *tuning)
@@ -145,6 +157,15 @@ static void current_tuning(float longpress_ms, struct ThTuning *tuning)
     tuning->rest_px = (float)MyScreenHeight * TOUCH_HAND_REST_SHARE;
 }
 
+#ifdef __ANDROID__
+/** An own creature a right click with an empty hand would slap. */
+static TbBool own_slappable(const struct Thing *thing)
+{
+    return !thing_is_invalid(thing) && thing_is_creature(thing) && (thing->owner == my_player_number)
+        && thing_slappable(thing, my_player_number);
+}
+#endif
+
 static void what_is_seen(long x, long y, TbBool settled, struct ThSees *sees)
 {
     memset(sees, 0, sizeof(*sees));
@@ -154,24 +175,27 @@ static void what_is_seen(long x, long y, TbBool settled, struct ThSees *sees)
     sees->y = (float)y;
     sees->in_force = touch_keeper_in_force() && !touch_keeper_over_gui(x, y);
 #ifdef __ANDROID__
-    if (!sees->in_force || !settled)
+    if (!sees->in_force)
+        return;
+    const struct Dungeon *dungeon = get_my_dungeon();
+    // The hand is the simulation's, whatever the pointer is over.
+    sees->hand = dungeon->num_things_in_hand;
+    if (!settled)
         return;
     struct Coord3d pos;
     unsigned char context;
     ThingIndex under;
     if (!touch_pointer_place(&pos, &context, &under))
         return;
-    const struct Dungeon *dungeon = get_my_dungeon();
     sees->known = 1;
-    sees->hand = dungeon->num_things_in_hand;
     sees->wall = (context == CSt_PickAxe);
     sees->door = (context == CSt_DoorKey);
     // With nothing in the hand yet this only asks about a place to wait at, so the generous answer.
     const TbBool on_path = (sees->hand > 0) ? is_creature_droppable_on_path(thing_get(dungeon->things_in_hand[0])) : true;
     sees->droppable = can_drop_thing_here(coord_subtile(pos.x.val), coord_subtile(pos.y.val), my_player_number, on_path);
-    const struct Thing *thing = thing_get(under);
     sees->thing = (under != 0);
-    if ((under != 0) && thing_is_creature(thing) && (thing->owner == my_player_number) && thing_slappable(thing, my_player_number))
+    // The game only looks for a thing under the hand where a left button would not dig.
+    if ((under != 0) && own_slappable(thing_get(under)))
         sees->creature = under;
 #endif
 }
@@ -185,13 +209,71 @@ enum ThVerdict touch_keeper_verdict(long x, long y, TbBool settled, float longpr
     return th_decide(the_hand(), &sees, &tuning, now);
 }
 
-enum ThClick touch_keeper_click_due(long x, long y, TbBool settled, float longpress_ms, long long now)
+TbBool touch_keeper_drop_due(long x, long y, TbBool settled, float longpress_ms)
 {
     struct ThSees sees;
     struct ThTuning tuning;
     what_is_seen(x, y, settled, &sees);
     current_tuning(longpress_ms, &tuning);
-    return th_click_due(the_hand(), &sees, &tuning, now);
+    return th_drop_due(the_hand(), &sees, &tuning);
+}
+
+void touch_keeper_look_at_start(long x, long y)
+{
+    struct ThSees sees;
+    what_is_seen(x, y, true, &sees);
+    th_stroke_look(the_hand(), &sees);
+}
+
+void touch_keeper_stroke_path(long x0, long y0, long x1, long y1, long long now)
+{
+#ifdef __ANDROID__
+    struct ThHand *h = the_hand();
+    if (!th_stroke_looks_for_crossings(h))
+        return;
+    struct ThSees sees;
+    struct ThTuning tuning;
+    what_is_seen(x1, y1, false, &sees);
+    // A long press plays no part in what a path crosses.
+    current_tuning(0.0f, &tuning);
+    const float step = touch_camera_floor_step_px();
+    if (!sees.in_force || (step <= 0.0f))
+        return;
+    float xs[TH_PATH_SAMPLES];
+    float ys[TH_PATH_SAMPLES];
+    const int count = th_path_samples((float)x0, (float)y0, (float)x1, (float)y1, step, xs, ys, TH_PATH_SAMPLES);
+    for (int i = 0; i < count; i++)
+    {
+        MapCoord pos_x;
+        MapCoord pos_y;
+        if (touch_keeper_over_gui((long)xs[i], (long)ys[i]) || !touch_camera_floor_at(xs[i], ys[i], &pos_x, &pos_y))
+            continue;
+        // The same search the game makes for the thing under the hand, from the floor under this point.
+        const struct Thing *thing = get_nearest_thing_for_hand_or_slap(my_player_number, pos_x, pos_y);
+        if (own_slappable(thing) && th_stroke_crossed(h, &sees, &tuning, thing->index, xs[i], ys[i], now))
+            return;
+    }
+#endif
+}
+
+TbBool touch_keeper_slap_aim(long *x, long *y)
+{
+    float aim_x;
+    float aim_y;
+    if (!th_slap_aim(the_hand(), &aim_x, &aim_y))
+        return false;
+    *x = lroundf(aim_x);
+    *y = lroundf(aim_y);
+    return true;
+}
+
+TbBool touch_keeper_slap_now(long x, long y)
+{
+    struct ThSees sees;
+    struct ThTuning tuning;
+    what_is_seen(x, y, true, &sees);
+    current_tuning(0.0f, &tuning);
+    return th_slap_now(the_hand(), &sees, &tuning);
 }
 
 TbBool touch_keeper_long_press_gives_way(long x, long y, TbBool settled, float longpress_ms)

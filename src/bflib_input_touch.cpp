@@ -233,6 +233,11 @@ static TbBool touch_panel_click = false;
 /** A tap on the map while the panel had the pointer, and where. */
 static TbBool touch_map_tap_owed = false;
 static long touch_map_tap_x, touch_map_tap_y;
+/** The pointer is the slap's, at a creature a finger went over, until the game has read the click. */
+static TbBool touch_slap_click = false;
+/** It has just gone there, and the slap waits for a frame drawn with it there. */
+static TbBool touch_slap_aimed = false;
+static long touch_slap_x, touch_slap_y;
 
 /**
  * A frame has been drawn with the pointer where it is. The game's answer to what the pointer
@@ -392,8 +397,10 @@ static void touch_reset_state(void)
     touch_panel_click_wanted = false;
     touch_panel_click = false;
     touch_map_tap_owed = false;
+    touch_slap_click = false;
+    touch_slap_aimed = false;
     touch_pointer_settled = false;
-    touch_keeper_stroke_end();
+    touch_keeper_stroke_cancel();
 }
 
 void touch_focus_lost(void)
@@ -660,7 +667,16 @@ static void touch_normalized_to_game(float nx, float ny, long *x, long *y)
 /** The game's idea of what the pointer is over is about the finger on the map right now. */
 static TbBool touch_hand_sees_finger(void)
 {
-    return touch_pointer_settled && !touch_panel_click && !touch_panel_click_wanted;
+    return touch_pointer_settled && !touch_panel_click && !touch_panel_click_wanted && !touch_slap_click;
+}
+
+/**
+ * The pointer goes where the finger goes, unless a click elsewhere has it or the hand's rules
+ * are still to see what the finger landed on.
+ */
+static TbBool touch_pointer_follows_finger(void)
+{
+    return !touch_panel_click && !touch_slap_click && !touch_keeper_start_unseen();
 }
 
 /**
@@ -858,27 +874,30 @@ void TEvent(const SDL_Event *ev)
         {
             // Put the pointer where the player touched right away, so the
             // cursor sprite and any hover highlight track the finger.
-            if (!touch_panel_click)
+            if (!touch_panel_click && !touch_slap_click)
                 touch_move_pointer(finger->x, finger->y);
             touch_pointer_settled = false;
             touch_gesture = TGest_Point;
             touch_contact_start_ticks = finger->down_ticks;
             touch_contact_moved = false;
             if (!finger->on_gui)
+            {
                 touch_keeper_stroke_begin((long long)finger->down_ticks);
+                touch_keeper_stroke_path(finger->x, finger->y, finger->x, finger->y, (long long)finger->down_ticks);
+            }
         }
         else if (touch_finger_count == 2)
         {
             // A second finger cancels whatever the first one started.
             touch_release_buttons();
-            touch_keeper_stroke_end();
+            touch_keeper_stroke_cancel();
             touch_spoil_beside_fingers();
             touch_begin_camera_gesture();
         }
         else
         {
             touch_release_buttons();
-            touch_keeper_stroke_end();
+            touch_keeper_stroke_cancel();
             touch_spoil_beside_fingers();
             touch_reset_gesture_axes();
             touch_camera_release(NULL, false);
@@ -892,6 +911,8 @@ void TEvent(const SDL_Event *ev)
         struct TouchFinger *finger = touch_find(ev->tfinger.fingerID);
         if (finger == NULL)
             break;
+        const long from_x = finger->x;
+        const long from_y = finger->y;
         touch_normalized_to_game(ev->tfinger.x, ev->tfinger.y, &finger->x, &finger->y);
         const long travel_x = finger->x - finger->start_x;
         const long travel_y = finger->y - finger->start_y;
@@ -916,7 +937,11 @@ void TEvent(const SDL_Event *ev)
         }
         else if ((touch_finger_count == 1) && (touch_gesture != TGest_Blocked))
         {
-            if (!touch_panel_click)
+            // What it went over counts before anything is decided: a stroke from a wall swipes
+            // because of it, and a flick may lift before the next event.
+            if ((touch_gesture == TGest_Point) || (touch_gesture == TGest_Hand))
+                touch_keeper_stroke_path(from_x, from_y, finger->x, finger->y, (long long)touch_event_ms(ev));
+            if (touch_pointer_follows_finger())
                 touch_move_pointer(finger->x, finger->y);
             touch_start_drag_when_due(finger, touch_event_ms(ev));
         }
@@ -954,16 +979,22 @@ void TEvent(const SDL_Event *ev)
         }
         if (touch_finger_count > 0)
             touch_finger_count--;
-        touch_keeper_stroke_end();
+        enum ThLift lift = ThL_Tap;
+        if (canceled)
+            touch_keeper_stroke_cancel();
+        else
+            lift = touch_keeper_stroke_lift();
 
         if (touch_finger_count == 0)
         {
             switch (touch_gesture)
             {
             case TGest_Point:
-                // Moved and still a point: a stroke over before the second finger's grace
-                // was. Without the grace that would have been a press, so it still is.
-                if (!canceled && (moved || (held_ms <= TOUCH_TAP_MAX_MS)))
+                // Moved and still a point: a stroke over before the second finger's grace was.
+                // Where the hand's rules are not in force that would have been a press without
+                // the grace, so it still is; where they are, it was a flick, which clicks nothing
+                // and leaves the slap of what it crossed to touch_serve_hand().
+                if (!canceled && (lift == ThL_Tap) && (moved || (held_ms <= TOUCH_TAP_MAX_MS)))
                 {
                     if (touch_panel_click || touch_panel_click_wanted)
                     {
@@ -1090,7 +1121,6 @@ static void touch_serve_steering(void)
  */
 static void touch_serve_hand(void)
 {
-    const Uint64 now = SDL_GetTicks();
     struct TouchFinger *finger = (touch_finger_count == 1) ? touch_gesture_finger(NULL) : NULL;
     if (touch_gesture == TGest_LongTap)
     {
@@ -1111,9 +1141,10 @@ static void touch_serve_hand(void)
     if (touch_click_pending || touch_right_click_pending || left_button_held || right_button_held
      || lbDisplay.LeftButton || lbDisplay.RightButton)
         return;
-    if (touch_panel_click)
+    if (touch_panel_click || (touch_slap_click && !touch_slap_aimed))
     {
         touch_panel_click = false;
+        touch_slap_click = false;
         if (touch_map_tap_owed)
             touch_move_pointer(touch_map_tap_x, touch_map_tap_y);
         else if (finger != NULL)
@@ -1137,21 +1168,29 @@ static void touch_serve_hand(void)
         }
         return;
     }
+    // A creature a swipe or a flick went over gets its slap where it was found. The game has to
+    // have drawn a frame with the pointer there before it can say what a right click there hits.
+    if (touch_slap_aimed)
+    {
+        if (!touch_pointer_settled)
+            return;
+        touch_slap_aimed = false;
+        if (touch_keeper_slap_now(touch_slap_x, touch_slap_y))
+            touch_right_click_whole();
+        return;
+    }
+    if (((finger == NULL) || (touch_gesture == TGest_Hand)) && touch_keeper_slap_aim(&touch_slap_x, &touch_slap_y))
+    {
+        touch_slap_click = true;
+        touch_slap_aimed = true;
+        touch_move_pointer(touch_slap_x, touch_slap_y);
+        touch_pointer_settled = false;
+        return;
+    }
     if ((finger == NULL) || (touch_gesture != TGest_Hand))
         return;
-    switch (touch_keeper_click_due(finger->x, finger->y, touch_pointer_settled, touch_longpress_ms, (long long)now))
-    {
-    case ThC_Drop:
-    case ThC_Slap:
+    if (touch_keeper_drop_due(finger->x, finger->y, touch_hand_sees_finger(), touch_longpress_ms))
         touch_right_click_whole();
-        break;
-    case ThC_PressLeft:
-        touch_gesture = TGest_Drag;
-        touch_press_left();
-        break;
-    default:
-        break;
-    }
 }
 
 /**
@@ -1232,6 +1271,17 @@ void update_touch_inputs(void)
             struct TouchFinger *finger = &touch_fingers[i];
             if (!finger->active || finger->beside)
                 continue;
+            // What the finger landed on is read where it landed, from the frame the pointer waited
+            // there for, and then the pointer catches up with a finger that went on meanwhile.
+            if (touch_keeper_start_unseen() && touch_hand_sees_finger())
+            {
+                touch_keeper_look_at_start(finger->start_x, finger->start_y);
+                if ((finger->x != finger->start_x) || (finger->y != finger->start_y))
+                {
+                    touch_move_pointer(finger->x, finger->y);
+                    touch_pointer_settled = false;
+                }
+            }
             // A finger that stopped within the grace sends no more motion to start its drag.
             // The queue was emptied just before this, so no second finger can be waiting.
             touch_start_drag_when_due(finger, SDL_GetTicks());

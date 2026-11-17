@@ -165,6 +165,48 @@ static float surface_height_at(const struct TgView *view, const struct TgCamera 
     return 0.0f;
 }
 
+/** The camera of the dungeon view as it was last drawn, if that is a view the floor can be found in. */
+static const struct Camera *shown_floor_camera(struct TgView *view, struct TgCamera *pose)
+{
+    if (!local_state.camera.ready || !touch_camera_owns_view() || (get_local_map_fade() != PVT_None))
+        return NULL;
+    const int idx = active_camera_index();
+    if ((idx != CamIV_Isometric) && (idx != CamIV_FrontView))
+        return NULL;
+    const struct Camera *cam = &local_state.camera.current[idx];
+    view_of_camera(cam, idx, view);
+    pose_of_camera(cam, pose);
+    return cam;
+}
+
+TbBool touch_camera_floor_at(float sx, float sy, MapCoord *x, MapCoord *y)
+{
+    struct TgView view;
+    struct TgCamera pose;
+    if (shown_floor_camera(&view, &pose) == NULL)
+        return false;
+    float gx;
+    float gy;
+    // The floor of a dug out slab is one subtile high, and that is where creatures walk.
+    tg_screen_to_ground(&view, &pose, (float)COORD_PER_STL, sx, sy, &gx, &gy);
+    if ((gx < 0.0f) || (gy < 0.0f) || (gx > view.limit_x) || (gy > view.limit_y))
+        return false;
+    *x = (MapCoord)gx;
+    *y = (MapCoord)gy;
+    return true;
+}
+
+float touch_camera_floor_step_px(void)
+{
+    struct TgView view;
+    struct TgCamera pose;
+    if (shown_floor_camera(&view, &pose) == NULL)
+        return 0.0f;
+    // The floor is squashed in the up and down of the screen, so that is the short way.
+    const float squash = (view.squash < 1.0f) ? view.squash : 1.0f;
+    return 0.5f * (float)COORD_PER_STL * pose.zoom * view.px_per_zoom * squash;
+}
+
 static TbBool moved_by_something_else(const struct Camera *cam, int idx)
 {
     struct TgCamera pose;

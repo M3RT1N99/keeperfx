@@ -70,6 +70,18 @@ uint32_t touch_camera_take_zoom_flags(void);
 /** True where two fingers move the camera directly, rather than through game keys. */
 TbBool touch_camera_owns_view(void);
 
+/**
+ * Where a pixel of the screen meets the floor in the dungeon view as it is shown, the way the game
+ * points at the floor under the hand. @return false off the map or in any other view.
+ */
+TbBool touch_camera_floor_at(float sx, float sy, MapCoord *x, MapCoord *y);
+
+/**
+ * The longest step on the screen that stays within half a subtile on the floor, in any direction;
+ * 0 when there is no dungeon view to step in.
+ */
+float touch_camera_floor_step_px(void);
+
 /******************************************************************************/
 #ifdef __cplusplus
 }

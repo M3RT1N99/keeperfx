@@ -19,6 +19,7 @@
 /******************************************************************************/
 #include "touch_hand.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -121,6 +122,22 @@ static void end_of_turn(void)
 }
 
 /*
+ * A slap the way the wiring makes one: the finger's path went over the creature under it,
+ * the pointer went where that was, and the game says what is under it there.
+ */
+static int slap_with(const struct ThTuning *t)
+{
+    if (sees.creature != 0)
+        th_stroke_crossed(&h, &sees, t, sees.creature, sees.x, sees.y, now);
+    float aim_x;
+    float aim_y;
+    if (!th_slap_aim(&h, &aim_x, &aim_y))
+        return 0;
+    CHECK((aim_x == sees.x) && (aim_y == sees.y), "aimed where it was found, %g,%g", (double)aim_x, (double)aim_y);
+    return th_slap_now(&h, &sees, t);
+}
+
+/*
  * Runs for a while with a look every 16 ms, the way the polls come: at most one click
  * read per turn, because the wiring only asks when the button is free.
  */
@@ -131,12 +148,9 @@ static void run_ms(int ms)
         refresh();
         if (rubbing)
             sees.x = (float)((now / 16) % 40) * 8.0f;
-        if (th_decide(&h, &sees, &tuning, now) == ThV_Hand) {
-            if (!right_click_waiting) {
-                const enum ThClick click = th_click_due(&h, &sees, &tuning, now);
-                if ((click == ThC_Drop) || (click == ThC_Slap))
-                    right_click_waiting = 1;
-            }
+        if ((th_decide(&h, &sees, &tuning, now) == ThV_Hand) && !right_click_waiting) {
+            if (th_drop_due(&h, &sees, &tuning) || slap_with(&tuning))
+                right_click_waiting = 1;
         }
         if ((now % TURN_MS) < 16)
             end_of_turn();
@@ -198,7 +212,7 @@ static void test_a_rate_between_turns_keeps_to_it(void)
         now += 16;
         refresh();
         if ((th_decide(&h, &sees, &between, now) == ThV_Hand) && !right_click_waiting
-         && (th_click_due(&h, &sees, &between, now) == ThC_Drop))
+         && th_drop_due(&h, &sees, &between))
             right_click_waiting = 1;
         if ((now % TURN_MS) < 16)
             end_of_turn();
@@ -217,7 +231,7 @@ static void test_a_rate_between_turns_keeps_to_it(void)
         now += 16;
         refresh();
         if ((th_decide(&h, &sees, &fastest, now) == ThV_Hand) && !right_click_waiting
-         && (th_click_due(&h, &sees, &fastest, now) == ThC_Drop))
+         && th_drop_due(&h, &sees, &fastest))
             right_click_waiting = 1;
         if ((now % TURN_MS) < 16)
             end_of_turn();
@@ -231,16 +245,16 @@ static void test_a_rate_between_turns_keeps_to_it(void)
     refresh();
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "armed before this turn's packet");
     th_note_packet(&h, game_turn, 0, 0, 0);
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "the first goes out one packet later");
+    CHECK(th_drop_due(&h, &sees, &tuning), "the first goes out one packet later");
     game_turn += 1;
     refresh();
     th_note_packet(&h, game_turn, 0, 1, 0);
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "not in the next packet");
+    CHECK(!th_drop_due(&h, &sees, &tuning), "not in the next packet");
     game_turn += 1;
     refresh();
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "nor in this one");
+    CHECK(!th_drop_due(&h, &sees, &tuning), "nor in this one");
     th_note_packet(&h, game_turn, 0, 0, 0);
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "two packets on from the first");
+    CHECK(th_drop_due(&h, &sees, &tuning), "two packets on from the first");
     // A click made after the turn's packet goes out in the next one, and the rate counts from there.
     begin(5, 0);
     th_stroke_begin(&h, now);
@@ -248,15 +262,15 @@ static void test_a_rate_between_turns_keeps_to_it(void)
     refresh();
     th_note_packet(&h, game_turn, 0, 0, 0);
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "armed");
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "the first, for the next packet");
+    CHECK(th_drop_due(&h, &sees, &tuning), "the first, for the next packet");
     game_turn += 1;
     refresh();
     th_note_packet(&h, game_turn, 0, 1, 0);
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "the next packet would be one turn on");
+    CHECK(!th_drop_due(&h, &sees, &tuning), "the next packet would be one turn on");
     game_turn += 1;
     refresh();
     th_note_packet(&h, game_turn, 0, 0, 0);
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "after this turn's packet: two turns on");
+    CHECK(th_drop_due(&h, &sees, &tuning), "after this turn's packet: two turns on");
 }
 
 static void test_no_slap_after_a_rain_at_any_lag(void)
@@ -299,7 +313,7 @@ static void test_a_tap_on_the_floor_with_a_full_hand_drops_nothing(void)
     begin(8, 0);
     th_stroke_begin(&h, now);
     run_ms(100);
-    th_stroke_end(&h);
+    CHECK(th_stroke_lift(&h, 1) == ThL_Tap, "a tap");
     run_ms(500);
     CHECK(drops == 0, "drops %d", drops);
 }
@@ -337,7 +351,7 @@ static void test_out_of_force_stays_today(void)
     CHECK(drops == 0, "drops %d", drops);
     refresh();
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "today");
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "no click");
+    CHECK(!th_drop_due(&h, &sees, &tuning), "no click");
     // A rain that goes over the panel holds off and goes on behind it.
     begin(5, 0);
     th_stroke_begin(&h, now);
@@ -447,20 +461,23 @@ static void test_a_long_press_on_a_creature_with_an_empty_hand(void)
     refresh();
     CHECK(th_long_press_gives_way(&h, &sees, &tuning), "it gives way");
     now += 16;
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "the release was the first drop");
+    CHECK(!th_drop_due(&h, &sees, &tuning), "the release was the first drop");
     game_turn += 2;
     refresh();
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Drop, "then at the rate");
+    CHECK(th_drop_due(&h, &sees, &tuning), "then at the rate");
 }
 
 static void test_a_long_press_on_a_wall_stays(void)
 {
+    // Open until the long press time, since a quick start could still cross a creature; then today.
     begin(0, 0);
     sees.wall = 1;
     th_stroke_begin(&h, now);
     run_ms(16);
     refresh();
-    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "today, and the wiring times the long press");
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Wait, "a wall, still open");
+    now += 420;
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "today at the long press time, and the wiring presses");
     begin(0, 0);
     sees.door = 1;
     th_stroke_begin(&h, now);
@@ -525,16 +542,16 @@ static void test_the_slap_rate_keeps_a_creature_waiting(void)
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
     sees.thing = 1;
     sees.creature = CREATURE_A;
-    CHECK(th_click_due(&h, &sees, &slow, now) == ThC_Slap, "the first");
+    CHECK(slap_with(&slow), "the first");
     th_note_packet(&h, sees.turn, sees.lag, 1, 0);
     game_turn += 6;
     now += 300;
     refresh();
     sees.x += 20.0f;
-    CHECK(th_click_due(&h, &sees, &slow, now) == ThC_None, "under the rate");
+    CHECK(!slap_with(&slow), "under the rate");
     // Another one does not wait for this one's rate, only for the whip.
     sees.creature = CREATURE_B;
-    CHECK(th_click_due(&h, &sees, &slow, now) == ThC_Slap, "the next creature");
+    CHECK(slap_with(&slow), "the next creature");
     th_note_packet(&h, sees.turn, sees.lag, 1, 0);
     now += 16;
     sees.creature = CREATURE_A;
@@ -542,14 +559,16 @@ static void test_the_slap_rate_keeps_a_creature_waiting(void)
     game_turn += 1;
     now += 200;
     refresh();
-    CHECK(th_click_due(&h, &sees, &slow, now) == ThC_None, "the whip is still on its way");
+    CHECK(!slap_with(&slow), "the whip is still on its way");
     game_turn += 3;
     refresh();
-    CHECK(th_click_due(&h, &sees, &slow, now) == ThC_Slap, "and over");
+    CHECK(slap_with(&slow), "and over");
 }
 
-static void test_a_slow_stroke_stays_what_it_is(void)
+static void test_a_slow_stroke_does_nothing(void)
 {
+    // Over a creature, from the floor: no slap, and no left button, which would pick up or mark
+    // wherever the finger is once it has travelled.
     begin(0, 0);
     sees.thing = 1;
     sees.creature = CREATURE_A;
@@ -557,8 +576,15 @@ static void test_a_slow_stroke_stays_what_it_is(void)
     run_ms(300);
     th_stroke_moved(&h, now);
     refresh();
-    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "the ordinary drag");
-    CHECK(slaps == 0, "slaps %d", slaps);
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "the hand's, not the ordinary drag");
+    rubbing = 1;
+    run_ms(1000);
+    CHECK((slaps == 0) && (drops == 0), "slaps %d drops %d", slaps, drops);
+    // What the other hand fetches meanwhile still falls.
+    rubbing = 0;
+    pick_waiting = 1;
+    run_ms(300);
+    CHECK((drops == 1) && (slaps == 0), "drops %d slaps %d", drops, slaps);
 }
 
 static void test_a_swipe_counts_what_is_under_way(void)
@@ -573,7 +599,7 @@ static void test_a_swipe_counts_what_is_under_way(void)
     sees.thing = 1;
     sees.creature = CREATURE_A;
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "it goes on as a finger that drops");
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "and sends no slap");
+    CHECK(!th_drop_due(&h, &sees, &tuning) && !slap_with(&tuning), "and sends no slap");
     // A swipe already going when the other hand's click goes out: the same.
     begin(0, 8);
     th_stroke_begin(&h, now);
@@ -584,10 +610,11 @@ static void test_a_swipe_counts_what_is_under_way(void)
     th_note_packet(&h, sees.turn, sees.lag, 0, 1);
     sees.thing = 1;
     sees.creature = CREATURE_A;
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "no slap with a pick up on its way");
+    CHECK(!slap_with(&tuning), "no slap with a pick up on its way");
     game_turn += 9;
     refresh();
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Slap, "once that has landed or come to nothing");
+    sees.x += 20.0f;
+    CHECK(slap_with(&tuning), "once that has landed or come to nothing");
     // The hand reads one and that one is on its way out: empty by the time this arrives.
     begin(1, 8);
     th_stroke_begin(&h, now);
@@ -598,15 +625,26 @@ static void test_a_swipe_counts_what_is_under_way(void)
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
     sees.thing = 1;
     sees.creature = CREATURE_A;
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "under the whip's turns, as a right click just went");
+    CHECK(!slap_with(&tuning), "under the whip's turns, as a right click just went");
     game_turn += 4;
     refresh();
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Slap, "it slaps");
+    CHECK(slap_with(&tuning), "it slaps");
+    // A pick up the other hand sends while the slap's pointer is on its way: no right click.
+    begin(0, 8);
+    th_stroke_begin(&h, now);
+    th_stroke_moved(&h, now);
+    now += 100;
+    refresh();
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
+    CHECK(th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 50.0f, 60.0f, now), "crossed");
+    th_note_packet(&h, sees.turn, sees.lag, 0, 1);
+    sees.creature = CREATURE_A;
+    CHECK(!th_slap_now(&h, &sees, &tuning), "not with the pick up on its way");
 }
 
 static void test_a_quick_stroke_reaching_a_wall(void)
 {
-    // Nothing crossed yet: from the wall on it is the ordinary drag, so tagging is not lost.
+    // From the floor nothing presses the left button: no marks, wherever the finger goes.
     begin(0, 0);
     th_stroke_begin(&h, now);
     th_stroke_moved(&h, now + 30);
@@ -615,34 +653,209 @@ static void test_a_quick_stroke_reaching_a_wall(void)
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
     sees.wall = 1;
     now += 16;
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_PressLeft, "the left button");
     refresh();
-    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "and today's drag from here");
-    // A creature crossed: it stays a swipe.
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "still the hand's on the wall");
+    CHECK(!th_drop_due(&h, &sees, &tuning) && !slap_with(&tuning), "and nothing to click there");
+    CHECK(th_stroke_lift(&h, 1) == ThL_Tap, "the lift of a decided finger clicks nothing more either");
+}
+
+static void test_a_stroke_from_a_wall(void)
+{
+    // Quick, nothing crossed by the time the drag would press: the ordinary drag, which marks.
     begin(0, 0);
+    sees.wall = 1;
     th_stroke_begin(&h, now);
-    th_stroke_moved(&h, now + 30);
+    refresh();
+    th_stroke_look(&h, &sees);
+    th_stroke_moved(&h, now + 40);
+    sees.wall = 0;
     now += 100;
     refresh();
-    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
-    sees.thing = 1;
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "it marks as it always did");
+    // Quick, and over an own creature before that: a swipe, and the creature gets its slap.
+    begin(0, 0);
+    sees.wall = 1;
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    sees.wall = 0;
+    th_stroke_moved(&h, now + 40);
+    now += 60;
+    refresh();
+    CHECK(th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, now), "crossed, and kept for later");
+    float aim_x;
+    float aim_y;
+    CHECK(!th_slap_aim(&h, &aim_x, &aim_y), "no slap before it is decided");
+    now += 40;
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe after all");
+    CHECK(th_slap_aim(&h, &aim_x, &aim_y) && (aim_x == 300.0f) && (aim_y == 200.0f), "aimed where it was found");
     sees.creature = CREATURE_A;
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Slap, "a slap");
-    sees.thing = 0;
-    sees.creature = 0;
+    CHECK(th_slap_now(&h, &sees, &tuning), "slapped");
+    // Slow, crossing or not: the ordinary drag.
+    begin(0, 0);
     sees.wall = 1;
-    now += 16;
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "no left button on the wall after it");
-    // A door on the way is no wall: the press would lock it.
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    sees.wall = 0;
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, now + 100);
+    th_stroke_moved(&h, now + 300);
+    now += 310;
+    refresh();
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "slow: it marks");
+    CHECK(!th_slap_aim(&h, &aim_x, &aim_y), "and slaps nothing");
+    // With a hand, or from a door: as it always was.
+    begin(2, 0);
+    sees.wall = 1;
+    sees.droppable = 0;
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, now);
+    th_stroke_moved(&h, now + 40);
+    now += 100;
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "with a hand it marks");
+    begin(0, 0);
+    sees.door = 1;
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    sees.door = 0;
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 300.0f, 200.0f, now);
+    th_stroke_moved(&h, now + 40);
+    now += 100;
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "from a door: today");
+}
+
+static void test_a_flick(void)
+{
+    float aim_x;
+    float aim_y;
+    // Over a creature from the floor, lifted inside the grace: no click where it ended, a slap where the creature was.
     begin(0, 0);
     th_stroke_begin(&h, now);
-    th_stroke_moved(&h, now + 30);
+    refresh();
+    th_stroke_look(&h, &sees);
+    sees.x = 140.0f;
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30);
+    th_stroke_moved(&h, now + 40);
+    now += 70;
+    refresh();
+    CHECK(th_stroke_lift(&h, 1) == ThL_Flick, "a flick, not a tap");
+    CHECK(th_slap_aim(&h, &aim_x, &aim_y) && (aim_x == 120.0f) && (aim_y == 80.0f), "its slap waits past the lift");
+    sees.creature = CREATURE_A;
+    CHECK(th_slap_now(&h, &sees, &tuning), "and goes out");
+    CHECK(!th_slap_aim(&h, &aim_x, &aim_y), "once");
+    // Where the game says the pointer would hit a wall there, no right click: it would take a dig mark off.
+    begin(0, 0);
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30);
+    th_stroke_moved(&h, now + 40);
+    CHECK(th_stroke_lift(&h, 1) == ThL_Flick, "a flick");
+    sees.wall = 1;
+    sees.creature = 0;
+    CHECK(!th_slap_now(&h, &sees, &tuning), "no click on the wall beside it");
+    CHECK(!th_slap_aim(&h, &aim_x, &aim_y), "and nothing left waiting");
+    // Over nothing: nothing at all.
+    begin(0, 0);
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    th_stroke_moved(&h, now + 40);
+    CHECK((th_stroke_lift(&h, 1) == ThL_Flick) && !th_slap_aim(&h, &aim_x, &aim_y), "nothing");
+    // From a wall, or with a hand: nothing.
+    begin(0, 0);
+    sees.wall = 1;
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    sees.wall = 0;
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30);
+    th_stroke_moved(&h, now + 40);
+    CHECK((th_stroke_lift(&h, 1) == ThL_Flick) && !th_slap_aim(&h, &aim_x, &aim_y), "from a wall");
+    begin(3, 0);
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    CHECK(!th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30), "a hand crosses nothing");
+    th_stroke_moved(&h, now + 40);
+    CHECK((th_stroke_lift(&h, 1) == ThL_Flick) && !th_slap_aim(&h, &aim_x, &aim_y), "with a hand");
+    // Before anything showed where it landed: nothing.
+    begin(0, 0);
+    th_stroke_begin(&h, now);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 10);
+    th_stroke_moved(&h, now + 20);
+    CHECK((th_stroke_lift(&h, 1) == ThL_Flick) && !th_slap_aim(&h, &aim_x, &aim_y), "start unknown");
+    // A finger that did not travel stays a tap, even one that landed on a creature.
+    begin(0, 0);
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now);
+    CHECK((th_stroke_lift(&h, 1) == ThL_Tap) && !th_slap_aim(&h, &aim_x, &aim_y), "a tap");
+    // Where the rules are not in force, a stroke over before the grace is the press it always was.
+    begin(0, 0);
+    th_stroke_begin(&h, now);
+    th_stroke_moved(&h, now + 40);
+    CHECK(th_stroke_lift(&h, 0) == ThL_Tap, "out of force");
+    // A second finger: nothing the first one crossed is slapped.
+    begin(0, 0);
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    th_stroke_crossed(&h, &sees, &tuning, CREATURE_A, 120.0f, 80.0f, now + 30);
+    th_stroke_moved(&h, now + 40);
+    th_stroke_cancel(&h);
+    CHECK(!th_slap_aim(&h, &aim_x, &aim_y), "a grip");
+}
+
+static void test_where_it_landed(void)
+{
+    // What it landed on is read once, where it landed, and a wall it reaches later is no start.
+    begin(0, 0);
+    th_stroke_begin(&h, now);
+    CHECK(th_stroke_start_unseen(&h), "the pointer waits where it landed");
+    sees.known = 0;
+    th_stroke_look(&h, &sees);
+    CHECK(!th_stroke_start_unseen(&h), "one frame, whatever the game could say");
+    sees.known = 1;
+    th_stroke_moved(&h, now + 40);
+    sees.wall = 1;
     now += 100;
     refresh();
-    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
-    sees.door = 1;
-    now += 16;
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_None, "over a door");
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "an unknown start read later, here on a wall");
+    begin(0, 0);
+    th_stroke_begin(&h, now);
+    refresh();
+    th_stroke_look(&h, &sees);
+    th_stroke_moved(&h, now + 40);
+    sees.wall = 1;
+    now += 100;
+    refresh();
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "the floor it landed on");
+}
+
+static void test_the_path_samples(void)
+{
+    float xs[TH_PATH_SAMPLES];
+    float ys[TH_PATH_SAMPLES];
+    int count = th_path_samples(0.0f, 0.0f, 100.0f, 0.0f, 10.0f, xs, ys, TH_PATH_SAMPLES);
+    CHECK(count == 10, "a point every 10 px past the start: %d", count);
+    for (int i = 0; i < count; i++)
+        CHECK((fabsf(xs[i] - 10.0f * (float)(i + 1)) < 0.001f) && (ys[i] == 0.0f), "point %d in order: %g", i, (double)xs[i]);
+    count = th_path_samples(0.0f, 0.0f, 30.0f, 40.0f, 9.0f, xs, ys, TH_PATH_SAMPLES);
+    CHECK(count == 6, "50 px at 9: %d", count);
+    for (int i = 1; i < count; i++)
+        CHECK(hypotf(xs[i] - xs[i - 1], ys[i] - ys[i - 1]) <= 9.0f, "no further apart than the step, %d", i);
+    CHECK((xs[count - 1] == 30.0f) && (ys[count - 1] == 40.0f), "the end itself");
+    count = th_path_samples(5.0f, 7.0f, 5.0f, 7.0f, 10.0f, xs, ys, TH_PATH_SAMPLES);
+    CHECK((count == 1) && (xs[0] == 5.0f) && (ys[0] == 7.0f), "where it landed: %d", count);
+    count = th_path_samples(0.0f, 0.0f, 10000.0f, 0.0f, 1.0f, xs, ys, TH_PATH_SAMPLES);
+    CHECK((count == TH_PATH_SAMPLES) && (xs[count - 1] == 10000.0f), "no more than the most: %d", count);
+    count = th_path_samples(0.0f, 0.0f, 50.0f, 0.0f, 0.0f, xs, ys, TH_PATH_SAMPLES);
+    CHECK((count == 1) && (xs[0] == 50.0f), "no step: the end alone, %d", count);
 }
 
 static void test_a_swipe_that_gets_something_drops(void)
@@ -665,7 +878,7 @@ static void test_the_finger_lifts_and_it_all_ends(void)
     begin(5, 0);
     th_stroke_begin(&h, now);
     run_ms(300);
-    th_stroke_end(&h);
+    th_stroke_lift(&h, 1);
     const int before = drops;
     run_ms(500);
     CHECK(drops == before, "drops %d, was %d", drops, before);
@@ -685,7 +898,7 @@ static void test_a_new_level_starts_the_turns_over(void)
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a swipe");
     sees.thing = 1;
     sees.creature = CREATURE_A;
-    CHECK(th_click_due(&h, &sees, &tuning, now) == ThC_Slap, "not waiting for turn 5004");
+    CHECK(slap_with(&tuning), "not waiting for turn 5004");
     CHECK(h.flights_count == 0, "and nothing under way: %d", h.flights_count);
 }
 
@@ -722,9 +935,13 @@ int touch_hand_tests(int *total_checks)
     test_a_hold_after_a_rain_is_no_slap();
     test_a_quick_stroke_with_an_empty_hand_slaps();
     test_the_slap_rate_keeps_a_creature_waiting();
-    test_a_slow_stroke_stays_what_it_is();
+    test_a_slow_stroke_does_nothing();
     test_a_swipe_counts_what_is_under_way();
     test_a_quick_stroke_reaching_a_wall();
+    test_a_stroke_from_a_wall();
+    test_a_flick();
+    test_where_it_landed();
+    test_the_path_samples();
     test_a_swipe_that_gets_something_drops();
     test_the_finger_lifts_and_it_all_ends();
     test_a_new_level_starts_the_turns_over();

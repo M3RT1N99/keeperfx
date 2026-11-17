@@ -31,6 +31,8 @@ extern "C" {
 #define TH_SLAP_MEMORY 8
 /** A stroke that has travelled by this time counts as quick, and with an empty hand it swipes. */
 #define TH_SWIPE_MS 250
+/** The most points of one piece of a finger's path that are looked at for creatures. */
+#define TH_PATH_SAMPLES 64
 
 struct ThTuning {
     float hold_ms;       /**< How long a finger rests before the hand starts to drop. */
@@ -51,7 +53,7 @@ struct ThSees {
     int wall;                  /**< A left button pressed here is a pick axe. */
     int door;                  /**< A left button pressed here locks or unlocks a door. */
     int thing;                 /**< There is something here that the hand can pick up or slap. */
-    unsigned long creature;    /**< That is an own creature, and this one; 0 when it is not. */
+    unsigned long creature;    /**< That is an own creature a right click here would slap, and this one; 0 when there is none. */
     long long turn;            /**< The game turn. */
     int lag;                   /**< Input lag: what goes out now arrives this many turns later. */
     float x, y;                /**< Where the finger is. */
@@ -62,15 +64,13 @@ enum ThVerdict {
     ThV_Wait = 0,    /**< Too early to say. */
     ThV_Today,       /**< The rules have nothing to say here: the ordinary tap, drag and long press. */
     ThV_LongPress,   /**< The ordinary long press, now. */
-    ThV_Hand,        /**< From here on the finger drops and slaps. */
+    ThV_Hand,        /**< From here on the finger drops, and a swipe slaps; it never presses a button and holds it. */
 };
 
-/** What a finger that drops and slaps wants done at this moment. */
-enum ThClick {
-    ThC_None = 0,
-    ThC_Drop,        /**< A right click: the first thing in the hand falls here. */
-    ThC_Slap,        /**< A right click: the creature here gets a slap. */
-    ThC_PressLeft,   /**< It reached a wall with nothing done yet: the ordinary drag, from here. */
+/** What a finger lifted before anything was decided about it was. */
+enum ThLift {
+    ThL_Tap = 0,     /**< The ordinary tap, a left click where it lifted. */
+    ThL_Flick,       /**< It travelled: no click, only the slap of what it crossed, if anything. */
 };
 
 /** One right click or pick up on its way through the input lag. */
@@ -88,11 +88,15 @@ struct ThSlapped {
 /** The finger on the map. */
 struct ThStroke {
     unsigned char phase;
+    unsigned char looked;        /**< A frame has been drawn with the pointer where it landed. */
     unsigned char read_start;    /**< What it landed on is known. */
+    unsigned char start_empty;   /**< It landed with nothing that will be in the hand. */
+    unsigned char start_wall;    /**< It landed where a left button presses the pick axe. */
+    unsigned char start_door;    /**< It landed on an own door. */
     unsigned char open;          /**< It landed where the rules apply. */
     unsigned char moved;         /**< It has travelled further than a tap may. */
     unsigned char swipe;         /**< It was quick, with an empty hand: it slaps what it crosses. */
-    unsigned char crossed;       /**< A swipe that has met a creature, so a wall does not turn it into a drag. */
+    unsigned char crossed;       /**< With an empty hand its path has gone over an own creature. */
     long long down_ms;
     long long moved_ms;
     double next_drop_turn;       /**< The packet the next drop is due in, with what a rate between turns carries over. */
@@ -101,12 +105,19 @@ struct ThStroke {
     struct ThSlapped slapped[TH_SLAP_MEMORY];
 };
 
+/** A creature a finger went over, waiting for its slap, and where on the screen it was found. */
+struct ThAim {
+    unsigned long creature;      /**< 0 when nothing waits. */
+    float x, y;
+};
+
 struct ThHand {
     struct ThFlight flights[TH_MAX_FLIGHTS];
     int flights_count;
     long long last_right_turn;   /**< The turn of the last right release in a packet; negative before any. */
     long long last_packet_turn;  /**< The last turn whose packet has been made, so what a click made now goes out in. */
     struct ThStroke stroke;
+    struct ThAim aim;            /**< Kept past the lift: a flick's slap goes out once the finger is gone. */
 };
 
 void th_reset(struct ThHand *h);
@@ -124,17 +135,61 @@ void th_note_packet(struct ThHand *h, long long turn, int lag, int right_release
 void th_stroke_begin(struct ThHand *h, long long ms);
 /** That finger has travelled further than a tap may. Only the first time counts. */
 void th_stroke_moved(struct ThHand *h, long long ms);
-/** It lifted, or became part of something else. */
-void th_stroke_end(struct ThHand *h);
+/** It became part of something else, or the touch went away: nothing it was going to do happens. */
+void th_stroke_cancel(struct ThHand *h);
+/**
+ * It lifted. @param in_force The plain hand is what fingers on the map work with.
+ * @return What it was, for a finger that had not started anything yet; ThL_Tap for any other.
+ */
+enum ThLift th_stroke_lift(struct ThHand *h, int in_force);
+
+/**
+ * A frame has been drawn with the pointer where the finger landed, and this is what the game says
+ * is there. Until then the pointer is to stay there, so that this is about where it landed and not
+ * about where a quick finger has got to: see th_stroke_start_unseen().
+ */
+void th_stroke_look(struct ThHand *h, const struct ThSees *s);
+/** The finger has started nothing, and no frame has shown the pointer where it landed yet. */
+int th_stroke_start_unseen(const struct ThHand *h);
 
 /** Decides what a finger that has started nothing is going to be. Ask it again until it stops waiting. */
 enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t, long long now);
 
 /**
- * What a finger that drops and slaps wants done now. It counts as done:
+ * Whether a finger that drops wants a drop now, at the pointer. It counts as done:
  * ask only when the game's pointer and buttons are free.
  */
-enum ThClick th_click_due(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t, long long now);
+int th_drop_due(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t);
+
+/**
+ * The points a finger's path is looked at for creatures, from just past (x0, y0) up to and
+ * including (x1, y1), in that order and no further apart than step. Only the first max of them
+ * when the piece is longer than that. @return How many.
+ */
+int th_path_samples(float x0, float y0, float x1, float y1, float step, float *xs, float *ys, int max);
+
+/** The finger's path is to be looked at for creatures: it has started nothing yet, or it swipes. */
+int th_stroke_looks_for_crossings(const struct ThHand *h);
+
+/**
+ * The finger's path went over an own creature that a slap can reach from (x, y), with the finger
+ * at s->x, s->y by now. @return true when that creature is to be slapped there: see th_slap_aim().
+ */
+int th_stroke_crossed(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t,
+    unsigned long creature, float x, float y, long long now);
+
+/**
+ * Where a slap waits to go out, once the pointer is free: a swipe's, or a flick's after the lift.
+ * Nothing while it is still open whether the finger swipes.
+ */
+int th_slap_aim(const struct ThHand *h, float *x, float *y);
+
+/**
+ * The pointer has been at the aim for a drawn frame, and s is what the game says is under it.
+ * @return true when the right click goes out there now, which only a creature to slap under the
+ *     hand allows: a right click also takes a dig mark off a wall. The aim is gone either way.
+ */
+int th_slap_now(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t);
 
 /**
  * A long press on something with the hand empty holds the right button until the
