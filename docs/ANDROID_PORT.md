@@ -243,9 +243,9 @@ into one synthetic mouse. `src/android.cpp` turns it off, and
 |---|---|
 | Tap | Left click at the touched point |
 | Hold about 0.42 s | Right click |
-| Drag one finger | Left button held: tag or paint |
+| Drag one finger | Left button held: tag or paint; with the plain hand only from a wall, see below |
 | Hold or drag with something in the hand | It falls under the finger, one thing at a time |
-| Quick stroke with an empty hand | Slaps the creatures it crosses |
+| Quick stroke or flick with an empty hand | Slaps the creatures it crosses |
 | Two fingers on the map | Hold the map: move, pinch and twist together |
 | Release with speed | The map rolls on; a touch catches it |
 | Two finger tap | Right click where the first finger landed |
@@ -302,16 +302,28 @@ above says. Android only: the hooks that feed them are inside `#ifdef __ANDROID_
 | Tap | Left click | Left click, so gathering loses nothing |
 | Rests on a place to drop | Waits; on a creature or a wall a right click after 0.42 s | First drop after `handhold` (0.25 s), then one every `handrain` (0.1 s), on an own creature too |
 | Rests where nothing can drop | Right click after 0.42 s | Right click after 0.42 s, which the game refuses as it always did |
-| Stroke from a place to drop | Over 30 px within 0.25 s: a swipe. Slower: the left button | Drops along the finger, at once, at the same rate. The left button is not pressed |
-| Stroke from a wall | The left button: tags and untags | The left button: tags and untags |
+| Stroke from the floor or a creature | Over 30 px within 0.25 s: a swipe. Slower: nothing, until something falls. Never the left button | Drops along the finger, at once, at the same rate. The left button is not pressed |
+| Stroke from a wall | The left button: tags and untags. A quick start that crosses an own creature before that press is a swipe | The left button: tags and untags |
+| Flick: over 30 px and lifted within the second finger's grace (0.1 s) | From the floor it slaps an own creature it crossed; from a wall nothing. Never a click where it lifted | Nothing |
 
-A swipe slaps every own creature under the finger, again and again for as long as the
-finger stays down and goes on moving, however slowly, at most once per creature every
-`slaprate` (0.15 s), and presses no left button. A finger that comes to rest on a creature
-stops slapping it. It reaches a wall with nothing crossed yet and it turns into the ordinary drag, which
-tags from there. A stroke with something in the hand that starts on a floor does not tag
-any more, one that starts on the wall does, and with an empty hand a drag whose press lands
-on the floor never tagged. Second fingers on the map are the grip and end all of this.
+What a finger landed on decides, so the pointer waits where it landed until one frame has
+been drawn there, and that frame's answer is the start.
+
+A swipe slaps the own creatures it goes over, again and again for as long as the finger
+stays down and goes on moving, however slowly, at most once per creature every `slaprate`
+(0.15 s). A finger that comes to rest on a creature stops slapping it. Nothing a stroke from
+the floor does presses the left button, so it marks no wall wherever it goes, and picks up
+nothing where it ends. Second fingers on the map are the grip and end all of this.
+
+The game only knows what is under the pointer once a frame has been drawn with it there, and
+a quick finger crosses a creature between two frames. So `touch_keeper_stroke_path()` looks at
+the finger's path itself: points no further apart than half a subtile on the floor, each
+mapped to the floor the way the grip maps fingers, each asked the game's own question for the
+thing under the hand (`get_nearest_thing_for_hand_or_slap()`), which only reads. A creature
+found there gets its slap where it was found: the pointer goes there, and once a frame has
+been drawn with it there the right click goes out, but only when the game then reports an own
+creature to slap under the hand. A right click with an empty hand also takes a dig mark off a
+wall, and the top of a wall beside a creature is where a pointer aimed at it can land.
 
 A drop and a slap are the same click: a right release drops while the hand holds something
 and slaps when it does not (`process_dungeon_control_packet_dungeon_control()`). Under input
