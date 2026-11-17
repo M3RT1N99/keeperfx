@@ -408,7 +408,8 @@ A touch the system takes away, as when the app goes to the background, is cancel
 second finger. A reset of the touch layer that comes without that, a lost focus while a finger
 still counts as down or a possession starting or ending, and any other click that lets go of the
 buttons, let go of the key with them, so they apply nothing either, unless the finger had lifted
-after moving and asked for the area.
+after moving and asked for the area. Where the drag mode is the default there is no key, and such
+a release applies the area as a lift would.
 
 ### A possessed creature
 
