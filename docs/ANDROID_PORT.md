@@ -354,7 +354,8 @@ of the pointer waits for a drawn frame. There is one pointer: a finger on the pa
 finger on the map stays out of the gesture, clicks where it lifts, and gets the pointer for its
 press and release, as on a steered creature, with the drops waiting meanwhile. A two finger tap
 that straddles the panel's edge is therefore no two finger tap; on the map or on the panel it
-is, and that with a long press is the panel's right click.
+is, and that with a long press is the panel's right click. Beside an area of walls a finger on
+the panel is a second finger, and cancels the area.
 
 A slap takes the game 4 turns, and it ignores another one meanwhile or within 10 turns of a
 drop (`magic_use_power_slap_thing()`). So 0.2 s is the most a swipe gets, whatever `slaprate`
@@ -371,8 +372,9 @@ rectangle from that slab to the finger floats on the map as the finger moves, sc
 the edge. Lifting marks every slab in it, or unmarks them when the first one was marked. Lifted
 where it rested, the area is one slab, which is what a tap is for, and a finger held on a
 creature drawn over the top of a wall has not asked for that wall: so that applies nothing. A
-second finger cancels it, and so do the rules going out of force under it: a pause, a menu, the
-level's end. Moving before the long press time is the stroke from a wall above.
+second finger cancels it, on the map or on the panel, and so do the rules going out of force
+under it: a pause, a menu, the level's end. Moving before the long press time is the stroke from
+a wall above.
 
 That is the game's own area, `drag_placement_mode`, which Shift turns on from the default
 single mode on a computer (`process_highlight_roomspace_inputs()`): the touch layer holds
@@ -385,14 +387,28 @@ lag says, and the client predicts the selection through the packets still on the
 the press for the key's action, the key held until a packet has carried the release, since a
 release read in the single mode would apply nothing, and after a cancel the release for the
 packet that carried a right click with the left button still down, which is how a mouse cancels
-one. Letting go of the left button first would apply the area. With `TAG_MODE_TOGGLING` on, the
-game takes that right click for its own reset of the mode instead, and the left button still
-down marks the slab under the finger in the single mode, as it does under a mouse: there a hold
-lifted where it rested marks that one slab. A right press no packet carries,
-as in a pause, is given up on after 0.25 s. A touch the system takes away, as when the app goes
-to the background, is cancelled like a second finger. A reset of the touch layer that comes
-without that, a lost focus while a finger still counts as down or a possession starting or
-ending, lets go of the buttons at once, which applies the area as a lift would.
+one. Letting go of the left button first would apply the area, and letting go of the key first
+would leave the rest of the drag to the single mode, which marks the slab under the pointer: so
+the key is held whatever opens meanwhile, and never let go of before the buttons.
+
+The packet after the right press decides. A slow game, a network wait or a slow frame, makes it
+late, and it still carries the click. When it does not carry it with the left button down,
+nothing later will: with `TAG_MODE_TOGGLING` on the game takes that right click for its own reset
+of the mode, and the left button still down marks the slab under the finger in the single mode,
+as it does under a mouse, so there a hold lifted where it rested marks that one slab. The area
+then lets go of the buttons and the key together, a release the game reads in the single mode
+with that mode's reset, which applies nothing. So it does when the rules go out of force under
+it: no right click, whose release would close a menu that has just opened and which a pause
+never carries, and in a pause the pointer leaves the paused message first, which would take the
+release for a click on itself and go on with the game. A game that makes no packet for 2 s while
+the rules are in force gets the same, as a last resort. Where `DEFAULT_TAG_MODE` makes the drag
+mode the default there is no key to let go of, and only the right click cancels, menu or not.
+
+A touch the system takes away, as when the app goes to the background, is cancelled like a
+second finger. A reset of the touch layer that comes without that, a lost focus while a finger
+still counts as down or a possession starting or ending, and any other click that lets go of the
+buttons, let go of the key with them, so they apply nothing either, unless the finger had lifted
+after moving and asked for the area.
 
 ### A possessed creature
 
