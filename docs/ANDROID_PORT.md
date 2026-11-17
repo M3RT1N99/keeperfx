@@ -385,7 +385,10 @@ lag says, and the client predicts the selection through the packets still on the
 the press for the key's action, the key held until a packet has carried the release, since a
 release read in the single mode would apply nothing, and after a cancel the release for the
 packet that carried a right click with the left button still down, which is how a mouse cancels
-one. Letting go of the left button first would apply the area. A right press no packet carries,
+one. Letting go of the left button first would apply the area. With `TAG_MODE_TOGGLING` on, the
+game takes that right click for its own reset of the mode instead, and the left button still
+down marks the slab under the finger in the single mode, as it does under a mouse: there a hold
+lifted where it rested marks that one slab. A right press no packet carries,
 as in a pause, is given up on after 0.25 s. A touch the system takes away, as when the app goes
 to the background, is cancelled like a second finger. A reset of the touch layer that comes
 without that, a lost focus while a finger still counts as down or a possession starting or
