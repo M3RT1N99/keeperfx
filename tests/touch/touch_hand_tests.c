@@ -673,6 +673,32 @@ static void test_a_second_finger_cancels_an_area(void)
     CHECK(!area_left && !area_right, "no button");
 }
 
+static void test_the_key_waits_for_the_packet_with_the_release(void)
+{
+    // The game can read the buttons before they go up and make its packet after: that packet still
+    // has the left button held, and the release is in the next one, which needs the key as well.
+    rest_on_a_wall(0);
+    area_to_drag();
+    th_stroke_moved(&h, now);
+    CHECK(th_stroke_lift(&h, 1) == ThL_Area, "applied by the lift");
+    area_serve();
+    CHECK(!area_left, "the buttons up");
+    th_note_area_packet(&h, 1, 1, 0);
+    CHECK(th_area_key(&h), "a packet read before the release keeps the key");
+    th_note_area_packet(&h, 1, 0, 0);
+    CHECK(!th_area_key(&h), "the one with the release lets it go");
+    // The same after a cancel.
+    rest_on_a_wall(0);
+    area_to_drag();
+    th_stroke_cancel(&h);
+    area_serve();
+    th_note_area_packet(&h, 1, 0, 1);
+    CHECK(th_area_key(&h) && area_left, "a right click without the left button held cancels nothing yet");
+    th_note_area_packet(&h, 1, 1, 0);
+    area_serve();
+    CHECK(area_left, "nor a left button held without the right click");
+}
+
 static void test_a_cancel_no_packet_carries(void)
 {
     // A pause carries no buttons: the right click is given up on, and the buttons still go up.
@@ -1394,6 +1420,7 @@ int touch_hand_tests(int *total_checks)
     test_an_area_of_walls();
     test_a_hold_lifted_where_it_rested_applies_nothing();
     test_a_second_finger_cancels_an_area();
+    test_the_key_waits_for_the_packet_with_the_release();
     test_a_cancel_no_packet_carries();
     test_the_buttons_let_go_of_elsewhere();
     test_moving_first_keeps_the_stroke_rules();
