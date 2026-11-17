@@ -209,7 +209,7 @@
     <string name="input_auto">自動：依照上次使用的輸入裝置</string>
     <string name="input_touch">觸控：一律使用觸控操作</string>
     <string name="input_pointer">滑鼠和鍵盤：忽略觸控螢幕</string>
-    <string name="input_gestures">輕觸 = 按左鍵 · 長按 = 按右鍵 · 拖曳 = 標記區域（挖掘時從牆上開始） · 手中有生物時：長按或拖曳 = 牠們逐一落到手指下方 · 空手快速劃過 = 甩劃過的生物巴掌 · 雙指 = 平移，雙指開合可縮放，扭轉可旋轉 · 雙指輕觸 = 按右鍵 · 三指輕觸 = 返回（地圖在面板上有專用按鈕）\n\n系統返回鍵和返回手勢也可以離開選單。畫面上有返回箭頭。</string>
+    <string name="input_gestures">輕觸 = 按左鍵 · 長按 = 按右鍵 · 拖曳 = 標記區域（挖掘時從牆上開始） · 在牆上長按後拖曳 = 放開時標記整個矩形（若該牆已標記則取消標記；第二根手指可取消） · 手中有生物時：長按或拖曳 = 牠們逐一落到手指下方 · 空手快速劃過 = 甩劃過的生物巴掌 · 雙指 = 平移，雙指開合可縮放，扭轉可旋轉 · 雙指輕觸 = 按右鍵 · 三指輕觸 = 返回（地圖在面板上有專用按鈕）\n\n系統返回鍵和返回手勢也可以離開選單。畫面上有返回箭頭。</string>
     <string name="option_back_button">遊戲時顯示螢幕按鈕</string>
     <string name="game_back">返回</string>
     <string name="settings_data">遊戲資料</string>

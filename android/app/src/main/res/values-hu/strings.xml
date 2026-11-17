@@ -209,7 +209,7 @@
     <string name="input_auto">Automatikus — a legutóbb használt eszköz szerint</string>
     <string name="input_touch">Érintés — mindig érintéses irányítás</string>
     <string name="input_pointer">Egér és billentyűzet — figyelmen kívül hagyja az érintőképernyőt</string>
-    <string name="input_gestures">Koppintás = bal kattintás · nyomva tartás = jobb kattintás · húzás = terület kijelölése (ásáshoz falon kezdd) · lényekkel a kézben: nyomva tartás vagy húzás = egymás után az ujj alá esnek · gyors húzás üres kézzel = pofont ad a lényeknek, amelyeken áthalad · két ujj = mozgatás, csippentés = nagyítás, csavarás = forgatás · koppintás két ujjal = jobb kattintás · koppintás három ujjal = vissza (a térképnek saját gombja van a panelen)\n\nA rendszer Vissza gombja és a vissza kézmozdulat is kilép a menüből. A képernyőn: egy vissza nyíl.</string>
+    <string name="input_gestures">Koppintás = bal kattintás · nyomva tartás = jobb kattintás · húzás = terület kijelölése (ásáshoz falon kezdd) · nyomva tartás falon, majd húzás = elengedéskor az egész téglalapot kijelöli (ha az a fal ki volt jelölve, a kijelölést törli; egy második ujj megszakítja) · lényekkel a kézben: nyomva tartás vagy húzás = egymás után az ujj alá esnek · gyors húzás üres kézzel = pofont ad a lényeknek, amelyeken áthalad · két ujj = mozgatás, csippentés = nagyítás, csavarás = forgatás · koppintás két ujjal = jobb kattintás · koppintás három ujjal = vissza (a térképnek saját gombja van a panelen)\n\nA rendszer Vissza gombja és a vissza kézmozdulat is kilép a menüből. A képernyőn: egy vissza nyíl.</string>
     <string name="option_back_button">Képernyőgombok mutatása játék közben</string>
     <string name="game_back">Vissza</string>
     <string name="settings_data">Játékadatok</string>

@@ -264,7 +264,7 @@
     <string name="input_auto">Automatic — follow the device last used</string>
     <string name="input_touch">Touch — always use the touch scheme</string>
     <string name="input_pointer">Mouse &amp; keyboard — ignore the touch screen</string>
-    <string name="input_gestures">Tap = left click · hold = right click · drag = mark an area (for digging, start on a wall) · with creatures in the hand: hold or drag = they fall under the finger one by one · quick stroke with an empty hand = slaps the creatures it crosses · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back\n\nThe system back button and the back gesture also leave a menu. On screen: a back arrow.</string>
+    <string name="input_gestures">Tap = left click · hold = right click · drag = mark an area (for digging, start on a wall) · hold on a wall, then drag = marks the whole rectangle when you lift (unmarks it if that wall was marked; a second finger cancels) · with creatures in the hand: hold or drag = they fall under the finger one by one · quick stroke with an empty hand = slaps the creatures it crosses · two fingers = pan, pinch to zoom, twist to rotate · two finger tap = right click · three finger tap = back\n\nThe system back button and the back gesture also leave a menu. On screen: a back arrow.</string>
     <string name="option_back_button">Show the on screen buttons while playing</string>
     <string name="game_back">Back</string>
 
