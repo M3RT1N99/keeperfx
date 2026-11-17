@@ -1153,6 +1153,10 @@ static void touch_serve_hand(void)
     }
     if (touch_panel_click_wanted)
     {
+        // A slap still waiting for its frame gives the pointer up and is aimed again afterwards:
+        // what the game says under the pointer would be about the panel by then.
+        touch_slap_aimed = false;
+        touch_slap_click = false;
         touch_panel_click_wanted = false;
         touch_panel_click = true;
         touch_move_pointer(touch_panel_click_x, touch_panel_click_y);
