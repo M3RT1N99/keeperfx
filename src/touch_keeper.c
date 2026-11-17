@@ -24,6 +24,7 @@
 #include "pre_inc.h"
 #include "touch_keeper.h"
 
+#include <float.h>
 #include <math.h>
 #include <string.h>
 
@@ -38,6 +39,7 @@
 #include "gui_parchment.h"
 #include "keeperfx.hpp"
 #include "local_camera.h"
+#include "map_columns.h"
 #include "map_data.h"
 #include "observer.h"
 #include "packets.h"
@@ -121,9 +123,9 @@ TbBool touch_keeper_over_gui(long x, long y)
     return point_is_over_gui_box(x, y);
 }
 
-void touch_keeper_stroke_begin(long long ms)
+void touch_keeper_stroke_begin(long x, long y, long long ms)
 {
-    th_stroke_begin(the_hand(), ms);
+    th_stroke_begin(the_hand(), ms, (float)x, (float)y);
 }
 
 void touch_keeper_stroke_moved(long long ms)
@@ -155,6 +157,8 @@ static void current_tuning(float longpress_ms, struct ThTuning *tuning)
     tuning->whip_turns = player_instance_info[PI_Whip].length_turns;
     tuning->turn_ms = 1000.0f / (float)max(turns_per_second, 1);
     tuning->rest_px = (float)MyScreenHeight * TOUCH_HAND_REST_SHARE;
+    // Within a finger of a creature's place, which is drawn at its feet.
+    tuning->over_px = (float)(2 * finger_reach());
 }
 
 #ifdef __ANDROID__
@@ -178,6 +182,25 @@ static TbBool own_slappable(const struct Thing *thing)
     return !thing_is_invalid(thing) && thing_is_creature(thing) && (thing->owner == my_player_number)
         && thing_slappable(thing, my_player_number);
 }
+
+/**
+ * Something solid is drawn in front of this place at (sx, sy): the top of a cube above its height
+ * that the line of sight crosses first, found the way the game finds what the pointer is over.
+ */
+static TbBool hidden_in_the_picture(const struct Coord3d *pos, float sx, float sy)
+{
+    for (int level = pos->z.val / COORD_PER_STL + 1; level <= COLUMN_STACK_HEIGHT; level++)
+    {
+        MapCoord x;
+        MapCoord y;
+        if (!touch_camera_ground_at(sx, sy, (float)(level * COORD_PER_STL), &x, &y))
+            continue;
+        const struct Map *mapblk = get_map_block_at(coord_subtile(x), coord_subtile(y));
+        if (!map_block_invalid(mapblk) && ((get_map_column(mapblk)->solidmask & (1 << (level - 1))) != 0))
+            return true;
+    }
+    return false;
+}
 #endif
 
 static void what_is_seen(long x, long y, TbBool settled, struct ThSees *sees)
@@ -187,14 +210,16 @@ static void what_is_seen(long x, long y, TbBool settled, struct ThSees *sees)
     sees->lag = game.input_lag_turns;
     sees->x = (float)x;
     sees->y = (float)y;
-    sees->in_force = touch_keeper_in_force() && !touch_keeper_over_gui(x, y);
+    const TbBool rules = touch_keeper_in_force();
+    sees->in_force = rules && !touch_keeper_over_gui(x, y);
 #ifdef __ANDROID__
-    if (!sees->in_force)
+    if (!rules)
         return;
     const struct Dungeon *dungeon = get_my_dungeon();
-    // The hand is the simulation's, whatever the pointer is over.
+    // The hand is the simulation's, whatever the pointer is over: a stroke the rules have taken
+    // is decided over a menu too.
     sees->hand = dungeon->num_things_in_hand;
-    if (!settled)
+    if (!sees->in_force || !settled)
         return;
     struct Coord3d pos;
     unsigned char context;
@@ -277,10 +302,16 @@ void touch_keeper_stroke_path(long x0, long y0, long x1, long y1, long long now)
             aim_x = xs[i];
             aim_y = ys[i];
         }
-        // Gone over, and not only within the hand's reach, when the creature's place is within a
-        // finger of the path.
-        const TbBool over = shown && (distance_to_path((float)x0, (float)y0, (float)x1, (float)y1, aim_x, aim_y) <= (float)(2 * finger_reach()));
-        if (th_stroke_crossed(h, &sees, &tuning, thing->index, aim_x, aim_y, over, now))
+        // How near the path came to the creature as the picture shows it. Behind a wall the finger
+        // went over the wall, and the game would see the wall there and not the creature.
+        float piece_px = FLT_MAX;
+        if (shown)
+        {
+            piece_px = distance_to_path((float)x0, (float)y0, (float)x1, (float)y1, aim_x, aim_y);
+            if ((piece_px <= tuning.over_px) && hidden_in_the_picture(&thing->mappos, aim_x, aim_y))
+                piece_px = FLT_MAX;
+        }
+        if (th_stroke_crossed(h, &sees, &tuning, thing->index, aim_x, aim_y, piece_px, now))
             return;
     }
 #endif

@@ -21,8 +21,9 @@
  *     there, and a quick finger travels further than a creature is wide between two
  *     frames. So the creatures a stroke crosses come from its path, looked at point by
  *     point, and a slap goes out where one was found, once a frame has shown the pointer
- *     there and the game agrees it would slap a creature: a right click on a wall beside
- *     it would take the wall's dig mark off instead.
+ *     there and the game agrees it would slap a creature. A right click on the top of a wall
+ *     beside it, where a pointer aimed at a creature can land, slaps nothing: the pick axe
+ *     ignores it, or with TAG_MODE_TOGGLING on it switches the dig highlight mode.
  * @author   KeeperFX Team
  * @date     06 Nov 2026
  * @par  Copying and copyrights:
@@ -117,11 +118,13 @@ static void th_drop_aim(struct ThHand *h)
     memset(&h->aim, 0, sizeof(h->aim));
 }
 
-void th_stroke_begin(struct ThHand *h, long long ms)
+void th_stroke_begin(struct ThHand *h, long long ms, float x, float y)
 {
     memset(&h->stroke, 0, sizeof(h->stroke));
     h->stroke.phase = ThP_Deciding;
     h->stroke.down_ms = ms;
+    h->stroke.land_x = x;
+    h->stroke.land_y = y;
     // A new touch speaks for itself: a slap the last one left behind does not wait for it.
     th_drop_aim(h);
 }
@@ -147,12 +150,16 @@ enum ThLift th_stroke_lift(struct ThHand *h, int in_force)
     if ((k->phase == ThP_Deciding) && k->moved && in_force) {
         // It travelled and lifted before anything was decided, inside the second finger's grace
         // or before a frame could show what it was over: a flick, which clicks nothing where it
-        // ended. Only one from a place an empty hand could not dig slaps what it went over.
+        // ended. Only one from a place an empty hand could not dig slaps what it went over: an own
+        // door is a stroke from the floor, which is where a creature walking through one is.
         lift = ThL_Flick;
-        if (!k->read_start || !k->start_empty || k->start_wall || k->start_door)
+        if (!k->read_start || !k->start_empty || k->start_wall)
             th_drop_aim(h);
-    } else if ((k->phase != ThP_Armed) || !k->swipe) {
-        th_drop_aim(h);
+    } else {
+        if ((k->phase == ThP_Armed) || (k->phase == ThP_LongPress))
+            lift = ThL_Hand;
+        if ((k->phase != ThP_Armed) || !k->swipe)
+            th_drop_aim(h);
     }
     memset(&h->stroke, 0, sizeof(h->stroke));
     return lift;
@@ -169,7 +176,8 @@ static void th_read_start(struct ThHand *h, const struct ThSees *s)
     k->start_empty = (unsigned char)(th_will_hold(h, s) <= 0);
     k->start_wall = (unsigned char)s->wall;
     k->start_door = (unsigned char)s->door;
-    k->open = (unsigned char)(k->start_empty ? (!s->wall && !s->door) : s->droppable);
+    // A tap on an own door still locks it: a tap is a left click wherever it lands.
+    k->open = (unsigned char)(k->start_empty ? !s->wall : s->droppable);
 }
 
 void th_stroke_look(struct ThHand *h, const struct ThSees *s)
@@ -229,7 +237,10 @@ enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct 
         return ThV_Hand;
     if (k->phase != ThP_Deciding)
         return ThV_Today;
-    if (!s->in_force)
+    // Where it landed out of force the ordinary gestures have it. A start read in force is the
+    // rules' wherever the finger has got to: a quick stroke from the floor reaches the margin
+    // around the panel before it is decided, and that is no reason to press the left button.
+    if (!k->read_start && !s->in_force)
         return th_today(h);
     th_read_start(h, s);
     if (!k->read_start)
@@ -239,13 +250,13 @@ enum ThVerdict th_decide(struct ThHand *h, const struct ThSees *s, const struct 
     if (!k->open) {
         // An empty hand on a wall marks as ever, unless a quick start goes over an own creature
         // before the drag would press: a finger aimed at a creature beside a wall can land on the
-        // wall's top. Until it moves, or the long press time is up, that is still open.
-        if (k->start_empty && k->start_wall && (will_hold <= 0)) {
-            if (k->moved && th_quick(k) && k->crossed)
-                return th_arm(h, 1, (double)th_packet_turn(h, s));
-            if (!k->moved && ((float)held < t->longpress_ms))
-                return ThV_Wait;
-        }
+        // wall's top.
+        if (k->moved && k->start_empty && k->start_wall && (will_hold <= 0) && th_quick(k) && k->crossed)
+            return th_arm(h, 1, (double)th_packet_turn(h, s));
+        // Until it moves, or the long press time is up, that is still open, and a flick that lifts
+        // meanwhile is one: it clicks nothing where it lifted.
+        if (!k->moved && ((float)held < t->longpress_ms))
+            return ThV_Wait;
         return th_today(h);
     }
     if (k->moved) {
@@ -341,12 +352,15 @@ int th_stroke_looks_for_crossings(const struct ThHand *h)
 }
 
 int th_stroke_crossed(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t,
-    unsigned long creature, float x, float y, int over, long long now)
+    unsigned long creature, float x, float y, float piece_px, long long now)
 {
     struct ThStroke *k = &h->stroke;
     if (!th_stroke_looks_for_crossings(h) || !s->in_force || (creature == 0) || !th_stays_empty(h, s))
         return 0;
-    if (over)
+    // Gone over the creature: the path came within over_px of its place, and nearer to it than
+    // where the finger landed by half that more. Landing beside one, or setting out from it along
+    // the wall it digs, is not going over it.
+    if ((piece_px <= t->over_px) && ((piece_px + 0.5f * t->over_px) <= hypotf(x - k->land_x, y - k->land_y)))
         k->crossed = 1;
     // One slap at a time, and none the game would ignore.
     if ((h->aim.creature != 0) || !th_whip_over(h, s, t))

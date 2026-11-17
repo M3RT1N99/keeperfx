@@ -42,6 +42,7 @@ struct ThTuning {
     int whip_turns;      /**< A slap takes this long, and the game ignores another one meanwhile. */
     float turn_ms;       /**< How long a game turn is meant to take. */
     float rest_px;       /**< Travel below this is a resting finger trembling, not a finger moving. */
+    float over_px;       /**< A path that comes this near a creature's place on the screen has gone over it. */
 };
 
 /** What the game says at this moment, about the hand and the place under the finger. */
@@ -67,10 +68,11 @@ enum ThVerdict {
     ThV_Hand,        /**< From here on the finger drops, and a swipe slaps; it never presses a button and holds it. */
 };
 
-/** What a finger lifted before anything was decided about it was. */
+/** What a lifted finger was. */
 enum ThLift {
-    ThL_Tap = 0,     /**< The ordinary tap, a left click where it lifted. */
-    ThL_Flick,       /**< It travelled: no click, only the slap of what it crossed, if anything. */
+    ThL_Tap = 0,     /**< Nothing the rules have a say in: a finger still pointing is the ordinary tap, a left click where it lifted. */
+    ThL_Flick,       /**< It travelled before anything was decided: no click, only the slap of what it crossed, if anything. */
+    ThL_Hand,        /**< The hand had it, dropping, slapping or holding the right button: nothing is clicked where it lifted. */
 };
 
 /** One right click or pick up on its way through the input lag. */
@@ -99,6 +101,7 @@ struct ThStroke {
     unsigned char crossed;       /**< With an empty hand its path has gone over an own creature itself. */
     long long down_ms;
     long long moved_ms;
+    float land_x, land_y;        /**< Where it landed. */
     double next_drop_turn;       /**< The packet the next drop is due in, with what a rate between turns carries over. */
     unsigned char slapped_once;  /**< It has slapped, so the next slap asks for travel from where that was. */
     float slap_x, slap_y;
@@ -131,15 +134,15 @@ void th_reset(struct ThHand *h);
  */
 void th_note_packet(struct ThHand *h, long long turn, int lag, int right_released, int picking);
 
-/** A finger landed on the map as the first one. Anything else is never asked about. */
-void th_stroke_begin(struct ThHand *h, long long ms);
+/** A finger landed on the map at (x, y) as the first one. Anything else is never asked about. */
+void th_stroke_begin(struct ThHand *h, long long ms, float x, float y);
 /** That finger has travelled further than a tap may. Only the first time counts. */
 void th_stroke_moved(struct ThHand *h, long long ms);
 /** It became part of something else, or the touch went away: nothing it was going to do happens. */
 void th_stroke_cancel(struct ThHand *h);
 /**
  * It lifted. @param in_force The plain hand is what fingers on the map work with.
- * @return What it was, for a finger that had not started anything yet; ThL_Tap for any other.
+ * @return What it was: a flick, the hand's, or nothing the rules have a say in.
  */
 enum ThLift th_stroke_lift(struct ThHand *h, int in_force);
 
@@ -163,8 +166,8 @@ int th_drop_due(struct ThHand *h, const struct ThSees *s, const struct ThTuning 
 
 /**
  * The points a finger's path is looked at for creatures, from just past (x0, y0) up to and
- * including (x1, y1), in that order and no further apart than step. Only the first max of them
- * when the piece is longer than that. @return How many.
+ * including (x1, y1), in that order and no further apart than step. A piece too long for that
+ * gets max of them, spread evenly over all of it and further apart. @return How many.
  */
 int th_path_samples(float x0, float y0, float x1, float y1, float step, float *xs, float *ys, int max);
 
@@ -173,12 +176,14 @@ int th_stroke_looks_for_crossings(const struct ThHand *h);
 
 /**
  * The finger's path came within a slap's reach of an own creature, to be aimed at (x, y), with the
- * finger at s->x, s->y by now. @param over It went over the creature itself, not just near it:
- *     only that makes a stroke from a wall a swipe, since zoomed in the reach spans a hundred pixels.
+ * finger at s->x, s->y by now. @param piece_px How near this piece of the path came to (x, y) on the
+ *     screen, where the picture shows the creature itself there; anything past t->over_px where it
+ *     does not. Only a path that went over the creature makes a stroke from a wall a swipe, since
+ *     zoomed in the reach spans a hundred pixels, and landing beside one is not going over it.
  * @return true when that creature is to be slapped there: see th_slap_aim().
  */
 int th_stroke_crossed(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t,
-    unsigned long creature, float x, float y, int over, long long now);
+    unsigned long creature, float x, float y, float piece_px, long long now);
 
 /**
  * Where a slap waits to go out, once the pointer is free: a swipe's, or a flick's after the lift.
@@ -189,7 +194,9 @@ int th_slap_aim(const struct ThHand *h, float *x, float *y);
 /**
  * The pointer has been at the aim for a drawn frame, and s is what the game says is under it.
  * @return true when the right click goes out there now, which only a creature to slap under the
- *     hand allows: a right click also takes a dig mark off a wall. The aim is gone either way.
+ *     hand allows: anywhere else it slaps nothing the finger went over, and on the top of a wall the
+ *     pick axe ignores it, or with TAG_MODE_TOGGLING on it switches the dig highlight mode. The aim
+ *     is gone either way.
  */
 int th_slap_now(struct ThHand *h, const struct ThSees *s, const struct ThTuning *t);
 

@@ -230,9 +230,12 @@ static TbBool touch_panel_click_wanted = false;
 static long touch_panel_click_x, touch_panel_click_y;
 /** The click under way is the panel's. It holds the pointer until the game has seen it end. */
 static TbBool touch_panel_click = false;
-/** A tap on the map while the panel had the pointer, and where. */
+/** A tap on the map while a click elsewhere had the pointer, where, and whether it is a two finger one. */
 static TbBool touch_map_tap_owed = false;
+static TbBool touch_map_tap_right = false;
 static long touch_map_tap_x, touch_map_tap_y;
+/** Where the first finger of the contact landed: what the rules read first, and where a two finger tap clicks. */
+static long touch_contact_x, touch_contact_y;
 /** The pointer is the slap's, at a creature a finger went over, until the game has read the click. */
 static TbBool touch_slap_click = false;
 /** It has just gone there, and the slap waits for a frame drawn with it there. */
@@ -397,6 +400,7 @@ static void touch_reset_state(void)
     touch_panel_click_wanted = false;
     touch_panel_click = false;
     touch_map_tap_owed = false;
+    touch_map_tap_right = false;
     touch_slap_click = false;
     touch_slap_aimed = false;
     touch_pointer_settled = false;
@@ -664,10 +668,16 @@ static void touch_normalized_to_game(float nx, float ny, long *x, long *y)
         *y = game_h - 1;
 }
 
+/** A click elsewhere, the panel's or a slap's, has the pointer or is about to take it. */
+static TbBool touch_pointer_taken(void)
+{
+    return touch_panel_click || touch_panel_click_wanted || touch_slap_click;
+}
+
 /** The game's idea of what the pointer is over is about the finger on the map right now. */
 static TbBool touch_hand_sees_finger(void)
 {
-    return touch_pointer_settled && !touch_panel_click && !touch_panel_click_wanted && !touch_slap_click;
+    return touch_pointer_settled && !touch_pointer_taken();
 }
 
 /**
@@ -874,15 +884,18 @@ void TEvent(const SDL_Event *ev)
         {
             // Put the pointer where the player touched right away, so the
             // cursor sprite and any hover highlight track the finger.
+            // While a click elsewhere holds it the pointer comes here once that is over, see touch_serve_hand().
             if (!touch_panel_click && !touch_slap_click)
                 touch_move_pointer(finger->x, finger->y);
             touch_pointer_settled = false;
             touch_gesture = TGest_Point;
             touch_contact_start_ticks = finger->down_ticks;
             touch_contact_moved = false;
+            touch_contact_x = finger->x;
+            touch_contact_y = finger->y;
             if (!finger->on_gui)
             {
-                touch_keeper_stroke_begin((long long)finger->down_ticks);
+                touch_keeper_stroke_begin(finger->x, finger->y, (long long)finger->down_ticks);
                 touch_keeper_stroke_path(finger->x, finger->y, finger->x, finger->y, (long long)finger->down_ticks);
             }
         }
@@ -996,9 +1009,10 @@ void TEvent(const SDL_Event *ev)
                 // and leaves the slap of what it crossed to touch_serve_hand().
                 if (!canceled && (lift == ThL_Tap) && (moved || (held_ms <= TOUCH_TAP_MAX_MS)))
                 {
-                    if (touch_panel_click || touch_panel_click_wanted)
+                    if (touch_pointer_taken())
                     {
                         touch_map_tap_owed = true;
+                        touch_map_tap_right = false;
                         touch_map_tap_x = up_x;
                         touch_map_tap_y = up_y;
                     }
@@ -1028,7 +1042,16 @@ void TEvent(const SDL_Event *ev)
                     // an armed room. Leaving it behind a 420 ms hold made all of
                     // those cost most of a second. Escape moves up a finger; it
                     // still has the system back button and the on screen arrow.
-                    if (touch_max_fingers_this_contact == 2)
+                    if ((touch_max_fingers_this_contact == 2) && touch_pointer_taken())
+                    {
+                        // It clicks where its first finger landed, which the pointer is not while
+                        // a click elsewhere has it.
+                        touch_map_tap_owed = true;
+                        touch_map_tap_right = true;
+                        touch_map_tap_x = touch_contact_x;
+                        touch_map_tap_y = touch_contact_y;
+                    }
+                    else if (touch_max_fingers_this_contact == 2)
                         touch_tapped_right_click = true;
                     else if (touch_max_fingers_this_contact >= 3)
                         touch_tapped_back = true;
@@ -1145,10 +1168,17 @@ static void touch_serve_hand(void)
     {
         touch_panel_click = false;
         touch_slap_click = false;
+        // A finger that landed meanwhile is read where it landed, and the look then moves the pointer
+        // on to it: where it has got to by now can be a wall its stroke only reached. Two fingers
+        // are a grip, and a two finger tap clicks where the first one landed.
         if (touch_map_tap_owed)
             touch_move_pointer(touch_map_tap_x, touch_map_tap_y);
+        else if ((finger != NULL) && touch_keeper_start_unseen())
+            touch_move_pointer(finger->start_x, finger->start_y);
         else if (finger != NULL)
             touch_move_pointer(finger->x, finger->y);
+        else if (touch_finger_count > 1)
+            touch_move_pointer(touch_contact_x, touch_contact_y);
         touch_pointer_settled = false;
     }
     if (touch_panel_click_wanted)
@@ -1163,17 +1193,9 @@ static void touch_serve_hand(void)
         touch_queue_click();
         return;
     }
-    if (touch_map_tap_owed)
-    {
-        if (touch_pointer_settled)
-        {
-            touch_map_tap_owed = false;
-            touch_queue_click();
-        }
-        return;
-    }
     // A creature a swipe or a flick went over gets its slap where it was found. The game has to
     // have drawn a frame with the pointer there before it can say what a right click there hits.
+    // A tap owed meanwhile waits for that, or its click would land at the aim.
     if (touch_slap_aimed)
     {
         if (!touch_pointer_settled)
@@ -1181,6 +1203,18 @@ static void touch_serve_hand(void)
         touch_slap_aimed = false;
         if (touch_keeper_slap_now(touch_slap_x, touch_slap_y))
             touch_right_click_whole();
+        return;
+    }
+    if (touch_map_tap_owed)
+    {
+        if (touch_pointer_settled)
+        {
+            touch_map_tap_owed = false;
+            if (touch_map_tap_right)
+                touch_queue_right_click();
+            else
+                touch_queue_click();
+        }
         return;
     }
     if (((finger == NULL) || (touch_gesture == TGest_Hand)) && touch_keeper_slap_aim(&touch_slap_x, &touch_slap_y))

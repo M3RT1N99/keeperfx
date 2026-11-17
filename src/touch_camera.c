@@ -179,7 +179,7 @@ static const struct Camera *shown_floor_camera(struct TgView *view, struct TgCam
     return cam;
 }
 
-TbBool touch_camera_floor_at(float sx, float sy, MapCoord *x, MapCoord *y)
+TbBool touch_camera_ground_at(float sx, float sy, float height, MapCoord *x, MapCoord *y)
 {
     struct TgView view;
     struct TgCamera pose;
@@ -187,13 +187,18 @@ TbBool touch_camera_floor_at(float sx, float sy, MapCoord *x, MapCoord *y)
         return false;
     float gx;
     float gy;
-    // The floor of a dug out slab is one subtile high, and that is where creatures walk.
-    tg_screen_to_ground(&view, &pose, (float)COORD_PER_STL, sx, sy, &gx, &gy);
+    tg_screen_to_ground(&view, &pose, height, sx, sy, &gx, &gy);
     if ((gx < 0.0f) || (gy < 0.0f) || (gx > view.limit_x) || (gy > view.limit_y))
         return false;
     *x = (MapCoord)gx;
     *y = (MapCoord)gy;
     return true;
+}
+
+TbBool touch_camera_floor_at(float sx, float sy, MapCoord *x, MapCoord *y)
+{
+    // The floor of a dug out slab is one subtile high, and that is where creatures walk.
+    return touch_camera_ground_at(sx, sy, (float)COORD_PER_STL, x, y);
 }
 
 TbBool touch_camera_screen_at(const struct Coord3d *pos, float *sx, float *sy)

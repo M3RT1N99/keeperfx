@@ -75,6 +75,8 @@ TbBool touch_camera_owns_view(void);
  * points at the floor under the hand. @return false off the map or in any other view.
  */
 TbBool touch_camera_floor_at(float sx, float sy, MapCoord *x, MapCoord *y);
+/** The same at any height, as the game looks for the top of a column under the pointer. */
+TbBool touch_camera_ground_at(float sx, float sy, float height, MapCoord *x, MapCoord *y);
 
 /** Where a place on the map is on the screen in the dungeon view as it is shown. @return false in any other view. */
 TbBool touch_camera_screen_at(const struct Coord3d *pos, float *sx, float *sy);

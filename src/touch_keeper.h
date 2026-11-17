@@ -45,7 +45,8 @@ TbBool touch_keeper_over_gui(long x, long y);
 /** True on the panel, with the same reach. */
 TbBool touch_keeper_over_panel(long x);
 
-void touch_keeper_stroke_begin(long long ms);
+/** The first finger on the map landed at x, y. */
+void touch_keeper_stroke_begin(long x, long y, long long ms);
 void touch_keeper_stroke_moved(long long ms);
 void touch_keeper_stroke_cancel(void);
 /** The finger lifted, see th_stroke_lift(). */
