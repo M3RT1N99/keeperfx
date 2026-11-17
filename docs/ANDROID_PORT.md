@@ -244,6 +244,7 @@ into one synthetic mouse. `src/android.cpp` turns it off, and
 | Tap | Left click at the touched point |
 | Hold about 0.42 s | Right click |
 | Drag one finger | Left button held: tag or paint; with the plain hand only from a wall, see below |
+| Hold on a wall, then drag | An area of walls, as Shift and a drag do with a mouse: marked or unmarked when the finger lifts |
 | Hold or drag with something in the hand | It falls under the finger, one thing at a time |
 | Quick stroke or flick with an empty hand | Slaps the creatures it crosses |
 | Two fingers on the map | Hold the map: move, pinch and twist together |
@@ -301,8 +302,9 @@ margin before it is decided. Android only: the hooks that feed them are inside `
 | What the finger does | Hand empty | Something in the hand |
 |---|---|---|
 | Tap | Left click | Left click, so gathering loses nothing |
-| Rests on a place to drop | Waits; on a creature or a wall a right click after 0.42 s | First drop after `handhold` (0.25 s), then one every `handrain` (0.1 s), on an own creature too |
+| Rests on a place to drop | Waits; on a creature a right click after 0.42 s | First drop after `handhold` (0.25 s), then one every `handrain` (0.1 s), on an own creature too |
 | Rests where nothing can drop | Right click after 0.42 s | Right click after 0.42 s, which the game refuses as it always did |
+| Rests on a wall it could mark, for 0.42 s | An area of walls from there to the finger, see below | The same |
 | Stroke from the floor, a creature or an own door | Over 30 px within 0.25 s: a swipe. Slower: nothing, until something falls. Never the left button | Drops along the finger, at once, at the same rate. The left button is not pressed |
 | Stroke from a wall | The left button: tags and untags. A quick start that goes over an own creature before that press is a swipe; landing beside one is not going over it | The left button: tags and untags |
 | Flick: over 30 px and lifted within the second finger's grace (0.1 s) | From the floor or an own door it slaps an own creature it crossed; from a wall nothing. Never a click where it lifted | Nothing |
@@ -360,6 +362,32 @@ says, and the rules leave the turns of the whip free so that a click is not wast
 
 The rate of the drops is counted in turns, 2 at the default, so it stretches with the game
 when a phone cannot keep up its 20 turns a second.
+
+#### An area of walls
+
+A finger that rests on a wall it could mark for the long press time (`longpress`, 0.42 s)
+selects an area of walls, with an empty hand or not: the left button goes down there, and the
+rectangle from that slab to the finger floats on the map as the finger moves, scrolling it at
+the edge. Lifting marks every slab in it, or unmarks them when the first one was marked. Lifted
+where it rested, the area is one slab, which is what a tap is for, and a finger held on a
+creature drawn over the top of a wall has not asked for that wall: so that applies nothing. A
+second finger cancels it, and so do the rules going out of force under it: a pause, a menu, the
+level's end. Moving before the long press time is the stroke from a wall above.
+
+That is the game's own area, `drag_placement_mode`, which Shift turns on from the default
+single mode on a computer (`process_highlight_roomspace_inputs()`): the touch layer holds
+`Gkey_BestRoomSpace` through `touch_game_key_pressed()`, the game key lane a controller holds
+it through, and presses the left button, so the packets are the ones a mouse and a keyboard
+send. Where `DEFAULT_TAG_MODE` makes the drag mode the default, Shift would make the drag paint,
+and the key is not held. A packet carries one action and arrives as many turns later as the input
+lag says, and the client predicts the selection through the packets still on their way
+(`update_dig_tag_input()`), so every step waits for a packet that has carried the one before:
+the press for the key's action, the key held until a packet has carried the release, since a
+release read in the single mode would apply nothing, and after a cancel the release for the
+packet that carried a right click with the left button still down, which is how a mouse cancels
+one. Letting go of the left button first would apply the area. A right press no packet carries,
+as in a pause, is given up on after 0.25 s. A reset of the touch layer, the app going to the
+background among others, lets go of the buttons at once, which applies the area as a lift would.
 
 ### A possessed creature
 
