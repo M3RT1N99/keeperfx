@@ -386,8 +386,10 @@ the press for the key's action, the key held until a packet has carried the rele
 release read in the single mode would apply nothing, and after a cancel the release for the
 packet that carried a right click with the left button still down, which is how a mouse cancels
 one. Letting go of the left button first would apply the area. A right press no packet carries,
-as in a pause, is given up on after 0.25 s. A reset of the touch layer, the app going to the
-background among others, lets go of the buttons at once, which applies the area as a lift would.
+as in a pause, is given up on after 0.25 s. A touch the system takes away, as when the app goes
+to the background, is cancelled like a second finger. A reset of the touch layer that comes
+without that, a lost focus while a finger still counts as down or a possession starting or
+ending, lets go of the buttons at once, which applies the area as a lift would.
 
 ### A possessed creature
 
