@@ -34,6 +34,7 @@
 #include "dungeon_data.h"
 #include "front_input.h"
 #include "frontend.h"
+#include "frontmenu_ingame_evnt.h"
 #include "game_legacy.h"
 #include "gui_boxmenu.h"
 #include "gui_frontmenu.h"
@@ -371,11 +372,31 @@ void touch_keeper_note_packet(const struct Packet *pckt)
     th_note_area_packet(the_hand(), area_mode, (pckt->control_flags & PCtr_LBtnHeld) != 0, (pckt->control_flags & PCtr_RBtnClick) != 0);
 }
 
+/**
+ * The key turns the default mode into the other one, so from the drag mode it would make the drag
+ * paint: there the area needs no key.
+ */
+static TbBool area_keyed(void)
+{
+    return (settings.highlight_mode ^ 1) == drag_placement_mode;
+}
+
 TbBool touch_keeper_area_key(void)
 {
-    // The key turns the default mode into the other one, so from the drag mode it would make the
-    // drag paint: there the area needs no key.
-    return th_area_key(the_hand()) && ((settings.highlight_mode ^ 1) == drag_placement_mode) && touch_keeper_in_force();
+    // Whatever opens or pauses meanwhile: let go of while the left button is down, the rest of the
+    // drag is read in the single mode, which marks the slab under the pointer. The area itself lets
+    // go of it once the rules are out of force, see touch_keeper_area_give_up().
+    return th_area_key(the_hand()) && area_keyed();
+}
+
+void touch_keeper_area_give_up(void)
+{
+    th_area_give_up(the_hand(), area_keyed());
+}
+
+TbBool touch_keeper_pointer_over_pause_box(void)
+{
+    return flag_is_set(game.operation_flags, GOF_Paused) && mouse_is_over_paused_message();
 }
 
 TbBool touch_keeper_area_owns_buttons(void)
@@ -388,9 +409,9 @@ TbBool touch_keeper_area_anchoring(void)
     return th_area_anchoring(the_hand());
 }
 
-enum ThAreaStep touch_keeper_area_step(long long now, float overdue_ms)
+enum ThAreaStep touch_keeper_area_step(long long now, float give_up_ms)
 {
-    return th_area_step(the_hand(), now, overdue_ms);
+    return th_area_step(the_hand(), now, give_up_ms);
 }
 
 void touch_keeper_area_buttons_released(void)

@@ -511,19 +511,32 @@ static void test_a_long_press_on_a_wall_selects_an_area(void)
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_LongPress, "the ordinary long press on it at its time");
 }
 
-/* The buttons as the wiring holds them for an area, and a right press no packet has carried yet. */
+/* The area's last resort, as the wiring passes it. */
+#define AREA_GIVE_UP_MS 2000.0f
+
+/*
+ * The buttons as the wiring holds them for an area, and what the game makes of them packet by
+ * packet: a release read with the key held applies the area, unless a packet before it read a right
+ * click with the left button down; one read without the key comes with the reset to the single
+ * mode, which applies nothing.
+ */
 static int area_left;
 static int area_right;
-static int area_right_unsent;
+static int area_right_unsent;   /* A right press no packet has read yet. */
+static int area_left_unread;    /* The left button went up, and no packet has read that yet. */
+static int area_cancel_read;
+static int area_eats_right;     /* The next packet loses its right click, as to TAG_MODE_TOGGLING's reset. */
 static int area_applied;
 static int area_cancelled;
+static int area_dropped;
 static int area_packet_left;
 
 /* A finger resting on a wall the hand could mark, to the long press time. */
 static void rest_on_a_wall(int hand)
 {
     begin(hand, 0);
-    area_left = area_right = area_right_unsent = area_applied = area_cancelled = 0;
+    area_left = area_right = area_right_unsent = area_left_unread = area_cancel_read = area_eats_right = 0;
+    area_applied = area_cancelled = area_dropped = 0;
     sees.droppable = 0;
     sees.wall = 1;
     th_stroke_begin(&h, now, 0.0f, 0.0f);
@@ -535,14 +548,22 @@ static void rest_on_a_wall(int hand)
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Area, "hand %d: an area at the long press time", hand);
 }
 
-/* What the wiring does with a step, and what the game makes of the buttons going up. */
+static void area_buttons_up(void)
+{
+    if (area_left)
+        area_left_unread = 1;
+    area_left = area_right = 0;
+}
+
+/* What the wiring does with a step. */
 static void area_serve(void)
 {
-    switch (th_area_step(&h, now, 250.0f))
+    switch (th_area_step(&h, now, AREA_GIVE_UP_MS))
     {
     case ThAS_PressLeft:
         CHECK(!area_left, "pressed once");
         area_left = 1;
+        area_cancel_read = 0;
         break;
     case ThAS_PressRight:
         CHECK(area_left, "a right click with the left button down");
@@ -550,25 +571,44 @@ static void area_serve(void)
         area_right_unsent = 1;
         break;
     case ThAS_Release:
-        // A release no right click has gone ahead of applies the area, which is in drag mode.
-        if (area_left && !area_right)
-            area_applied++;
-        else if (area_left && !area_right_unsent)
-            area_cancelled++;
-        area_left = area_right = 0;
+        area_buttons_up();
         break;
     default:
         break;
     }
 }
 
+/* Some other part of the touch layer lets go of the buttons the area holds, as touch_release_buttons() tells it. */
+static void area_let_go_elsewhere(void)
+{
+    if (th_area_owns_buttons(&h))
+        th_area_buttons_released(&h);
+    area_buttons_up();
+}
+
 /* A packet: area_mode says it made the left button drag an area. */
 static void area_packet(int area_mode)
 {
     area_serve();
+    const int key = th_area_key(&h);
+    const int right_click = area_right_unsent && !area_eats_right;
+    // Let go of with the left button down, the key would leave the rest of the drag to the single mode.
+    CHECK(key || !area_left, "the key held while the left button is down");
+    if (right_click && area_left)
+        area_cancel_read = 1;
+    if (area_left_unread) {
+        if (area_cancel_read)
+            area_cancelled++;
+        else if (key)
+            area_applied++;
+        else
+            area_dropped++;
+        area_left_unread = 0;
+    }
     area_packet_left = area_left;
-    th_note_area_packet(&h, area_mode, area_left, area_right_unsent);
+    th_note_area_packet(&h, area_mode, area_left, right_click);
     area_right_unsent = 0;
+    area_eats_right = 0;
     now += TURN_MS;
     area_serve();
 }
@@ -589,10 +629,10 @@ static void area_to_drag(void)
     CHECK(th_area_owns_buttons(&h), "the area has the buttons");
 }
 
-/* Packets until the key is let go of, which only a packet without the left button held does. */
+/* Packets until the key is let go of. */
 static void area_until_the_key_goes(void)
 {
-    for (int t = 0; (t < 10) && th_area_key(&h); t++) {
+    for (int t = 0; (t < 10) && (th_area_key(&h) || area_left_unread); t++) {
         area_packet(1);
         CHECK(!area_packet_left || th_area_key(&h), "the key outlasts a packet with the left button held");
     }
@@ -600,6 +640,10 @@ static void area_until_the_key_goes(void)
     CHECK(!area_left && !area_right, "the buttons up");
     CHECK(!th_area_owns_buttons(&h), "and nothing owned");
 }
+
+#define AREA_ENDED(applied, cancelled, dropped, ...) \
+    CHECK((area_applied == (applied)) && (area_cancelled == (cancelled)) && (area_dropped == (dropped)), \
+        __VA_ARGS__)
 
 static void test_an_area_of_walls(void)
 {
@@ -613,8 +657,7 @@ static void test_an_area_of_walls(void)
         CHECK(th_stroke_lift(&h, 1) == ThL_Area, "hand %d: a lift after moving applies it", hand);
         CHECK(th_area_key(&h), "hand %d: the key held for the packet with the release", hand);
         area_until_the_key_goes();
-        CHECK(area_applied == 1, "hand %d: applied %d", hand, area_applied);
-        CHECK(area_cancelled == 0, "hand %d: cancelled %d", hand, area_cancelled);
+        AREA_ENDED(1, 0, 0, "hand %d: applied %d, cancelled %d, dropped %d", hand, area_applied, area_cancelled, area_dropped);
         refresh();
         CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Today, "hand %d: a phase of none is nobody's", hand);
     }
@@ -631,7 +674,7 @@ static void test_a_hold_lifted_where_it_rested_applies_nothing(void)
     area_serve();
     CHECK(area_left, "and the left button waits for the packet that carries both");
     area_until_the_key_goes();
-    CHECK((area_applied == 0) && (area_cancelled == 1), "applied %d, cancelled %d", area_applied, area_cancelled);
+    AREA_ENDED(0, 1, 0, "applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
     // Lifted before any packet carried the key: nothing was pressed, and the key goes at once.
     rest_on_a_wall(0);
     area_serve();
@@ -646,7 +689,7 @@ static void test_a_hold_lifted_where_it_rested_applies_nothing(void)
     th_stroke_moved(&h, now);
     CHECK(th_stroke_lift(&h, 1) == ThL_Hand, "before the game had the press, nothing is applied");
     area_until_the_key_goes();
-    CHECK((area_applied == 0) && (area_cancelled == 1), "applied %d, cancelled %d", area_applied, area_cancelled);
+    AREA_ENDED(0, 1, 0, "applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
 }
 
 static void test_a_second_finger_cancels_an_area(void)
@@ -657,14 +700,16 @@ static void test_a_second_finger_cancels_an_area(void)
     th_stroke_cancel(&h);
     area_serve();
     CHECK(area_right && area_left, "a right click with the left button still down");
-    for (int t = 0; t < 10; t++) {
+    // A network wait or a slow frame: no packet for a while, and the buttons wait for the next one,
+    // which reads the right click whenever it comes.
+    for (int t = 0; t < 25; t++) {
         now += 16;
         area_serve();
     }
-    CHECK(area_left, "no release before a packet has carried the right click");
+    CHECK(area_left && area_right, "no release before a packet has carried the right click");
     CHECK(th_stroke_lift(&h, 1) == ThL_Tap, "the finger lifting later is nobody's");
     area_until_the_key_goes();
-    CHECK((area_applied == 0) && (area_cancelled == 1), "applied %d, cancelled %d", area_applied, area_cancelled);
+    AREA_ENDED(0, 1, 0, "applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
     // Before the press nothing is held, and the key goes at once.
     rest_on_a_wall(5);
     th_stroke_cancel(&h);
@@ -687,52 +732,138 @@ static void test_the_key_waits_for_the_packet_with_the_release(void)
     CHECK(th_area_key(&h), "a packet read before the release keeps the key");
     th_note_area_packet(&h, 1, 0, 0);
     CHECK(!th_area_key(&h), "the one with the release lets it go");
-    // The same after a cancel.
+}
+
+static void test_a_right_click_the_game_takes_elsewhere(void)
+{
+    // TAG_MODE_TOGGLING takes the right click for its own reset, and the panel can take it too. The
+    // packet after the right press is the one that would have read it: no later one will, so the
+    // buttons and the key go up together, and the release is read in the single mode.
+    rest_on_a_wall(0);
+    area_to_drag();
+    th_stroke_moved(&h, now);
+    th_stroke_cancel(&h);
+    area_serve();
+    area_eats_right = 1;
+    area_packet(1);
+    CHECK(!area_left && !area_right, "both up after the packet that lost the click");
+    CHECK(!th_area_key(&h), "and the key with them");
+    area_until_the_key_goes();
+    AREA_ENDED(0, 0, 1, "applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
+    // A packet that read the right click after the left button had gone up cancelled nothing either.
     rest_on_a_wall(0);
     area_to_drag();
     th_stroke_cancel(&h);
     area_serve();
     th_note_area_packet(&h, 1, 0, 1);
-    CHECK(th_area_key(&h) && area_left, "a right click without the left button held cancels nothing yet");
-    th_note_area_packet(&h, 1, 1, 0);
     area_serve();
-    CHECK(area_left, "nor a left button held without the right click");
+    CHECK(!th_area_key(&h), "a right click without the left button held: given up on");
 }
 
-static void test_a_cancel_no_packet_carries(void)
+static void test_a_game_that_makes_no_packets(void)
 {
-    // A pause carries no buttons: the right click is given up on, and the buttons still go up.
+    // A last resort only: after it the buttons and the key go up together, never the buttons alone.
     rest_on_a_wall(0);
     area_to_drag();
     th_stroke_cancel(&h);
     area_serve();
-    CHECK(area_right, "the right click");
-    now += 250;
+    now += (long long)AREA_GIVE_UP_MS;
     area_serve();
-    CHECK(area_left, "still down at the overdue time");
+    CHECK(area_left && area_right, "still down at the last resort");
     now += 16;
     area_serve();
     CHECK(!area_left && !area_right, "up after it");
-    CHECK(th_area_key(&h), "the key until a packet without the left button");
-    th_note_area_packet(&h, 0, 0, 0);
-    CHECK(!th_area_key(&h), "let go of");
+    CHECK(!th_area_key(&h), "with the key");
+    area_until_the_key_goes();
+    AREA_ENDED(0, 0, 1, "applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
+    // The key a lift kept for its release does not outlast it either.
+    rest_on_a_wall(0);
+    area_to_drag();
+    th_stroke_moved(&h, now);
+    th_stroke_lift(&h, 1);
+    area_serve();
+    now += (long long)AREA_GIVE_UP_MS + 16;
+    area_serve();
+    CHECK(!th_area_key(&h), "the key let go of");
 }
 
 static void test_the_buttons_let_go_of_elsewhere(void)
 {
-    // The touch layer reset: the buttons are up already, and the key waits for the packet with the release.
+    // A reset of the touch layer, or another click: the key goes with the buttons, so nothing applies.
     rest_on_a_wall(0);
     area_to_drag();
-    th_area_buttons_released(&h);
-    area_left = area_right = 0;
-    CHECK(th_area_key(&h), "the key held");
+    th_stroke_moved(&h, now);
+    area_let_go_elsewhere();
+    CHECK(!th_area_key(&h), "the key with the buttons");
     th_stroke_cancel(&h);
     area_serve();
     CHECK(!area_left && !area_right, "no right click after the buttons went up");
     area_until_the_key_goes();
+    AREA_ENDED(0, 0, 1, "applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
+    // The same while a cancel waits for its packet.
     rest_on_a_wall(0);
-    th_area_buttons_released(&h);
+    area_to_drag();
+    th_stroke_cancel(&h);
+    area_serve();
+    area_let_go_elsewhere();
+    CHECK(!th_area_key(&h), "a cancel's key with the buttons");
+    area_until_the_key_goes();
+    AREA_ENDED(0, 0, 1, "cancel: applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
+    // A lift had asked for it: the key stays for the release.
+    rest_on_a_wall(0);
+    area_to_drag();
+    th_stroke_moved(&h, now);
+    CHECK(th_stroke_lift(&h, 1) == ThL_Area, "lifted");
+    area_let_go_elsewhere();
+    CHECK(th_area_key(&h), "the key kept for the lift's release");
+    area_until_the_key_goes();
+    AREA_ENDED(1, 0, 0, "lift: applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
+    rest_on_a_wall(0);
+    area_let_go_elsewhere();
+    th_stroke_cancel(&h);
     CHECK(!th_area_key(&h), "before the press, the key goes at once");
+}
+
+static void test_out_of_force_gives_an_area_up(void)
+{
+    // A menu or a pause: no right click, which would close the menu and which a pause would never
+    // carry, and the key not before the buttons, but both together.
+    rest_on_a_wall(0);
+    area_to_drag();
+    th_stroke_moved(&h, now);
+    th_area_give_up(&h, 1);
+    th_stroke_cancel(&h);
+    area_serve();
+    CHECK(!area_right, "no right click");
+    CHECK(!area_left && !th_area_key(&h), "the left button and the key up together");
+    area_until_the_key_goes();
+    AREA_ENDED(0, 0, 1, "applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
+    // A cancel already waiting for its packet ends the same way.
+    rest_on_a_wall(0);
+    area_to_drag();
+    th_stroke_cancel(&h);
+    area_serve();
+    th_area_give_up(&h, 1);
+    area_serve();
+    CHECK(!area_left && !area_right && !th_area_key(&h), "a waiting cancel: all up together");
+    // Before the press nothing is held.
+    rest_on_a_wall(0);
+    th_area_give_up(&h, 1);
+    CHECK(!th_area_key(&h), "the key goes at once");
+    // A lift that asked for the area: its release goes out as it would have.
+    rest_on_a_wall(0);
+    area_to_drag();
+    th_stroke_moved(&h, now);
+    th_stroke_lift(&h, 1);
+    th_area_give_up(&h, 1);
+    area_until_the_key_goes();
+    AREA_ENDED(1, 0, 0, "lift: applied %d, cancelled %d, dropped %d", area_applied, area_cancelled, area_dropped);
+    // Without the key, where the drag mode is the default, only the right click cancels.
+    rest_on_a_wall(0);
+    area_to_drag();
+    th_area_give_up(&h, 0);
+    area_serve();
+    CHECK(area_right && area_left, "unkeyed: the right click with the left button down");
 }
 
 static void test_moving_first_keeps_the_stroke_rules(void)
@@ -1169,6 +1300,30 @@ static void test_a_stroke_from_an_own_door(void)
     now += 80;
     CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Wait, "not decided before the lift");
     CHECK(th_stroke_lift(&h, 1) == ThL_Tap, "a tap on a door");
+    // With things in the hand a stroke from one is the floor's as well: they fall beyond it, and no
+    // left button is held, which would mark the walls on the way and pick up where it lifts.
+    begin(5, 0);
+    sees.door = 1;
+    sees.droppable = 0;
+    th_stroke_begin(&h, now, 0.0f, 0.0f);
+    refresh();
+    th_stroke_look(&h, &sees);
+    sees.door = 0;
+    sees.droppable = 1;
+    th_stroke_moved(&h, now + 100);
+    now += 120;
+    refresh();
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_Hand, "a hand's stroke from a door drops");
+    CHECK(th_drop_due(&h, &sees, &tuning), "beyond the door, at once");
+    // Resting on it, the game's refusal of a drop there as ever.
+    begin(5, 0);
+    sees.door = 1;
+    sees.droppable = 0;
+    th_stroke_begin(&h, now, 0.0f, 0.0f);
+    refresh();
+    th_stroke_look(&h, &sees);
+    now += 430;
+    CHECK(th_decide(&h, &sees, &tuning, now) == ThV_LongPress, "a hand resting on a door: the ordinary long press");
 }
 
 static void test_a_start_read_in_force_stays_the_hands(void)
@@ -1421,8 +1576,10 @@ int touch_hand_tests(int *total_checks)
     test_a_hold_lifted_where_it_rested_applies_nothing();
     test_a_second_finger_cancels_an_area();
     test_the_key_waits_for_the_packet_with_the_release();
-    test_a_cancel_no_packet_carries();
+    test_a_right_click_the_game_takes_elsewhere();
+    test_a_game_that_makes_no_packets();
     test_the_buttons_let_go_of_elsewhere();
+    test_out_of_force_gives_an_area_up();
     test_moving_first_keeps_the_stroke_rules();
     test_an_area_needs_a_wall_now();
     test_out_of_force_no_area();

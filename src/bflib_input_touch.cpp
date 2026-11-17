@@ -79,6 +79,13 @@ static float touch_drag_threshold_min_px = 12.0f;
 /** Safety net in case update_mouse() is not running; keeps a tap from sticking. */
 #define TOUCH_CLICK_MAX_HOLD_MS 250
 
+/**
+ * An area of walls waits for packets without a clock: a game that is only slow, a network wait or
+ * a slow frame, reads its buttons whenever it makes the next one. Waiting this long means it is not
+ * making any where the rules are in force, and the area lets go of the buttons and its key together.
+ */
+#define TOUCH_AREA_GIVE_UP_MS 2000
+
 /** Hold time in milliseconds before a motionless press becomes a right click. */
 static float touch_longpress_ms = 420.0f;
 
@@ -367,6 +374,9 @@ static struct TgTuning touch_current_tuning(void)
 static void touch_release_buttons(void)
 {
     struct TbPoint delta = {0, 0};
+    // Buttons an area holds, let go of from anywhere but its own steps: its key goes with them.
+    if (touch_keeper_area_owns_buttons())
+        touch_keeper_area_buttons_released();
     if (touch_button_down_left) {
         mouseControl(MActn_LBUTTONUP, &delta);
         touch_button_down_left = false;
@@ -382,9 +392,6 @@ static void touch_release_buttons(void)
 static void touch_reset_state(void)
 {
     touch_release_buttons();
-    // An area whose button has gone up this way is applied as a lift would, and its key lasts until
-    // the game has had that release.
-    touch_keeper_area_buttons_released();
     memset(touch_fingers, 0, sizeof(touch_fingers));
     touch_finger_count = 0;
     touch_beside_fingers = 0;
@@ -759,9 +766,10 @@ static TbBool touch_keep_panel_finger_aside(struct TouchFinger *finger)
     struct TouchFinger *other = touch_gesture_finger(finger);
     if (other == NULL)
         return false;
+    // Not beside an area of walls: a second finger cancels that, wherever it lands.
     if (finger->on_panel && !other->on_gui
      && ((touch_gesture == TGest_Point) || (touch_gesture == TGest_Hand) || (touch_gesture == TGest_LongTap)
-      || (touch_gesture == TGest_Drag) || (touch_gesture == TGest_Area)))
+      || (touch_gesture == TGest_Drag)))
     {
         finger->beside = true;
         touch_beside_fingers++;
@@ -1108,14 +1116,18 @@ static void touch_apply_pan_accumulator(void);
  */
 static void touch_serve_area(void)
 {
-    // The rules going out of force under it, a pause, a menu or the level's end, cancel it as a
-    // second finger would, and the finger does nothing more until it lifts.
-    if ((touch_gesture == TGest_Area) && !touch_keeper_in_force())
+    // The rules going out of force under it, a pause, a menu or the level's end, end it without
+    // applying it, and the finger does nothing more until it lifts.
+    if (!touch_keeper_in_force())
     {
-        touch_keeper_stroke_cancel();
-        touch_gesture = TGest_Blocked;
+        touch_keeper_area_give_up();
+        if (touch_gesture == TGest_Area)
+        {
+            touch_keeper_stroke_cancel();
+            touch_gesture = TGest_Blocked;
+        }
     }
-    switch (touch_keeper_area_step((long long)SDL_GetTicks(), (float)TOUCH_CLICK_MAX_HOLD_MS))
+    switch (touch_keeper_area_step((long long)SDL_GetTicks(), (float)TOUCH_AREA_GIVE_UP_MS))
     {
     case ThAS_PressLeft:
         touch_press_left();
@@ -1124,6 +1136,10 @@ static void touch_serve_area(void)
         touch_press_right();
         break;
     case ThAS_Release:
+        // The release reaches no packet in a pause, but the paused message reads it as a click on
+        // itself, which goes on with the game, and a finger dragging to the top edge is right there.
+        if (touch_keeper_pointer_over_pause_box())
+            touch_move_pointer(RendererPhysicalWidth() / 2, RendererPhysicalHeight() / 2);
         touch_release_buttons();
         break;
     default:

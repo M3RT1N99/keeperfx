@@ -87,9 +87,13 @@ TbBool touch_keeper_area_owns_buttons(void);
 /** See th_area_anchoring(). */
 TbBool touch_keeper_area_anchoring(void);
 /** See th_area_step(). */
-enum ThAreaStep touch_keeper_area_step(long long now, float overdue_ms);
-/** The buttons were let go of for another reason. */
+enum ThAreaStep touch_keeper_area_step(long long now, float give_up_ms);
+/** The buttons were let go of for another reason, see th_area_buttons_released(). */
 void touch_keeper_area_buttons_released(void);
+/** The rules are out of force under the area, see th_area_give_up(). */
+void touch_keeper_area_give_up(void);
+/** The game is paused and the pointer is over the paused message, where a left release goes on with the game. */
+TbBool touch_keeper_pointer_over_pause_box(void);
 
 /******************************************************************************/
 #ifdef __cplusplus

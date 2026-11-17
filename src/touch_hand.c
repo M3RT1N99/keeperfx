@@ -56,7 +56,10 @@ enum ThPhase {
  * the key's action, which a press in the same packet could miss when another action took the
  * packet; the key, held on until a packet has carried the release, since a release read without
  * it would be a plain one and apply nothing; and the release after a cancel for the packet that
- * carried the right click with the left button still down, which is what cancels.
+ * carried the right click with the left button still down, which is what cancels. The key is never
+ * let go of while the left button is down: the game would read the rest of the drag in the single
+ * mode, which marks the slab under the pointer. Where no right click can cancel, the buttons and the
+ * key go up together, a release read in the single mode, which applies nothing either.
  */
 enum ThAreaPhase {
     ThA_None = 0,
@@ -65,7 +68,8 @@ enum ThAreaPhase {
     ThA_Pressing,    /**< The left button is down where the finger rested, until a packet has carried it. */
     ThA_Drag,        /**< The game drags the area from there to the pointer. */
     ThA_CancelDue,
-    ThA_Cancel,      /**< The right button is down beside it, until a packet has carried both. */
+    ThA_Cancel,      /**< The right button is down beside it, until the next packet, which carries both or never will. */
+    ThA_DropDue,     /**< Given up on: the buttons and the key go up together. */
     ThA_ReleaseDue,
     ThA_Release,     /**< The buttons are up, and the key waits for a packet without the left button held. */
 };
@@ -221,9 +225,10 @@ static void th_read_start(struct ThHand *h, const struct ThSees *s)
     k->looked = 1;
     k->start_empty = (unsigned char)(th_will_hold(h, s) <= 0);
     k->start_wall = (unsigned char)s->wall;
-    k->start_door = (unsigned char)s->door;
-    // A tap on an own door still locks it: a tap is a left click wherever it lands.
-    k->open = (unsigned char)(k->start_empty ? !s->wall : s->droppable);
+    // A tap on an own door still locks it: a tap is a left click wherever it lands. A stroke from one
+    // is a stroke from the floor, with things in the hand too: they fall beyond it, and a left button
+    // held from there would mark the walls the hand passes and pick up where it lifts.
+    k->open = (unsigned char)(k->start_empty ? !s->wall : (s->droppable || s->door));
 }
 
 void th_stroke_look(struct ThHand *h, const struct ThSees *s)
@@ -490,7 +495,7 @@ int th_area_anchoring(const struct ThHand *h)
     return (h->area == ThA_Key) || (h->area == ThA_PressDue) || (h->area == ThA_Pressing);
 }
 
-enum ThAreaStep th_area_step(struct ThHand *h, long long now, float overdue_ms)
+enum ThAreaStep th_area_step(struct ThHand *h, long long now, float give_up_ms)
 {
     switch (h->area)
     {
@@ -502,12 +507,22 @@ enum ThAreaStep th_area_step(struct ThHand *h, long long now, float overdue_ms)
         h->area_ms = now;
         return ThAS_PressRight;
     case ThA_Cancel:
-        if ((float)(now - h->area_ms) <= overdue_ms)
+        // A game that is only slow reads the right click whenever it makes its next packet, so
+        // only one that has stopped making them for this long is given up on.
+        if ((float)(now - h->area_ms) <= give_up_ms)
             return ThAS_None;
         // fall through
+    case ThA_DropDue:
+        h->area = ThA_None;
+        return ThAS_Release;
     case ThA_ReleaseDue:
         h->area = ThA_Release;
+        h->area_ms = now;
         return ThAS_Release;
+    case ThA_Release:
+        if ((float)(now - h->area_ms) > give_up_ms)
+            h->area = ThA_None;
+        return ThAS_None;
     default:
         return ThAS_None;
     }
@@ -526,8 +541,10 @@ void th_note_area_packet(struct ThHand *h, int area_mode, int left_held, int rig
             h->area = ThA_Drag;
         break;
     case ThA_Cancel:
-        if (right_click && left_held)
-            h->area = ThA_ReleaseDue;
+        // The first packet after the right press carries it, unless something else took the click:
+        // the reset of TAG_MODE_TOGGLING, the panel, a pause, which carries no buttons at all. Then no
+        // packet ever will, and waiting on would only let go of the buttons with the key still held.
+        h->area = (right_click && left_held) ? ThA_ReleaseDue : ThA_DropDue;
         break;
     case ThA_Release:
         if (!left_held)
@@ -540,10 +557,22 @@ void th_note_area_packet(struct ThHand *h, int area_mode, int left_held, int rig
 
 void th_area_buttons_released(struct ThHand *h)
 {
+    // Only the release a lift asked for keeps the key, for the packet that carries it.
+    if ((h->area != ThA_ReleaseDue) && (h->area != ThA_Release))
+        h->area = ThA_None;
+}
+
+void th_area_give_up(struct ThHand *h, int keyed)
+{
+    if (!keyed) {
+        // Nothing to let go of with the buttons: only the right click cancels.
+        th_area_abandon(h);
+        return;
+    }
     if ((h->area == ThA_Key) || (h->area == ThA_PressDue))
         h->area = ThA_None;
-    else if (h->area != ThA_None)
-        h->area = ThA_Release;
+    else if ((h->area >= ThA_Pressing) && (h->area <= ThA_Cancel))
+        h->area = ThA_DropDue;
 }
 
 /******************************************************************************/

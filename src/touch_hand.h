@@ -82,7 +82,7 @@ enum ThAreaStep {
     ThAS_None = 0,
     ThAS_PressLeft,  /**< The game has had the key: the left button goes down where the finger rests, and anchors the area there. */
     ThAS_PressRight, /**< A right click while the left button is down cancels an area, as it does on a computer. */
-    ThAS_Release,    /**< Both buttons go up. After a move that applies the area, after a cancel nothing. */
+    ThAS_Release,    /**< Both buttons go up. After a move that applies the area, after a cancel or with the key nothing. */
 };
 
 /** One right click or pick up on its way through the input lag. */
@@ -104,7 +104,6 @@ struct ThStroke {
     unsigned char read_start;    /**< What it landed on is known. */
     unsigned char start_empty;   /**< It landed with nothing that will be in the hand. */
     unsigned char start_wall;    /**< It landed where a left button presses the pick axe. */
-    unsigned char start_door;    /**< It landed on an own door. */
     unsigned char open;          /**< It landed where the rules apply. */
     unsigned char moved;         /**< It has travelled further than a tap may. */
     unsigned char swipe;         /**< It was quick, with an empty hand: it slaps what it crosses. */
@@ -132,7 +131,7 @@ struct ThHand {
     struct ThStroke stroke;
     struct ThAim aim;            /**< Kept past the lift: a flick's slap goes out once the finger is gone. */
     unsigned char area;          /**< Where the area of walls is, see touch_hand.c. Kept past the lift, until the game has the release. */
-    long long area_ms;           /**< When its right press went down. */
+    long long area_ms;           /**< When its right press went down, or its buttons up after a lift. */
 };
 
 void th_reset(struct ThHand *h);
@@ -233,18 +232,31 @@ int th_area_owns_buttons(const struct ThHand *h);
 /** The pointer stays where the finger rested until a packet has carried the press that anchors the area there. */
 int th_area_anchoring(const struct ThHand *h);
 /**
- * What the area asks of the buttons now, each step once. @param overdue_ms A right press that no
- * packet has carried by then is given up on, since the game is not making any: a pause carries none.
+ * What the area asks of the buttons now, each step once. @param give_up_ms A last resort: a right
+ * press or a key no packet has followed for this long, while the game is meant to make one every
+ * turn, is given up on, the buttons and the key together.
  */
-enum ThAreaStep th_area_step(struct ThHand *h, long long now, float overdue_ms);
+enum ThAreaStep th_area_step(struct ThHand *h, long long now, float give_up_ms);
 /**
  * What the turn's packet carries for the area, once it is complete.
  * @param area_mode It makes a left button drag an area: it carries the key's action, or the
  *     game's own default does that by itself.
+ * After a right press the first packet decides: one that has not carried it with the left button
+ * held never will, and the buttons and the key go up together.
  */
 void th_note_area_packet(struct ThHand *h, int area_mode, int left_held, int right_click);
-/** The buttons were let go of for another reason: the key waits for a packet with the release. */
+/**
+ * The buttons were let go of for another reason, a reset of the touch layer or another click: the key
+ * goes with them, so that the release applies nothing, unless a lift had asked for it already.
+ */
 void th_area_buttons_released(struct ThHand *h);
+/**
+ * The rules went out of force under the area: a pause, a menu, the level's end. A right click would
+ * close a menu, and a pause carries no click at all, so where the key is held, @p keyed, the buttons
+ * and the key go up together; without the key, where the drag mode is the default, only the right
+ * click cancels. A release a lift asked for goes out as it would have.
+ */
+void th_area_give_up(struct ThHand *h, int keyed);
 
 /******************************************************************************/
 #ifdef __cplusplus
