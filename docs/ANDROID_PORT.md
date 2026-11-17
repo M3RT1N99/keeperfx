@@ -320,8 +320,8 @@ a quick finger crosses a creature between two frames. So `touch_keeper_stroke_pa
 the finger's path itself: points no further apart than half a subtile on the floor, each
 mapped to the floor the way the grip maps fingers, each asked the game's own question for the
 thing under the hand (`get_nearest_thing_for_hand_or_slap()`), which only reads. A creature
-found there gets its slap at the pixel through which the game points at the floor under it,
-since the point of the path that found it can be at the far edge of the hand's reach: the pointer goes there, and once a frame
+found there gets its slap at its own place on the screen, since the point of the path that
+found it can be at the far edge of the hand's reach: the pointer goes there, and once a frame
 has been drawn with it there the right click goes out, but only when the game then reports an
 own creature to slap under the hand. A right click with an empty hand also takes a dig mark off
 a wall, and the top of a wall beside a creature is where a pointer aimed at it can land. Zoomed
