@@ -209,7 +209,7 @@
     <string name="input_auto">Automatisk — følg enheten som sist ble brukt</string>
     <string name="input_touch">Berøring — bruk alltid berøringsstyring</string>
     <string name="input_pointer">Mus &amp; tastatur — ignorer berøringsskjermen</string>
-    <string name="input_gestures">Trykk = venstreklikk · hold = høyreklikk · dra = marker område · med vesener i hånden: hold eller dra = de faller under fingeren ett om gangen · raskt strøk med tom hånd = gir vesenene det krysser et slag · to fingre = panorer, knip for å zoome, vri for å rotere · trykk med to fingre = høyreklikk · trykk med tre fingre = tilbake (kartet har sin egen panelknapp)\n\nMed systemets tilbakeknapp og tilbakebevegelsen forlater du også en meny. På skjermen: en tilbakepil.</string>
+    <string name="input_gestures">Trykk = venstreklikk · hold = høyreklikk · dra = marker område (for graving: start på en vegg) · med vesener i hånden: hold eller dra = de faller under fingeren ett om gangen · raskt strøk med tom hånd = gir vesenene det krysser et slag · to fingre = panorer, knip for å zoome, vri for å rotere · trykk med to fingre = høyreklikk · trykk med tre fingre = tilbake (kartet har sin egen panelknapp)\n\nMed systemets tilbakeknapp og tilbakebevegelsen forlater du også en meny. På skjermen: en tilbakepil.</string>
     <string name="option_back_button">Vis skjermknappene under spillet</string>
     <string name="game_back">Tilbake</string>
     <string name="settings_data">Spilldata</string>

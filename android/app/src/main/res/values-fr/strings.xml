@@ -209,7 +209,7 @@
     <string name="input_auto">Automatique — selon le dernier périphérique utilisé</string>
     <string name="input_touch">Tactile — toujours utiliser les commandes tactiles</string>
     <string name="input_pointer">Souris et clavier — ignorer l’écran tactile</string>
-    <string name="input_gestures">Appui = clic gauche · appui long = clic droit · glisser = marquer une zone · avec des créatures en main : appui long ou glisser = elles tombent sous le doigt l’une après l’autre · trait rapide main vide = gifle les créatures qu’il croise · deux doigts = déplacer, pincer pour zoomer, pivoter pour tourner · appui à deux doigts = clic droit · appui à trois doigts = retour (la carte a son propre bouton sur le panneau)\n\nLe bouton Retour du système et le geste de retour permettent aussi de quitter un menu. À l’écran : une flèche de retour.</string>
+    <string name="input_gestures">Appui = clic gauche · appui long = clic droit · glisser = marquer une zone (pour creuser, commencer sur un mur) · avec des créatures en main : appui long ou glisser = elles tombent sous le doigt l’une après l’autre · trait rapide main vide = gifle les créatures qu’il croise · deux doigts = déplacer, pincer pour zoomer, pivoter pour tourner · appui à deux doigts = clic droit · appui à trois doigts = retour (la carte a son propre bouton sur le panneau)\n\nLe bouton Retour du système et le geste de retour permettent aussi de quitter un menu. À l’écran : une flèche de retour.</string>
     <string name="option_back_button">Afficher les boutons à l’écran pendant le jeu</string>
     <string name="game_back">Retour</string>
     <string name="settings_data">Données du jeu</string>
